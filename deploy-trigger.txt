@@ -1,0 +1,3 @@
+FTP deploy test trigger
+Stand: v37
+Hinweis: Diese Datei dient nur zum Auslösen des GitHub-Actions-FTP-Deployments.
