@@ -343,7 +343,7 @@ tr.sel { background: rgba(255,90,0,.1); }
    ══════════════════════════════ */
 .bottom {
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 4px;
   min-height: 160px;
   max-height: 260px;
