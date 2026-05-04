@@ -1,0 +1,100 @@
+{
+  "name": "ABB KR8 / RobSimul v37 Zielwerte",
+  "joints": [
+    {
+      "name": "A1",
+      "axis": "Rz",
+      "offset": {
+        "x": 175,
+        "y": 0,
+        "z": 495
+      },
+      "min": -180,
+      "max": 180
+    },
+    {
+      "name": "A2",
+      "axis": "Ry",
+      "offset": {
+        "x": 1095,
+        "y": 0,
+        "z": 0
+      },
+      "min": -90,
+      "max": 150
+    },
+    {
+      "name": "A3",
+      "axis": "Ry",
+      "offset": {
+        "x": 0,
+        "y": 0,
+        "z": 175
+      },
+      "min": -180,
+      "max": 75
+    },
+    {
+      "name": "A4",
+      "axis": "Rx",
+      "offset": {
+        "x": 1270,
+        "y": 0,
+        "z": 0
+      },
+      "min": -179,
+      "max": 179
+    },
+    {
+      "name": "A5",
+      "axis": "Ry",
+      "offset": {
+        "x": 135,
+        "y": 0,
+        "z": 0
+      },
+      "min": -125,
+      "max": 120
+    },
+    {
+      "name": "A6",
+      "axis": "Rx",
+      "offset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "min": -179,
+      "max": 179
+    }
+  ],
+  "stlRefAngles": [
+    0,
+    -90,
+    90,
+    0,
+    0,
+    0
+  ],
+  "note": "v37: Drehpunkte, Drehrichtungen, Gimbal, Parameter und JSON nutzen immer das fachliche 0°-Koordinatensystem. STL-/Roboter-Transformation wird dafür nicht berücksichtigt.",
+  "sceneModels": {
+    "pedestal": {
+      "px": 0,
+      "py": 0,
+      "pz": 0,
+      "rx": 0,
+      "ry": 0,
+      "rz": 0,
+      "name": "podest"
+    },
+    "tool": {
+      "px": 0,
+      "py": 0,
+      "pz": 0,
+      "rx": 0,
+      "ry": 0,
+      "rz": 0,
+      "name": "tool1_tcp"
+    }
+  }
+}
