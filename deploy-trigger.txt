@@ -1,3 +1,3 @@
 FTP deploy test trigger
 Stand: v37
-Test: Secrets wurden gesetzt, erneuter GitHub-Actions-Lauf.
+Test: FTP-Zielordner wurde angelegt, erneuter Deploy-Lauf.
