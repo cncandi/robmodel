@@ -22,6 +22,7 @@
       <label class="filebtn" for="jsonInput">JSON laden</label><input id="jsonInput" type="file" accept=".json,application/json">
       <button id="demoBtn">Demo</button>
       <button id="downloadJson" disabled>JSON</button><button id="downloadZip" class="orange" disabled>save</button>
+      <button id="btnTheme" title="Hintergrund wechseln">&#x25D1; Hintergrund</button>
     </div>
   </header>
 
@@ -85,9 +86,8 @@
   </main>
 
   <footer class="bottom">
-    <section class="panel"><h2 style="font-size:14px;margin:0 0 6px">Parameter / Drehpunkte 0°</h2><table><thead><tr><th>A</th><th>A=</th><th>Dreht</th><th>X</th><th>Y</th><th>Z</th><th>Min</th><th>Max</th><th>+/-</th><th>Sim</th></tr></thead><tbody id="jointRows"></tbody></table></section>
-    <section class="panel"><h2 style="font-size:14px;margin:0 0 6px">STL / Package</h2><table><thead><tr><th>✓</th><th>Datei</th><th>Teil</th><th>Größe</th></tr></thead><tbody id="stlRows"></tbody></table></section>
-    <section class="panel"><h2 style="font-size:14px;margin:0 0 6px">JSON</h2><pre class="json" id="jsonPreview"></pre></section>
+    <section class="panel"><h2>Parameter / Drehpunkte 0°</h2><table><thead><tr><th>A</th><th>A=</th><th>Dreht</th><th>X</th><th>Y</th><th>Z</th><th>Min</th><th>Max</th><th>+/-</th><th>Sim</th></tr></thead><tbody id="jointRows"></tbody></table></section>
+    <section class="panel"><h2>STL / Package</h2><table><thead><tr><th>✓</th><th>Datei</th><th>Teil</th><th>Größe</th></tr></thead><tbody id="stlRows"></tbody></table></section>
   </footer>
 </div>
 
@@ -126,7 +126,7 @@ const state={files:[],stls:[],xmls:[],jsons:[],buffers:new Map(),robotName:'',ac
 let scene,camera,renderer,controls,grid,robotGroup,toolGroup,tcpMarker,axisPointGroup,axisLine,transformControls,raycaster,mouse;const meshes=new Map(),axisMeshes=[],axisPivotGroups=[],loader=new STLLoader();
 init3d();renderAll();animate();
 
-function init3d(){const canvas=$('viewer');renderer=new THREE.WebGLRenderer({canvas,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));scene=new THREE.Scene();scene.background=new THREE.Color(0xeef2f7);camera=new THREE.PerspectiveCamera(45,1,1,100000);camera.position.set(1600,-2200,1300);camera.up.set(0,0,1);controls=new OrbitControls(camera,canvas);controls.enablePan=true;controls.screenSpacePanning=true;controls.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};canvas.addEventListener('contextmenu',e=>e.preventDefault());canvas.addEventListener('auxclick',e=>{if(e.button===1){e.preventDefault();e.stopPropagation();}},true);canvas.addEventListener('mousedown',e=>{if(e.button===1){e.preventDefault();}},true);controls.target.set(450,0,550);controls.update();scene.add(new THREE.HemisphereLight(0xffffff,0x94a3b8,2.4));const d=new THREE.DirectionalLight(0xffffff,2.1);d.position.set(1500,-2000,2500);scene.add(d);grid=new THREE.GridHelper(4000,40,0x64748b,0xcbd5e1);grid.rotation.x=Math.PI/2;scene.add(grid);scene.add(new THREE.AxesHelper(900));robotGroup=new THREE.Group();toolGroup=new THREE.Group();scene.add(robotGroup,toolGroup);axisPointGroup=new THREE.Group();scene.add(axisPointGroup);raycaster=new THREE.Raycaster();mouse=new THREE.Vector2();transformControls=new TransformControls(camera,renderer.domElement);transformControls.addEventListener('dragging-changed',e=>controls.enabled=!e.value);transformControls.addEventListener('objectChange',onAxisObjectMoved);scene.add(transformControls);renderer.domElement.addEventListener('pointerdown',pickAxisPoint);tcpMarker=new THREE.Group();tcpMarker.add(new THREE.Mesh(new THREE.SphereGeometry(28,20,12),new THREE.MeshStandardMaterial({color:'#8b5cf6',emissive:'#7c3aed',emissiveIntensity:.3})));tcpMarker.visible=false;toolGroup.add(tcpMarker);new ResizeObserver(resize).observe(canvas.parentElement);resize();setTimeout(()=>setView('iso'),0)}
+function init3d(){const canvas=$('viewer');renderer=new THREE.WebGLRenderer({canvas,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));scene=new THREE.Scene();scene.background=new THREE.Color(0x050b14);camera=new THREE.PerspectiveCamera(45,1,1,100000);camera.position.set(1600,-2200,1300);camera.up.set(0,0,1);controls=new OrbitControls(camera,canvas);controls.enablePan=true;controls.screenSpacePanning=true;controls.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};canvas.addEventListener('contextmenu',e=>e.preventDefault());canvas.addEventListener('auxclick',e=>{if(e.button===1){e.preventDefault();e.stopPropagation();}},true);canvas.addEventListener('mousedown',e=>{if(e.button===1){e.preventDefault();}},true);controls.target.set(450,0,550);controls.update();scene.add(new THREE.HemisphereLight(0xffffff,0x94a3b8,2.4));const d=new THREE.DirectionalLight(0xffffff,2.1);d.position.set(1500,-2000,2500);scene.add(d);grid=new THREE.GridHelper(4000,40,0x1b3454,0x0f2038);grid.rotation.x=Math.PI/2;scene.add(grid);scene.add(new THREE.AxesHelper(900));robotGroup=new THREE.Group();toolGroup=new THREE.Group();scene.add(robotGroup,toolGroup);axisPointGroup=new THREE.Group();scene.add(axisPointGroup);raycaster=new THREE.Raycaster();mouse=new THREE.Vector2();transformControls=new TransformControls(camera,renderer.domElement);transformControls.addEventListener('dragging-changed',e=>controls.enabled=!e.value);transformControls.addEventListener('objectChange',onAxisObjectMoved);scene.add(transformControls);renderer.domElement.addEventListener('pointerdown',pickAxisPoint);tcpMarker=new THREE.Group();tcpMarker.add(new THREE.Mesh(new THREE.SphereGeometry(28,20,12),new THREE.MeshStandardMaterial({color:'#8b5cf6',emissive:'#7c3aed',emissiveIntensity:.3})));tcpMarker.visible=false;toolGroup.add(tcpMarker);new ResizeObserver(resize).observe(canvas.parentElement);resize();setTimeout(()=>setView('iso'),0)}
 function resize(){const r=$('viewer').parentElement.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix()}
 function animate(){requestAnimationFrame(animate);renderer.render(scene,camera)}
 function resetView(){setView('iso')}
@@ -617,7 +617,7 @@ function simulateAxis(axisIndex){
 }
 function renderRows(){$('jointRows').innerHTML=state.joints.map((j,i)=>`<tr data-param-row="${i}" class="${i===state.selectedAxis?'sel':''}"><td>${esc(j.name)}</td><td><input class="angleInput" data-joint-angle="${i}" type="number" step="0.1" value="${state.jointAngles?.[i]??0}"></td><td><span class="axisDir">${axisDirectionLabel(i)}</span></td><td><input data-j="${i}" data-f="x" value="${j.offset?.x??''}"></td><td><input data-j="${i}" data-f="y" value="${j.offset?.y??''}"></td><td><input data-j="${i}" data-f="z" value="${j.offset?.z??''}"></td><td><input data-j="${i}" data-f="min" value="${j.min??''}"></td><td><input data-j="${i}" data-f="max" value="${j.max??''}"></td><td><select class="dirSel" data-j="${i}" data-f="rotationSign"><option value="1" ${(num(j.rotationSign)??1)>=0?'selected':''}>+</option><option value="-1" ${(num(j.rotationSign)??1)<0?'selected':''}>-</option></select></td><td><button class="simBtn" data-sim-axis="${i}">Sim</button></td></tr>`).join('');$('stlRows').innerHTML=state.stls.map(f=>`<tr><td><input type="checkbox" data-vis="${esc(f.path)}" checked></td><td>${esc(f.name)}</td><td>${isTool(f)?'Tool':partKey(f.name)}</td><td>${fmt(f.size)}</td></tr>`).join('')}
 function renderTcp(){qsa('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===state.activeTcp));const tcp=state.tcp[state.activeTcp];qsa('[data-tcp]').forEach(i=>i.value=tcp?.[i.dataset.tcp]??'');const x=num(tcp?.x),y=num(tcp?.y),z=num(tcp?.z);tcpMarker.visible=x!==null||y!==null||z!==null;tcpMarker.position.set(x||0,y||0,z||0)}
-function renderJson(){$('jsonPreview').textContent=JSON.stringify(buildJson(),null,2)}
+function renderJson(){/* JSON-Panel entfernt */}
 function renderIssues(){const issues=[];if(state.mode==='package')issues.push(...packageIssues());else{if(!state.files.length)issues.push(['warn','Keine Datei geladen.']);if(!state.xmls.length)issues.push(['warn','XML-Datei fehlt.']);if(!state.stls.length)issues.push(['warn','STL-Dateien fehlen.']);if(!state.tcp.auftragen.toolStl)issues.push(['warn','Tool-STL konnte nicht eindeutig zugeordnet werden.']);if(!state.axisPoints.some(p=>String(p.source).includes('XML')))issues.push(['warn','AxisA*Pos Rotationspunkte wurden nicht aus XML gelesen.']);if([state.tcp.auftragen.rz,state.tcp.auftragen.ry,state.tcp.auftragen.rx].some(v=>{const n=num(v);return n!==null&&Math.abs(n)>0&&Math.abs(n)<1;}))issues.push(['warn',`TCP-Orientierung enthält ungültige Fraction-Werte; bitte ToolOrientation prüfen.`]);state.joints.forEach(j=>{if(j.offset?.x===null||j.offset?.y===null||j.offset?.z===null)issues.push(['warn',`${j.name}: Offset prüfen.`]);if(j.min===null||j.max===null)issues.push(['warn',`${j.name}: Endschalter prüfen.`])})}if(state.files.length){
   issues.push(['ok','A0 ist fest auf X0 / Y0 / Z0 gesetzt.']);issues.push(['ok','v37: Drehpunkte, Drehrichtungen, Gimbal, Parameter und JSON laufen immer im 0°-Koordinatensystem. Die STL-Rotation wird dafür ignoriert. Zielwerte: A1 175/0/495, A2 1095/0/0, A3 0/0/175, A4 1270/0/0, A5 135/0/0, A6 0/0/0.']);
   issues.push(['warn','STL-Ausgabe: Transformierte/geänderte STL-Dateien werden neu geschrieben.']);
@@ -722,6 +722,19 @@ function setView(view){
   controls.update();
   document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
 }
+
+// ── Theme Toggle ──
+const _themes=['dark','bg-white','bg-minimal','bg-win11','bg-deep','bg-vivid'];
+const _bgColors={dark:0x050b14,'bg-white':0xdce4ee,'bg-minimal':0xcccccc,'bg-win11':0xd8e4f4,'bg-deep':0x000408,'bg-vivid':0x0d0518};
+let _themeIdx=0;
+document.getElementById('btnTheme').addEventListener('click',()=>{
+  _themes.forEach(t=>document.body.classList.remove(t));
+  _themeIdx=(_themeIdx+1)%_themes.length;
+  const t=_themes[_themeIdx];
+  if(t!=='dark')document.body.classList.add(t);
+  if(scene)scene.background=new THREE.Color(_bgColors[t]||0x050b14);
+  if(grid){const gc=t==='dark'||t==='bg-deep'?0x1b3454:t==='bg-vivid'?0x4a2080:0x888888;grid.material&&(grid.material.color?.set(gc));}
+});
 
 $('newBtn').onclick=newProject;$('jsonInput').addEventListener('change',e=>e.target.files[0]&&loadJsonFile(e.target.files[0]));
 $('sourceZip').addEventListener('change',e=>e.target.files[0]&&loadSourceZip(e.target.files[0]).catch(err=>alert(err.message)));
