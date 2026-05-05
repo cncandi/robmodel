@@ -747,6 +747,4 @@ document.addEventListener('click',e=>{const t=e.target;const row=t.closest?.('[d
 const dz=$('dropZone');['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.style.outline='3px solid #2563eb'}));['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.style.outline='none'}));dz.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)loadSourceZip(f)});
 </script>
 </body>
-  <script type="module" src="app.js"></script>
-</body>
 </html>
