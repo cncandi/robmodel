@@ -120,7 +120,7 @@ const state={files:[],stls:[],xmls:[],jsons:[],buffers:new Map(),robotName:'',ac
   tcp:{auftragen:{x:null,y:null,z:null,rz:null,ry:null,rx:null,toolLength:0,toolStl:'',status:'manuell'},abtragen:{x:null,y:null,z:null,rz:null,ry:null,rx:null,toolLength:0,toolStl:'',status:'manuell'}}
 };
 let scene,camera,renderer,controls,grid,robotGroup,toolGroup,tcpMarker,axisPointGroup,axisLine,transformControls,raycaster,mouse;const meshes=new Map(),axisMeshes=[],axisPivotGroups=[],loader=new STLLoader();
-init3d();renderAll();animate();
+init3d();demo();animate();
 
 window.addEventListener('error', e => {
   const el = document.getElementById('viewer');
