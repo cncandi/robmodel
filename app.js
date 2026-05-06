@@ -20,11 +20,11 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 
 // ── KR8-Zielwerte (default) ───────────────────────────────────────
 const KR8_TARGET = [
-  { x: 175,  y: 0, z: 495  },  // A1 Rz
-  { x: 0,    y: 0, z: 1095 },  // A2 Ry
-  { x: 0,    y: 0, z: 175  },  // A3 Ry
-  { x: 1270, y: 0, z: 0    },  // A4 Rx
-  { x: 185,  y: 0, z: 0    },  // A5 Ry
+  { x: 450,  y: 0, z: 150  },  // A1 Rz  — Display X=Three.Z(oben), Display Z=Three.X(horiz)
+  { x: 0,    y: 0, z: 610  },  // A2 Ry
+  { x: 200,  y: 0, z: 0    },  // A3 Ry
+  { x: 0,    y: 0, z: 630  },  // A4 Rx
+  { x: 0,    y: 0, z: 80   },  // A5 Ry
   { x: 0,    y: 0, z: 0    },  // A6 Rx
 ];
 function defOffset(i) { return { ...KR8_TARGET[i] }; }
@@ -43,14 +43,14 @@ const state = {
   activeTcp: 'auftragen',
   axisPoints: ['A1','A2','A3','A4','A5','A6'].map((name, i) => ({ name, ...defOffset(i), rx: 0, ry: 0, rz: 0, source: 'KR8 Zielwert' })),
   selectedAxis: 0,
-  jointAngles: [0, 0, 0, 0, 0, 0],
+  jointAngles: [0, -90, 90, 0, 0, 0],  // Referenzpose beim Start
   simulation: { active: false, axis: null, raf: null },
   joints: ['A1','A2','A3','A4','A5','A6'].map((n, i) => ({
     name: n,
     axis: ['Rz','Ry','Ry','Rx','Ry','Rx'][i],
     offset: defOffset(i),
     min: null, max: null,
-    rotationSign: 1, status: 'KR8 Zielwert'
+    rotationSign: [-1,1,1,-1,1,-1][i], status: 'KR8 Zielwert'
   })),
   tcp: {
     auftragen: { x: null, y: null, z: null, rz: null, ry: null, rx: null, toolLength: 0, toolStl: '', status: 'manuell' },
@@ -208,13 +208,19 @@ function nominalAxisVec(i)   { return ['z','y','y','x','y','x'][i] || 'z'; }
 function axisDirectionLabel(i) { return fixedAxisType(i) + ' · ' + nominalAxisVec(i).toUpperCase(); }
 
 function cumulativeAxisPositions() {
-  // A1/A2: direkt X→Three.X, Z→Three.Z
-  // A3+:   X↔Z getauscht (A2 Ry-Referenzpose dreht lokales CS)
-  let x = 0, y = 0, z = 0;
-  return state.axisPoints.map(p => {
-    x += num(p.x)||0; y += num(p.y)||0; z += num(p.z)||0;
-    return new THREE.Vector3(x, y, z);
-  });
+  // Exakt wie RobSimul: pivot[0]=(0,0,0), pivot[i] bei off[i-1]
+  // Display X-Spalte (p.x) → Three.Z (oben)
+  // Display Z-Spalte (p.z) → Three.X (horizontal)
+  let x=0, y=0, z=0;
+  const pts = [new THREE.Vector3(0,0,0)]; // pivot[0] immer Ursprung
+  for (let i=0; i<5; i++) {
+    const p = state.axisPoints[i];
+    x += num(p.z)||0;  // Display Z → Three.X
+    y += num(p.y)||0;
+    z += num(p.x)||0;  // Display X → Three.Z
+    pts.push(new THREE.Vector3(x,y,z));
+  }
+  return pts; // 6 Positionen für pivot[0..5]
 }
 
 function syncJointsFromAxisPoints() {
@@ -258,17 +264,16 @@ function rebuildRobotKinematics() {
 }
 
 function applyJointRotations() {
-  // Lokale Rotation wie RobSimul updatePivotRotations:
-  // Jedes Pivot dreht um seine EIGENE lokale Achse — keine Weltachsen-Umrechnung.
-  const refPose = parseReferencePose();
+  // Exakt wie RobSimul updatePivotRotations:
+  // Mechanischer Winkel direkt (keine Referenzpose-Subtraktion)
+  const r = Math.PI / 180;
   axisPivotGroups.forEach((g, i) => {
-    const ref   = refPose[i] || 0;
-    const angle = deg(((state.jointAngles[i] || 0) - ref) * (num(state.joints[i]?.rotationSign) ?? 1));
+    const a = (state.jointAngles[i] || 0) * (num(state.joints[i]?.rotationSign) ?? 1) * r;
     const v = nominalAxisVec(i);
     g.rotation.set(0, 0, 0);
-    if      (v === 'x') g.rotation.x = angle;
-    else if (v === 'y') g.rotation.y = angle;
-    else                g.rotation.z = angle;
+    if      (v === 'x') g.rotation.x = a;
+    else if (v === 'y') g.rotation.y = a;
+    else                g.rotation.z = a;
   });
   scene.updateMatrixWorld(true);
 }
@@ -298,31 +303,27 @@ function updateAxisPointVisuals() {
   if (!axisPointGroup) return;
   clearAxisPointVisuals();
   const pts = cumulativeAxisPositions();
-  // Viewport-Labels: Ursprung = A1, pts[0]=A2 … pts[4]=A6.
-  // pts[5] (A6-Offset 0,0,0) wird nicht separat visualisiert.
-  const ptsWithOrigin = [new THREE.Vector3(0,0,0), ...pts.slice(0,5)];
+  // Alle 6 Pivots als Kugeln A1-A6 (pts[0]=A1 Ursprung, pts[1..5]=A2..A6)
   const sphereGeo = new THREE.SphereGeometry(45, 24, 16);
 
-  // A1 am Ursprung
-  const a1Origin = new THREE.Mesh(sphereGeo.clone(), new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
-  a1Origin.name = 'A1 Ursprung';
-  axisPointGroup.add(a1Origin, makeAxisLabel('A1', new THREE.Vector3(0,0,85)));
-
-  pts.slice(0,5).forEach((p, i) => {
-    const label = 'A' + (i + 2);   // A2 … A6
+  pts.forEach((p, i) => {
+    const label = 'A' + (i + 1);
+    const isOrigin = i === 0;
     const mat = new THREE.MeshStandardMaterial({
-      color: i === state.selectedAxis ? 0x2563eb : 0xf59e0b,
-      emissive: i === state.selectedAxis ? 0x0f3b85 : 0x7c2d12, emissiveIntensity: .15
+      color: isOrigin ? 0x94a3b8 : (i-1 === state.selectedAxis ? 0x2563eb : 0xf59e0b),
+      emissive: i-1 === state.selectedAxis ? 0x0f3b85 : 0x7c2d12, emissiveIntensity: isOrigin ? 0 : .15
     });
     const mesh = new THREE.Mesh(sphereGeo.clone(), mat);
-    mesh.position.copy(p); mesh.userData.axisIndex = i; mesh.name = label;
+    mesh.position.copy(p);
+    mesh.userData.axisIndex = i - 1;
+    mesh.name = label;
     axisPointGroup.add(mesh, makeAxisLabel(label, p.clone().add(new THREE.Vector3(0,0,85))));
-    axisMeshes.push(mesh);
+    if (!isOrigin) axisMeshes.push(mesh);
   });
 
-  if (ptsWithOrigin.length > 1) {
+  if (pts.length > 1) {
     axisLine = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(ptsWithOrigin),
+      new THREE.BufferGeometry().setFromPoints(pts),
       new THREE.LineBasicMaterial({ color: 0xff8a00, linewidth: 2 })
     );
     axisPointGroup.add(axisLine);
@@ -381,11 +382,11 @@ function updateCSHelper() {
   const pos = pts[state.selectedAxis] || new THREE.Vector3();
   const L = 380;   // Pfeillänge mm
   const H = 30;    // Pfeilkopf
-  // Weltachsen: X=rot (horizontal), Y=grün, Z=blau (oben)
+  // Display X-Spalte = Three.Z (oben), Display Z-Spalte = Three.X (horizontal)
   const axes = [
-    { dir: new THREE.Vector3(1,0,0), color: 0xff2222, label: 'X' },
-    { dir: new THREE.Vector3(0,1,0), color: 0x22dd22, label: 'Y' },
-    { dir: new THREE.Vector3(0,0,1), color: 0x2288ff, label: 'Z' },
+    { dir: new THREE.Vector3(0,0,1), color: 0xff3333, label: 'X' },  // X → oben
+    { dir: new THREE.Vector3(0,1,0), color: 0x33dd33, label: 'Y' },
+    { dir: new THREE.Vector3(1,0,0), color: 0x3388ff, label: 'Z' },  // Z → horizontal
   ];
   axes.forEach(({ dir, color, label }) => {
     const arrow = new THREE.ArrowHelper(dir, pos, L, color, H, H * 0.6);
