@@ -177,12 +177,12 @@ function clearGroup(g){while(g.children.length){g.remove(g.children[0]);}}
 function rebuildRobotKinematics(){
   clearGroup(robotGroup);clearGroup(toolGroup);axisPivotGroups.length=0;
   toolGroup.add(tcpMarker);
-  const pts=cumulativeAxisPositions();
+  const pivots=jointPivotPositions();
   for(let i=0;i<6;i++){
     const g=new THREE.Group();g.name='Pivot '+(i+1);g.userData.axisIndex=i;
     axisPivotGroups[i]=g;
-    if(i===0){robotGroup.add(g);g.position.copy(pts[0]||new THREE.Vector3());}
-    else {axisPivotGroups[i-1].add(g);g.position.copy((pts[i]||new THREE.Vector3()).clone().sub(pts[i-1]||new THREE.Vector3()));}
+    if(i===0){robotGroup.add(g);g.position.copy(pivots[0]||new THREE.Vector3());}
+    else {axisPivotGroups[i-1].add(g);g.position.copy((pivots[i]||new THREE.Vector3()).clone().sub(pivots[i-1]||new THREE.Vector3()));}
   }
   for(const [path,mesh] of meshes){
     mesh.position.set(0,0,0);mesh.rotation.set(0,0,0);mesh.scale.set(1,1,1);
@@ -192,7 +192,7 @@ function rebuildRobotKinematics(){
     const m=key.match(/^A([1-6])$/);
     if(m){
       const idx=Number(m[1])-1;
-      const pivot=pts[idx]||new THREE.Vector3();
+      const pivot=pivots[idx]||new THREE.Vector3();
       axisPivotGroups[idx].add(mesh);
       mesh.position.copy(pivot.clone().multiplyScalar(-1));
     }else{
@@ -204,11 +204,38 @@ function rebuildRobotKinematics(){
 function axisVectorForJoint(i){
   return fixedAxisVector(i);
 }
+function axisWorldVector(i){
+  const axis=axisVectorForJoint(i);
+  if(axis==='x')return new THREE.Vector3(1,0,0);
+  if(axis==='y')return new THREE.Vector3(0,1,0);
+  return new THREE.Vector3(0,0,1);
+}
+function jointPivotIndex(i){return [0,1,2,3,5,6][i]??0}
+function jointPivotPositions(){
+  const pts=axisWorldPointsWithA0();
+  return [0,1,2,3,4,5].map(i=>(pts[jointPivotIndex(i)]||new THREE.Vector3()).clone());
+}
+function jointPivotPoint(i){return jointPivotPositions()[i]||new THREE.Vector3()}
+function applyWorldAxisRotationAtPivot(g,i,angle){
+  // Drehpunkte: A1 um A0/Ursprung, A2 um A1, A3 um A2, A4 um A3, A5 um A5, A6 um A6.
+  // Die Drehrichtung bleibt immer die feste World-/Roboter-Achse.
+  const parentQuat=new THREE.Quaternion();
+  g.parent?.getWorldQuaternion(parentQuat);
+  const localAxis=axisWorldVector(i).applyQuaternion(parentQuat.invert()).normalize();
+  g.quaternion.setFromAxisAngle(localAxis,angle);
+  g.updateMatrixWorld(true);
+}
 function applyJointRotations(){
+  // Jede Achse dreht am eigenen Drehpunkt, aber in der festen Ausrichtung des
+  // World-/Roboter-Koordinatensystems; Elternrotationen verändern nur die
+  // Lage des Drehpunkts, nicht die fachliche Drehrichtung der Achse.
+  axisPivotGroups.forEach(g=>g.quaternion.identity());
+  scene.updateMatrixWorld(true);
+
   axisPivotGroups.forEach((g,i)=>{
-    g.rotation.set(0,0,0);
-    const ref=(parseReferencePose()[i]||0);const a=deg(((state.jointAngles[i]||0)-ref)*(num(state.joints[i]?.rotationSign)??1)), axis=axisVectorForJoint(i);
-    if(axis==='x')g.rotation.x=a; else if(axis==='y')g.rotation.y=a; else g.rotation.z=a;
+    const ref=parseReferencePose()[i]||0;
+    const angle=deg(((state.jointAngles[i]||0)-ref)*(num(state.joints[i]?.rotationSign)??1));
+    applyWorldAxisRotationAtPivot(g,i,angle);
   });
   scene.updateMatrixWorld(true);
 }
@@ -422,8 +449,10 @@ function renderAxisPointRows(){
 
 function fixedAxisType(i){return ['Rz','Ry','Ry','Rx','Ry','Rx'][i]||'Rz'}
 function nominalAxisVector(i){return ['z','y','y','x','y','x'][i]||'z'}
-function axisDirectionLabel(i){return fixedAxisType(i)+' · um '+nominalAxisVector(i).toUpperCase()}
-// v37: Die Achs-Drehvektoren werden immer im fachlichen 0°-Roboter-Koordinatensystem definiert.
+function axisCoordLabel(v){return Number.isInteger(v)?String(v):String(Number(v.toFixed(3)))}
+function axisPivotLabel(i){const p=jointPivotPoint(i);return `X${axisCoordLabel(p.x)} Y${axisCoordLabel(p.y)} Z${axisCoordLabel(p.z)}`}
+function axisDirectionLabel(i){return fixedAxisType(i)+' · World '+nominalAxisVector(i).toUpperCase()+' @ '+axisPivotLabel(i)}
+// v37: Die Achs-Drehvektoren werden immer im fachlichen World-/Roboter-Koordinatensystem definiert.
 // Die STL-/Roboter-Transformation Rx/Ry/Rz aus der UI wird hier ausdrücklich NICHT berücksichtigt.
 function fixedAxisVector(i){return nominalAxisVector(i)}
 function setJointAnglesToReferencePose(){
