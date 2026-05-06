@@ -617,6 +617,33 @@ async function loadJsonFile(file) {
   } catch (e) { alert('JSON konnte nicht gelesen werden: '+e.message); renderAll(); }
 }
 
+async function loadDemoKr8() {
+  const BASE  = 'https://www.cnc-technik.de/robsimul/stl/';
+  const FILES = ['podest.stl','a1.stl','a2.stl','a3.stl','a4.stl','a5.stl','a6.stl','tool1_tcp.stl'];
+  resetData(); state.mode='source'; state.robotName='KR8';
+  const btn = $('demoBtn');
+  if (btn) { btn.disabled=true; btn.textContent='Lade…'; }
+  try {
+    for (const fname of FILES) {
+      const res = await fetch(BASE + fname);
+      if (!res.ok) throw new Error(fname + ': HTTP ' + res.status);
+      const buf = new Uint8Array(await res.arrayBuffer());
+      state.buffers.set(fname, buf);
+      state.files.push({ path: fname, name: fname, size: buf.byteLength, type: 'STL' });
+    }
+    splitFiles();
+    state.robotTr=defaultRobotTr(); setInputs('r', state.robotTr);
+    state.toolTr=defaultToolTr();   setInputs('t', state.toolTr);
+    setJointAnglesToReferencePose();
+    await loadStls(); enableSave(); renderAll(); setView('iso');
+  } catch(e) {
+    alert('Demo-Load fehlgeschlagen: ' + e.message);
+    resetData(); renderAll();
+  } finally {
+    if (btn) { btn.disabled=false; btn.textContent='Test'; }
+  }
+}
+
 function zeroAllTransforms() {
   state.robotTr={x:0,y:0,z:0,rx:0,ry:0,rz:0}; state.toolTr={x:0,y:0,z:0,rx:0,ry:0,rz:0};
   state.jointAngles=[0,-90,90,0,0,0];
@@ -871,6 +898,7 @@ window.selectAxisPoint = selectAxisPoint;
 
 // ── Event-Listener ─────────────────────────────────────────────────
 $('newBtn').onclick     = () => { resetData(); disableSave(); renderAll(); setView('iso'); };
+$('demoBtn').onclick    = () => loadDemoKr8().catch(e=>alert(e.message));
 $('downloadJson').onclick = downloadJson;
 $('downloadZip').onclick  = downloadZip;
 $('resetView').onclick    = () => setView('iso');
