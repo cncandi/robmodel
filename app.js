@@ -65,6 +65,9 @@ let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup
 const meshes = new Map();
 const axisMeshes = [];
 const axisPivotGroups = [];
+const skeletonCyls = []; const skeletonSphs = [];
+const LINK_R=[28,20,16,12,8,6]; const JOINT_R=[40,38,30,24,20,16];
+const LINK_COLOR=0xcc4400; const JOINT_COLOR=0xe8a020;
 const loader = new STLLoader();
 
 // ── Fehleranzeige ──────────────────────────────────────────────────
@@ -315,14 +318,6 @@ function clearAxisPointVisuals() {
   if (transformControls) transformControls.detach();
 }
 
-
-// ── Skeleton-Zylinder (wie RobSimul) ────────────────────────────
-const skeletonCyls = [];   // Zylinder-Meshes
-const skeletonSphs = [];   // Kugel-Meshes
-const LINK_R  = [28,20,16,12,8,6];   // Zylinderradius pro Link
-const JOINT_R = [40,38,30,24,20,16]; // Kugelradius pro Gelenk
-const LINK_COLOR  = 0xcc4400;
-const JOINT_COLOR = 0xe8a020;
 
 function buildSkeletonCylinder(from, to, radius) {
   const v1 = from.clone(), v2 = to.clone();
