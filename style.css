@@ -105,6 +105,7 @@ aside.side::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px}
 .axis-stl-row{display:flex;align-items:center;gap:4px;padding:3px 0;
   border-bottom:1px solid rgba(255,255,255,.04)}
 .axis-stl-label{font-size:16px;font-weight:700;color:var(--acc);width:22px;flex-shrink:0}
+.axis-color-pick{width:24px;height:24px;padding:0;border:none;border-radius:4px;cursor:pointer;flex-shrink:0;background:none}
 .axis-stl-name{font-size:14px;color:var(--txt3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .axis-stl-name.has-file{color:var(--txt2)}
 .axis-stl-btn{font-size:14px;padding:2px 6px;background:rgba(37,99,235,.2);
