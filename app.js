@@ -20,11 +20,11 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 
 // ── KR8-Zielwerte (default) ───────────────────────────────────────
 const KR8_TARGET = [
-  { x: 495,  y: 0, z: 175  },  // A1 Rz  — lokales CS (wie RobSimul)
-  { x: 0,    y: 0, z: 1095 },  // A2 Ry
-  { x: 175,  y: 0, z: 0    },  // A3 Ry
-  { x: 0,    y: 0, z: 1270 },  // A4 Rx
-  { x: 0,    y: 0, z: 185  },  // A5 Ry
+  { x: 450,  y: 0, z: 150  },  // A1 Rz
+  { x: 0,    y: 0, z: 610  },  // A2 Ry
+  { x: 200,  y: 0, z: 0    },  // A3 Ry  ← RobSimul-Konvention (X↔Z auto)
+  { x: 0,    y: 0, z: 630  },  // A4 Rx
+  { x: 0,    y: 0, z: 80   },  // A5 Ry
   { x: 0,    y: 0, z: 0    },  // A6 Rx
 ];
 function defOffset(i) { return { ...KR8_TARGET[i] }; }
@@ -206,8 +206,15 @@ function nominalAxisVec(i)   { return ['z','y','y','x','y','x'][i] || 'z'; }
 function axisDirectionLabel(i) { return fixedAxisType(i) + ' · ' + nominalAxisVec(i).toUpperCase(); }
 
 function cumulativeAxisPositions() {
+  // A1/A2: direkt X→Three.X, Z→Three.Z
+  // A3+:   X↔Z getauscht (A2 Ry-Referenzpose dreht lokales CS)
   let x = 0, y = 0, z = 0;
-  return state.axisPoints.map(p => { x += num(p.x)||0; y += num(p.y)||0; z += num(p.z)||0; return new THREE.Vector3(x, y, z); });
+  return state.axisPoints.map((p, i) => {
+    const px = num(p.x)||0, py = num(p.y)||0, pz = num(p.z)||0;
+    if (i < 2) { x += px; y += py; z += pz; }
+    else        { x += pz; y += py; z += px; }  // X↔Z
+    return new THREE.Vector3(x, y, z);
+  });
 }
 
 function syncJointsFromAxisPoints() {
