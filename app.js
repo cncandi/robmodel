@@ -165,20 +165,16 @@ function setInputs(p, tr) {
 function applyTransforms() {
   state.robotTr = readInputs('r');
   state.toolTr  = readInputs('t');
-  // robotGroup: nur für unzugeordnete Meshes (Sockel etc.)
-  robotGroup.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
-  robotGroup.rotation.set(deg(state.robotTr.rx), deg(state.robotTr.ry), deg(state.robotTr.rz));
-  // kinematicsRoot: nur Position — Koordinatensystem bleibt weltachsenausgerichtet
-  kinematicsRoot.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
-  // STL-Rotation live auf alle Pivot-Meshes anwenden
+  // Gruppen: nur Position, keine Rotation (Rotation liegt auf den Meshes)
   const _rx = deg(state.robotTr.rx), _ry = deg(state.robotTr.ry), _rz = deg(state.robotTr.rz);
-  for (const [, mesh] of meshes) {
-    const file = state.stls.find(f => f.path === [...meshes.keys()].find(k => meshes.get(k)===mesh)) || {};
-    if (!isTool(file)) mesh.rotation.set(_rx, _ry, _rz);
-  }
-  if (axisPointGroup) { axisPointGroup.position.set(0,0,0); axisPointGroup.rotation.set(0,0,0); axisPointGroup.scale.set(1,1,1); }
+  robotGroup.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
+  robotGroup.rotation.set(0, 0, 0);
+  kinematicsRoot.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
   toolGroup.position.set(state.toolTr.x, state.toolTr.y, state.toolTr.z);
-  toolGroup.rotation.set(deg(state.toolTr.rx), deg(state.toolTr.ry), deg(state.toolTr.rz));
+  toolGroup.rotation.set(0, 0, 0);
+  // STL-Korrektur auf ALLE Meshes gleichmäßig anwenden (Roboter, Podest, Tool)
+  for (const [, mesh] of meshes) mesh.rotation.set(_rx, _ry, _rz);
+  if (axisPointGroup) { axisPointGroup.position.set(0,0,0); axisPointGroup.rotation.set(0,0,0); axisPointGroup.scale.set(1,1,1); }
   applyJointRotations();
   scene.updateMatrixWorld(true);
   renderIssues();
