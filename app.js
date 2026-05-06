@@ -20,9 +20,9 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 
 // ── KR8-Zielwerte (default) ───────────────────────────────────────
 const KR8_TARGET = [
-  { x: 450,  y: 0, z: 150  },  // A1 Rz
-  { x: 0,    y: 0, z: 610  },  // A2 Ry
-  { x: 200,  y: 0, z: 0    },  // A3 Ry  ← RobSimul-Konvention (X↔Z auto)
+  { x: 450,  y: 0, z: 150  },  // A1 Rz  — X=oben(Z), Z=horizontal(X)
+  { x: 610,  y: 0, z: 0    },  // A2 Ry  — X=oben
+  { x: 200,  y: 0, z: 0    },  // A3 Ry
   { x: 0,    y: 0, z: 630  },  // A4 Rx
   { x: 0,    y: 0, z: 80   },  // A5 Ry
   { x: 0,    y: 0, z: 0    },  // A6 Rx
@@ -211,10 +211,9 @@ function cumulativeAxisPositions() {
   // A1/A2: direkt X→Three.X, Z→Three.Z
   // A3+:   X↔Z getauscht (A2 Ry-Referenzpose dreht lokales CS)
   let x = 0, y = 0, z = 0;
-  return state.axisPoints.map((p, i) => {
+  return state.axisPoints.map((p) => {
     const px = num(p.x)||0, py = num(p.y)||0, pz = num(p.z)||0;
-    if (i < 2) { x += px; y += py; z += pz; }
-    else        { x += pz; y += py; z += px; }  // X↔Z
+    x += pz; y += py; z += px;  // X↔Z für alle Gelenke
     return new THREE.Vector3(x, y, z);
   });
 }
@@ -383,17 +382,11 @@ function updateCSHelper() {
   const pos = pts[state.selectedAxis] || new THREE.Vector3();
   const L = 380;   // Pfeillänge mm
   const H = 30;    // Pfeilkopf
-  // A1/A2: Input X→Welt-X, Z→Welt-Z
-  // A3+:   Input X→Welt-Z, Z→Welt-X  (wegen X↔Z-Swap durch A2-Rotation)
-  const swapped = state.selectedAxis >= 2;
-  const axes = swapped ? [
+  // Alle Gelenke: Eingabe-X → Welt-Z (oben), Eingabe-Z → Welt-X (horizontal)
+  const axes = [
     { dir: new THREE.Vector3(0,0,1),  color: 0xff2222, label: 'X' },  // X → Welt Z
     { dir: new THREE.Vector3(0,1,0),  color: 0x22dd22, label: 'Y' },
     { dir: new THREE.Vector3(1,0,0),  color: 0x2288ff, label: 'Z' },  // Z → Welt X
-  ] : [
-    { dir: new THREE.Vector3(1,0,0),  color: 0xff2222, label: 'X' },
-    { dir: new THREE.Vector3(0,1,0),  color: 0x22dd22, label: 'Y' },
-    { dir: new THREE.Vector3(0,0,1),  color: 0x2288ff, label: 'Z' },
   ];
   axes.forEach(({ dir, color, label }) => {
     const arrow = new THREE.ArrowHelper(dir, pos, L, color, H, H * 0.6);
