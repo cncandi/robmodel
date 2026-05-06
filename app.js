@@ -208,16 +208,25 @@ function nominalAxisVec(i)   { return ['z','y','y','x','y','x'][i] || 'z'; }
 function axisDirectionLabel(i) { return fixedAxisType(i) + ' · ' + nominalAxisVec(i).toUpperCase(); }
 
 function cumulativeAxisPositions() {
-  // RobSimul-Logik: pivot[0]=(0,0,0), pivot[i] bei off[i-1]
-  // GLOBAL für ALLE Gelenke: Display X (p.x) → Three.Z | Display Z (p.z) → Three.X
-  // A2 sieht numerisch gleich aus weil Ry(-90°) es intern kompensiert
+  // Regeln aus Excel (World→Skeleton-Logik, pivot[0] immer Ursprung):
+  // Seg1(A1): XZ tauschen  → Three.X=p.z, Three.Z=p.x
+  // Seg2(A2): unverändert  → Three.X=p.x, Three.Z=p.z
+  // Seg3(A3): Z→X          → Three.X=0,   Three.Z=p.x
+  // Seg4(A4): X→Z          → Three.X=p.z, Three.Z=0
+  // Seg5(A5): X→Z          → Three.X=p.z, Three.Z=0
+  const rules = [
+    (p) => ({ dx: num(p.z)||0, dz: num(p.x)||0 }),  // A1: XZ tauschen
+    (p) => ({ dx: num(p.x)||0, dz: num(p.z)||0 }),  // A2: unverändert
+    (p) => ({ dx: 0,           dz: num(p.x)||0 }),  // A3: Z→X
+    (p) => ({ dx: num(p.z)||0, dz: 0           }),  // A4: X→Z
+    (p) => ({ dx: num(p.z)||0, dz: 0           }),  // A5: X→Z
+  ];
   let x=0, y=0, z=0;
   const pts = [new THREE.Vector3(0,0,0)];
   for (let i=0; i<5; i++) {
     const p = state.axisPoints[i];
-    x += num(p.z)||0;  // Display Z → Three.X
-    y += num(p.y)||0;
-    z += num(p.x)||0;  // Display X → Three.Z
+    const {dx, dz} = rules[i](p);
+    x += dx; y += num(p.y)||0; z += dz;
     pts.push(new THREE.Vector3(x,y,z));
   }
   return pts;
@@ -303,10 +312,19 @@ function updateAxisPointVisuals() {
   if (!axisPointGroup) return;
   clearAxisPointVisuals();
   const pts = cumulativeAxisPositions();
-  // Alle 6 Pivots als Kugeln A1-A6 (pts[0]=A1 Ursprung, pts[1..5]=A2..A6)
+  // Kugeln an aktuellen Welt-Positionen der Pivot-Gruppen (aktuelle Pose)
   const sphereGeo = new THREE.SphereGeometry(45, 24, 16);
+  // Echte Welt-Positionen: pivot[0] immer Ursprung, pivot[i] via getWorldPosition
+  scene.updateMatrixWorld(true);
+  const livePts = [new THREE.Vector3(0,0,0)];
+  axisPivotGroups.forEach(g => {
+    const wp = new THREE.Vector3();
+    g.getWorldPosition(wp);
+    livePts.push(wp);
+  });
+  const displayPts = livePts.length > 1 ? livePts.slice(0, 6) : pts;
 
-  pts.forEach((p, i) => {
+  displayPts.forEach((p, i) => {
     const label = 'A' + (i + 1);
     const isOrigin = i === 0;
     const mat = new THREE.MeshStandardMaterial({
@@ -321,9 +339,9 @@ function updateAxisPointVisuals() {
     if (!isOrigin) axisMeshes.push(mesh);
   });
 
-  if (pts.length > 1) {
+  if (displayPts.length > 1) {
     axisLine = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.BufferGeometry().setFromPoints(displayPts),
       new THREE.LineBasicMaterial({ color: 0xff8a00, linewidth: 2 })
     );
     axisPointGroup.add(axisLine);
