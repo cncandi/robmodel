@@ -18,6 +18,9 @@ const norm = s => String(s || '').toLowerCase().replace(/\\/g, '/').split('/').p
 const zipName = s => (s || 'RobModel_export').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'RobModel_export';
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+// ── Farben ────────────────────────────────────────────────────────
+const colors = { Base:'#333333', A1:'#ffffff', A2:'#999999', A3:'#ff7f00', A4:'#ff7f00', A5:'#999999', A6:'#666666', Tool:'#64748b' };
+
 // ── KR8-Zielwerte (default) ───────────────────────────────────────
 const KR8_TARGET = [
   { x: 450,  y: 0, z: 150  },  // A1 Rz  — Display X=Three.Z(oben), Display Z=Three.X(horiz)
@@ -532,7 +535,6 @@ function partKey(n) {
   if (/podest|base/.test(s)) return 'Base';
   return 'A1';
 }
-const colors = { Base:'#333', A1:'#fff', A2:'#999', A3:'#ff7f00', A4:'#ff7f00', A5:'#999', A6:'#666', Tool:'#64748b' };
 function isTool(f) { const n = norm(f.name||f); const tool = norm(state.tcp.auftragen.toolStl||state.toolName); return n===tool||/tool1_tcp|tool|tcp|meltio/.test(n); }
 function findStl(stem) { const s = norm(stem); return state.stls.find(f=>norm(f.name)===s)?.name || state.stls.find(f=>norm(f.name).includes(s)||s.includes(norm(f.name)))?.name || null; }
 function clearGroup(g) { while (g.children.length) g.remove(g.children[0]); }
