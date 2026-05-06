@@ -20,12 +20,12 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 
 // ── KR8-Zielwerte (default) ───────────────────────────────────────
 const KR8_TARGET = [
-  { x: 0,    y: 0, z: 0    },  // A1 (am Ursprung)
-  { x: 175,  y: 0, z: 495  },  // A2
-  { x: 0,    y: 0, z: 1095 },  // A3
-  { x: 0,    y: 0, z: 175  },  // A4
-  { x: 1270, y: 0, z: 0    },  // A5
-  { x: 185,  y: 0, z: 0    },  // A6
+  { x: 495,  y: 0, z: 175  },  // A1 Rz
+  { x: 0,    y: 0, z: 1095 },  // A2 Ry
+  { x: 175,  y: 0, z: 0    },  // A3 Ry
+  { x: 0,    y: 0, z: 1270 },  // A4 Rx
+  { x: 0,    y: 0, z: 185  },  // A5 Ry
+  { x: 0,    y: 0, z: 0    },  // A6 Rx
 ];
 function defOffset(i) { return { ...KR8_TARGET[i] }; }
 
