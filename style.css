@@ -104,25 +104,25 @@ canvas#viewer { flex: 1; display: block; width: 100%; }
   border-radius: var(--r); padding: 10px 12px;
 }
 .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.card h2 { font-size: .82em; font-weight: 600; color: var(--txt2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+.card h2 { font-size: .65em; font-weight: 600; color: var(--txt2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
 .card-head h2 { margin-bottom: 0; }
-.hint { font-size: .73em; color: var(--txt3); margin-top: 6px; }
+.hint { font-size: .59em; color: var(--txt3); margin-top: 6px; }
 
 /* Grid layouts */
 .grid6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 6px; }
 .field { display: flex; flex-direction: column; gap: 2px; }
-.field label { font-size: .71em; color: var(--txt3); font-weight: 500; }
+.field label { font-size: .58em; color: var(--txt3); font-weight: 500; }
 .field input, .field select {
   background: var(--bg4); border: 1px solid var(--bdr);
-  border-radius: 3px; padding: 4px 6px; font-size: .82em;
+  border-radius: 3px; padding: 3px 5px; font-size: .67em;
   width: 100%; transition: border-color .12s;
 }
 .field input:focus, .field select:focus { outline: none; border-color: var(--acc); }
 
 /* Btn row */
 .btn-row { display: flex; gap: 6px; margin-top: 8px; }
-.btn-row button { flex: 1; font-size: .78em; padding: 5px 8px; }
+.btn-row button { flex: 1; font-size: .63em; padding: 4px 6px; }
 
 /* Badges */
 .badge {
@@ -147,7 +147,7 @@ canvas#viewer { flex: 1; display: block; width: 100%; }
 
 /* Checklist */
 .checklist { display: flex; flex-direction: column; gap: 5px; }
-.issue { display: flex; align-items: flex-start; gap: 7px; font-size: .78em; padding: 5px 7px; border-radius: 3px; }
+.issue { display: flex; align-items: flex-start; gap: 7px; font-size: .63em; padding: 5px 7px; border-radius: 3px; }
 .issue.ok   { background: rgba(34,197,94,.07); }
 .issue.warn { background: rgba(245,158,11,.07); }
 .issue.bad  { background: rgba(239,68,68,.1); }
@@ -165,17 +165,17 @@ canvas#viewer { flex: 1; display: block; width: 100%; }
 .panel-tables { display: flex; gap: 0; flex: 1; overflow: hidden; }
 .panel-sub { flex: 1; overflow: hidden; }
 .panel-divider { width: 1px; background: var(--bdr); flex-shrink: 0; margin: 0 6px; }
-.panel h2 { font-size: .56em; font-weight: 600; color: var(--txt3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.panel h2 { font-size: .75em; font-weight: 600; color: var(--txt3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
 
 /* Tables */
-table { width: 100%; border-collapse: collapse; font-size: .585em; }
+table { width: 100%; border-collapse: collapse; font-size: .82em; }
 thead tr { background: var(--bg3); }
-th { padding: 3px 4px; text-align: left; font-weight: 600; color: var(--txt2); white-space: nowrap; border-bottom: 1px solid var(--bdr); position: sticky; top: 0; background: var(--bg3); z-index: 1; }
-td { padding: 2px 3px; border-bottom: 1px solid rgba(255,255,255,.03); }
+th { padding: 4px 7px; text-align: left; font-weight: 600; color: var(--txt2); white-space: nowrap; border-bottom: 1px solid var(--bdr); position: sticky; top: 0; background: var(--bg3); z-index: 1; }
+td { padding: 3px 5px; border-bottom: 1px solid rgba(255,255,255,.03); }
 tr.sel td { background: rgba(37,99,235,.12); }
 tr:hover td { background: rgba(255,255,255,.03); }
 td input, td select {
-  background: transparent; border: none; width: 54px; padding: 1px 2px;
+  background: transparent; border: none; width: 65px; padding: 2px 3px;
   font-size: .85em; color: var(--txt);
 }
 td input:focus { background: var(--bg4); border: 1px solid var(--acc); border-radius: 2px; outline: none; }

@@ -342,7 +342,7 @@ function pickAxisPoint(event) {
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
   const hit = raycaster.intersectObjects(axisMeshes, false)[0];
-  if (hit) { state.selectedAxis = hit.object.userData.axisIndex; updateAxisPointVisuals(); renderAxisPointRows(); event.preventDefault(); }
+  if (hit) { state.selectedAxis = hit.object.userData.axisIndex; updateAxisPointVisuals(); event.preventDefault(); }
 }
 
 function onAxisObjectMoved() {
@@ -353,12 +353,12 @@ function onAxisObjectMoved() {
   const local = mesh.position.clone().sub(prev);
   const p = state.axisPoints[idx];
   p.x = Number(local.x.toFixed(3)); p.y = Number(local.y.toFixed(3)); p.z = Number(local.z.toFixed(3)); p.source = 'manuell';
-  syncJointsFromAxisPoints(); rebuildRobotKinematics(); applyTransforms(); renderAxisPointRows(); renderRows(); renderIssues();
+  syncJointsFromAxisPoints(); rebuildRobotKinematics(); applyTransforms(); renderRows(); renderIssues();
 }
 
 function selectAxisPoint(i) {
   state.selectedAxis = Math.max(0, Math.min(5, Number(i) || 0));
-  updateAxisPointVisuals(); renderAxisPointRows();
+  updateAxisPointVisuals();
 }
 
 // ── STL laden ──────────────────────────────────────────────────────
@@ -603,11 +603,11 @@ function simulateAxis(axisIndex){
 }
 
 // ── Render-Funktionen ──────────────────────────────────────────────
-function renderAll(){renderRows();renderJointAngleRows();renderAxisPointRows();updateAxisPointVisuals();renderTcp();renderIssues();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';const tb=$('toolBadge');if(tb)tb.textContent=state.tcp.auftragen.toolStl||state.toolName||'—';}
+function renderAll(){renderRows();renderJointAngleRows();updateAxisPointVisuals();renderTcp();renderIssues();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';const tb=$('toolBadge');if(tb)tb.textContent=state.tcp.auftragen.toolStl||state.toolName||'—';}
 
 function renderJointAngleRows(){const el=$('jointAngleRows');if(!el)return;el.innerHTML=state.jointAngles.map((v,i)=>`<div class="field"><label>${state.joints[i]?.name||'A'+(i+1)} ${fixedAxisType(i)}</label><input data-joint-angle="${i}" type="number" step="1" value="${v??0}"></div>`).join('');}
 
-function renderAxisPointRows(){const el=$('axisPointRows');if(!el)return;el.innerHTML=state.axisPoints.map((p,i)=>`<tr class="${i===state.selectedAxis?'sel':''}" onclick="selectAxisPoint(${i})"><td><b>${esc(p.name)}</b></td><td><input data-axis-point="${i}" data-axis-field="x" value="${p.x??''}"></td><td><input data-axis-point="${i}" data-axis-field="y" value="${p.y??''}"></td><td><input data-axis-point="${i}" data-axis-field="z" value="${p.z??''}"></td><td><input data-axis-point="${i}" data-axis-field="rx" value="${p.rx??''}"></td><td><input data-axis-point="${i}" data-axis-field="ry" value="${p.ry??''}"></td><td><input data-axis-point="${i}" data-axis-field="rz" value="${p.rz??''}"></td><td style="color:var(--txt3);font-size:.8em">${esc(p.source)}</td></tr>`).join('');}
+function{const el=$('axisPointRows');if(!el)return;el.innerHTML=state.axisPoints.map((p,i)=>`<tr class="${i===state.selectedAxis?'sel':''}" onclick="selectAxisPoint(${i})"><td><b>${esc(p.name)}</b></td><td><input data-axis-point="${i}" data-axis-field="x" value="${p.x??''}"></td><td><input data-axis-point="${i}" data-axis-field="y" value="${p.y??''}"></td><td><input data-axis-point="${i}" data-axis-field="z" value="${p.z??''}"></td><td><input data-axis-point="${i}" data-axis-field="rx" value="${p.rx??''}"></td><td><input data-axis-point="${i}" data-axis-field="ry" value="${p.ry??''}"></td><td><input data-axis-point="${i}" data-axis-field="rz" value="${p.rz??''}"></td><td style="color:var(--txt3);font-size:.8em">${esc(p.source)}</td></tr>`).join('');}
 
 function renderRows(){$('jointRows').innerHTML=state.joints.map((j,i)=>`<tr data-param-row="${i}" class="${i===state.selectedAxis?'sel':''}" ><td><b>${esc(j.name)}</b></td><td><input class="angleInput" data-joint-angle="${i}" type="number" step="0.1" value="${state.jointAngles?.[i]??0}"></td><td><span class="axisDir">${axisDirectionLabel(i)}</span></td><td><input data-j="${i}" data-f="x" value="${j.offset?.x??''}"></td><td><input data-j="${i}" data-f="y" value="${j.offset?.y??''}"></td><td><input data-j="${i}" data-f="z" value="${j.offset?.z??''}"></td><td><input data-j="${i}" data-f="min" value="${j.min??''}"></td><td><input data-j="${i}" data-f="max" value="${j.max??''}"></td><td><select class="dirSel" data-j="${i}" data-f="rotationSign"><option value="1" ${(num(j.rotationSign)??1)>=0?'selected':''}>+</option><option value="-1" ${(num(j.rotationSign)??1)<0?'selected':''}>−</option></select></td><td><button class="simBtn" data-sim-axis="${i}">▶</button></td></tr>`).join('');}
 
@@ -655,8 +655,8 @@ document.addEventListener('input',e=>{
   const t=e.target;
   if(t.dataset.jointAngle!==undefined){state.jointAngles[Number(t.dataset.jointAngle)]=num(t.value)||0;applyJointRotations();renderJointAngleRows();renderIssues();return;}
   if(t.dataset.tcp){state.tcp[state.activeTcp][t.dataset.tcp]=['toolStl','status'].includes(t.dataset.tcp)?t.value:num(t.value);renderTcp();renderIssues();}
-  if(t.dataset.axisPoint!==undefined){const p=state.axisPoints[Number(t.dataset.axisPoint)],f=t.dataset.axisField;p[f]=num(t.value);p.source='manuell';syncJointsFromAxisPoints();rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();renderRows();renderAxisPointRows();renderIssues();}
-  if(t.dataset.j!==undefined){const idx=Number(t.dataset.j),j=state.joints[idx],f=t.dataset.f;if(['x','y','z'].includes(f)){j.offset[f]=num(t.value);state.axisPoints[idx][f]=num(t.value);state.axisPoints[idx].source='manuell';rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();renderAxisPointRows();}else if(['min','max'].includes(f))j[f]=num(t.value);else if(f==='rotationSign'){j[f]=num(t.value);applyJointRotations();}else j[f]=t.value;renderIssues();}
+  if(t.dataset.axisPoint!==undefined){const p=state.axisPoints[Number(t.dataset.axisPoint)],f=t.dataset.axisField;p[f]=num(t.value);p.source='manuell';syncJointsFromAxisPoints();rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();renderRows();renderIssues();}
+  if(t.dataset.j!==undefined){const idx=Number(t.dataset.j),j=state.joints[idx],f=t.dataset.f;if(['x','y','z'].includes(f)){j.offset[f]=num(t.value);state.axisPoints[idx][f]=num(t.value);state.axisPoints[idx].source='manuell';rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();}else if(['min','max'].includes(f))j[f]=num(t.value);else if(f==='rotationSign'){j[f]=num(t.value);applyJointRotations();}else j[f]=t.value;renderIssues();}
 });
 
 document.addEventListener('click',e=>{
