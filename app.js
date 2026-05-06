@@ -397,44 +397,38 @@ function updateSkeletonPositions() {
 function updateAxisPointVisuals() {
   if (!axisPointGroup) return;
   clearAxisPointVisuals();
-  const pts = cumulativeAxisPositions();
-  // Kugeln an aktuellen Welt-Positionen der Pivot-Gruppen (aktuelle Pose)
-  const sphereGeo = new THREE.SphereGeometry(45, 24, 16);
-  // Echte Welt-Positionen: pivot[0] immer Ursprung, pivot[i] via getWorldPosition
   scene.updateMatrixWorld(true);
+
+  // Live-Weltpositionen der Pivot-Gruppen
   const livePts = [new THREE.Vector3(0,0,0)];
-  axisPivotGroups.forEach(g => {
-    const wp = new THREE.Vector3();
-    g.getWorldPosition(wp);
-    livePts.push(wp);
-  });
-  const displayPts = livePts.length > 1 ? livePts.slice(0, 6) : pts;
-
-  displayPts.forEach((p, i) => {
-    const label = 'A' + (i + 1);
-    const isOrigin = i === 0;
-    const mat = new THREE.MeshStandardMaterial({
-      color: isOrigin ? 0x94a3b8 : (i-1 === state.selectedAxis ? 0x2563eb : 0xf59e0b),
-      emissive: i-1 === state.selectedAxis ? 0x0f3b85 : 0x7c2d12, emissiveIntensity: isOrigin ? 0 : .15
+  if (axisPivotGroups.length) {
+    axisPivotGroups.forEach(g => {
+      const wp = new THREE.Vector3(); g.getWorldPosition(wp); livePts.push(wp);
     });
-    const mesh = new THREE.Mesh(sphereGeo.clone(), mat);
-    mesh.position.copy(p);
-    mesh.userData.axisIndex = i - 1;
-    mesh.name = label;
-    mesh.userData.skeletonIdx = i;
-    const lbl = makeAxisLabel(label, p.clone().add(new THREE.Vector3(0,0,85)));
-    lbl.userData.skeletonIdx = i;
-    axisPointGroup.add(mesh, lbl);
-    if (!isOrigin) axisMeshes.push(mesh);
-  });
-
-  if (displayPts.length > 1) {
-    axisLine = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(displayPts),
-      new THREE.LineBasicMaterial({ color: 0xff8a00, linewidth: 2 })
-    );
-    axisPointGroup.add(axisLine);
+  } else {
+    cumulativeAxisPositions().forEach(p => livePts.push(p));
   }
+  const pts6 = livePts.slice(0, 6);
+
+  // ── RobSimul-Stil: Zylinder + abgestufte Kugeln ──────────────
+  rebuildSkeletonMeshes(pts6);
+
+  // ── Auswählbare (unsichtbare) Raycaster-Kugeln + Labels ──────
+  pts6.forEach((p, i) => {
+    if (i === 0) return; // A1 (Ursprung) nicht selektierbar
+    const hitGeo = new THREE.SphereGeometry(JOINT_R[i-1] || 10, 8, 6);
+    const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+    const hit = new THREE.Mesh(hitGeo, hitMat);
+    hit.position.copy(p);
+    hit.userData.axisIndex = i - 1;
+    hit.name = 'A' + (i + 1);
+    axisPointGroup.add(hit);
+    axisMeshes.push(hit);
+
+    const lbl = makeAxisLabel('A' + (i + 1), p.clone().add(new THREE.Vector3(0, 0, JOINT_R[i-1] * 2 + 20)));
+    lbl.userData.skeletonIdx = i;
+    axisPointGroup.add(lbl);
+  });
 
   const selected = axisMeshes[state.selectedAxis];
   if (selected) transformControls.attach(selected);
