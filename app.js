@@ -59,7 +59,7 @@ const state = {
 };
 
 // ── Three.js Variablen ────────────────────────────────────────────
-let scene, camera, renderer, controls, grid, robotGroup, toolGroup, tcpMarker;
+let scene, camera, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot;
 let axisPointGroup, axisLine, transformControls, raycaster, mouse;
 const meshes = new Map();
 const axisMeshes = [];
@@ -113,7 +113,8 @@ function init3d() {
 
   robotGroup = new THREE.Group();
   toolGroup = new THREE.Group();
-  scene.add(robotGroup, toolGroup);
+  kinematicsRoot = new THREE.Group(); // keine STL-Transformation!
+  scene.add(robotGroup, toolGroup, kinematicsRoot);
 
   axisPointGroup = new THREE.Group();
   scene.add(axisPointGroup);
@@ -221,7 +222,7 @@ function rebuildRobotKinematics() {
   for (let i = 0; i < 6; i++) {
     const g = new THREE.Group(); g.name = 'Pivot ' + (i + 1); g.userData.axisIndex = i;
     axisPivotGroups[i] = g;
-    if (i === 0) { robotGroup.add(g); g.position.copy(pts[0] || new THREE.Vector3()); }
+    if (i === 0) { kinematicsRoot.add(g); g.position.copy(pts[0] || new THREE.Vector3()); }
     else {
       axisPivotGroups[i-1].add(g);
       g.position.copy((pts[i] || new THREE.Vector3()).clone().sub(pts[i-1] || new THREE.Vector3()));
