@@ -20,12 +20,12 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 
 // ── KR8-Zielwerte (default) ───────────────────────────────────────
 const KR8_TARGET = [
-  { x: 175, y: 0, z: 495 },
-  { x: 0,    y: 0, z: 1095 }, // A2
-  { x: 0,   y: 0, z: 175 },
-  { x: 1270, y: 0, z: 0 },
-  { x: 135,  y: 0, z: 0 },
-  { x: 0,   y: 0, z: 0 },
+  { x: 175,  y: 0, z: 495 },  // A1
+  { x: 1095, y: 0, z: 0   },  // A2  (lokales X entlang Oberarm, nicht Z)
+  { x: 0,    y: 0, z: 175 },  // A3
+  { x: 1270, y: 0, z: 0   },  // A4
+  { x: 135,  y: 0, z: 0   },  // A5
+  { x: 0,    y: 0, z: 0   },  // A6
 ];
 function defOffset(i) { return { ...KR8_TARGET[i] }; }
 
@@ -244,20 +244,17 @@ function rebuildRobotKinematics() {
 }
 
 function applyJointRotations() {
-  axisPivotGroups.forEach(g => g.quaternion.identity());
-  scene.updateMatrixWorld(true);
+  // Lokale Rotation wie RobSimul updatePivotRotations:
+  // Jedes Pivot dreht um seine EIGENE lokale Achse — keine Weltachsen-Umrechnung.
+  const refPose = parseReferencePose();
   axisPivotGroups.forEach((g, i) => {
-    const ref = parseReferencePose()[i] || 0;
+    const ref   = refPose[i] || 0;
     const angle = deg(((state.jointAngles[i] || 0) - ref) * (num(state.joints[i]?.rotationSign) ?? 1));
-    const parentQuat = new THREE.Quaternion();
-    g.parent?.getWorldQuaternion(parentQuat);
-    const axVec = (() => {
-      const v = nominalAxisVec(i);
-      return v === 'x' ? new THREE.Vector3(1,0,0) : v === 'y' ? new THREE.Vector3(0,1,0) : new THREE.Vector3(0,0,1);
-    })();
-    const localAxis = axVec.applyQuaternion(parentQuat.invert()).normalize();
-    g.quaternion.setFromAxisAngle(localAxis, angle);
-    g.updateMatrixWorld(true);
+    const v = nominalAxisVec(i);
+    g.rotation.set(0, 0, 0);
+    if      (v === 'x') g.rotation.x = angle;
+    else if (v === 'y') g.rotation.y = angle;
+    else                g.rotation.z = angle;
   });
   scene.updateMatrixWorld(true);
 }
