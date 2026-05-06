@@ -44,6 +44,7 @@ const state = {
   axisPoints: ['A1','A2','A3','A4','A5','A6'].map((name, i) => ({ name, ...defOffset(i), rx: 0, ry: 0, rz: 0, source: 'KR8 Zielwert' })),
   selectedAxis: 0,
   jointAngles: [0, -90, 90, 0, 0, 0],  // Referenzpose beim Start
+  axisStlMap: { A1:null, A2:null, A3:null, A4:null, A5:null, A6:null }, // manuelle STL-Zuweisung
   simulation: { active: false, axis: null, raf: null },
   joints: ['A1','A2','A3','A4','A5','A6'].map((n, i) => ({
     name: n,
@@ -260,7 +261,12 @@ function rebuildRobotKinematics() {
     mesh.rotation.set(deg(state.robotTr.rx), deg(state.robotTr.ry), deg(state.robotTr.rz));
     const file = state.stls.find(f => f.path === path) || { name: mesh.name };
     if (isTool(file)) { toolGroup.add(mesh); continue; }
-    const key = partKey(file.name);
+    // Manuelle Zuweisung prüfen
+    let assignedAxis = null;
+    for (const [ax, stlName] of Object.entries(state.axisStlMap)) {
+      if (stlName && norm(stlName) === norm(file.name)) { assignedAxis = ax; break; }
+    }
+    const key = assignedAxis || partKey(file.name);
     const m = key.match(/^A([1-6])$/);
     if (m) {
       const idx = Number(m[1]) - 1;
@@ -679,7 +685,7 @@ function simulateAxis(axisIndex){
 }
 
 // ── Render-Funktionen ──────────────────────────────────────────────
-function renderAll(){renderRows();renderJointAngleRows();updateAxisPointVisuals();renderTcp();renderIssues();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';const tb=$('toolBadge');if(tb)tb.textContent=state.tcp.auftragen.toolStl||state.toolName||'—';}
+function renderAll(){renderAxisStlRows();renderRows();renderJointAngleRows();updateAxisPointVisuals();renderTcp();renderIssues();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';const tb=$('toolBadge');if(tb)tb.textContent=state.tcp.auftragen.toolStl||state.toolName||'—';}
 
 function renderJointAngleRows(){const el=$('jointAngleRows');if(!el)return;el.innerHTML=state.jointAngles.map((v,i)=>`<div class="field"><label>${state.joints[i]?.name||'A'+(i+1)} ${fixedAxisType(i)}</label><input data-joint-angle="${i}" type="number" step="1" value="${v??0}"></div>`).join('');}
 
@@ -705,6 +711,62 @@ function setView(view){
   camera.updateProjectionMatrix();controls.update();
   qsa('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
 }
+
+// ── Achsen-STL UI ──────────────────────────────────────────────
+let _axisStlTarget = null;
+
+function renderAxisStlRows() {
+  const el = $('axisStlRows');
+  if (!el) return;
+  el.innerHTML = ['A1','A2','A3','A4','A5','A6'].map(ax => {
+    const name = state.axisStlMap[ax] ? norm(state.axisStlMap[ax]) : '—';
+    const hasFile = state.axisStlMap[ax] !== null;
+    return `<div class="axis-stl-row">
+      <span class="axis-stl-label">${ax}</span>
+      <span class="axis-stl-name${hasFile ? ' has-file' : ''}" title="${name}">${name}</span>
+      <button class="axis-stl-btn" data-ax="${ax}">+ STL</button>
+      ${hasFile ? `<button class="axis-stl-clear" data-ax="${ax}">✕</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function initAxisStlEvents() {
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.axis-stl-btn');
+    const clr = e.target.closest('.axis-stl-clear');
+    if (btn) { _axisStlTarget = btn.dataset.ax; $('axisStlInput').click(); }
+    if (clr) {
+      state.axisStlMap[clr.dataset.ax] = null;
+      renderAxisStlRows();
+      rebuildRobotKinematics(); applyTransforms();
+    }
+  });
+  $('axisStlInput').addEventListener('change', async e => {
+    const file = e.target.files[0]; if (!file || !_axisStlTarget) return;
+    const buf = await file.arrayBuffer();
+    const u8 = new Uint8Array(buf);
+    const geom = loader.parse(u8.buffer); geom.computeVertexNormals();
+    const ax = _axisStlTarget;
+    const mat = new THREE.MeshStandardMaterial({ color: colors[ax] || 0xe8a020, roughness: .62, metalness: .08 });
+    const mesh = new THREE.Mesh(geom, mat); mesh.name = file.name;
+    // In state aufnehmen
+    state.axisStlMap[ax] = file.name;
+    const fObj = { path: file.name, name: file.name, type: 'STL', size: file.size };
+    // Alten Mesh für diese Achse entfernen
+    state.stls = state.stls.filter(f => {
+      const k = state.axisStlMap[ax] === norm(f.name) ? ax : partKey(f.name);
+      return k !== ax;
+    });
+    state.stls.push(fObj);
+    state.files = state.stls;
+    state.buffers.set(file.name, u8);
+    meshes.set(file.name, mesh);
+    rebuildRobotKinematics(); applyTransforms();
+    renderAxisStlRows(); renderAll();
+    e.target.value = '';
+  });
+}
+
 window.selectAxisPoint = selectAxisPoint;
 
 // ── Event-Listener ─────────────────────────────────────────────────
@@ -717,6 +779,7 @@ $('robotGround').onclick  = () => ground(robotGroup,'r');
 $('robotReset').onclick   = () => { state.robotTr=defaultRobotTr(); setInputs('r',state.robotTr); applyTransforms(); fitCamera(); };
 $('toolGround').onclick   = () => ground(toolGroup,'t');
 $('toolReset').onclick    = () => { state.toolTr=defaultToolTr(); setInputs('t',state.toolTr); applyTransforms(); fitCamera(); };
+initAxisStlEvents();
 $('jointReset').onclick   = () => { stopSimulation(); setJointAnglesToReferencePose(); renderJointAngleRows(); renderRows(); applyTransforms(); };
 $('sourceZip').addEventListener('change', e => e.target.files[0] && loadSourceZip(e.target.files[0]).catch(err=>alert(err.message)));
 $('checkZip').addEventListener('change',  e => e.target.files[0] && loadPackageZip(e.target.files[0]).catch(err=>alert(err.message)));

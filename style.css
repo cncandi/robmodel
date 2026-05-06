@@ -204,3 +204,13 @@ body.bg-vivid { --bg:#0d0518; --bg2:#140825; --bg3:#1a0e35; --bg4:#221448; --acc
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+
+/* ── Achsen-STL ─────────────────────────────────────── */
+.axis-stl-row { display: flex; align-items: center; gap: 5px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
+.axis-stl-label { font-size: .55em; font-weight: 700; color: var(--acc); width: 22px; flex-shrink: 0; }
+.axis-stl-name { font-size: .5em; color: var(--txt3); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.axis-stl-name.has-file { color: var(--txt2); }
+.axis-stl-btn { font-size: .48em; padding: 2px 6px; background: rgba(37,99,235,.2); border: 1px solid rgba(37,99,235,.4); color: #93c5fd; border-radius: 3px; cursor: pointer; flex-shrink: 0; }
+.axis-stl-btn:hover { background: var(--blue); color: #fff; }
+.axis-stl-clear { font-size: .45em; padding: 2px 5px; background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; border-radius: 3px; cursor: pointer; flex-shrink: 0; }
+.axis-stl-clear:hover { background: rgba(239,68,68,.35); }
