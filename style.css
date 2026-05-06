@@ -155,7 +155,7 @@ canvas#viewer { flex: 1; display: block; width: 100%; }
 /* ── Footer ─────────────────────────────────────── */
 .bottom {
   display: flex; gap: 0; border-top: 1px solid var(--bdr);
-  background: var(--bg2); max-height: 220px; overflow: hidden;
+  background: var(--bg2); max-height: 320px; overflow: hidden;
   flex-shrink: 0;
 }
 .panel {
