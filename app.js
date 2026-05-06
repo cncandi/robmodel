@@ -906,8 +906,3 @@ const dz=$('dropZone');
 ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag-over');}));
 dz.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)loadSourceZip(f).catch(err=>alert(err.message));});
 
-// Theme
-const _themes=['dark','bg-white','bg-minimal','bg-deep','bg-vivid'];
-const _bgColors={dark:0x050b14,'bg-white':0xdce4ee,'bg-minimal':0xcccccc,'bg-deep':0x000408,'bg-vivid':0x0d0518};
-let _themeIdx=0;
-$('btnTheme').addEventListener('click',()=>{_themes.forEach(t=>document.body.classList.remove(t));_themeIdx=(_themeIdx+1)%_themes.length;const t=_themes[_themeIdx];if(t!=='dark')document.body.classList.add(t);if(scene)scene.background=new THREE.Color(_bgColors[t]||0x050b14);});
