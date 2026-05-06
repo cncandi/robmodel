@@ -21,7 +21,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 // ── KR8-Zielwerte (default) ───────────────────────────────────────
 const KR8_TARGET = [
   { x: 450,  y: 0, z: 150  },  // A1 Rz  — X=oben(Z), Z=horizontal(X)
-  { x: 610,  y: 0, z: 0    },  // A2 Ry  — X=oben
+  { x: 0,    y: 0, z: 610  },  // A2 Ry
   { x: 200,  y: 0, z: 0    },  // A3 Ry
   { x: 0,    y: 0, z: 630  },  // A4 Rx
   { x: 0,    y: 0, z: 80   },  // A5 Ry
@@ -211,9 +211,10 @@ function cumulativeAxisPositions() {
   // A1/A2: direkt X→Three.X, Z→Three.Z
   // A3+:   X↔Z getauscht (A2 Ry-Referenzpose dreht lokales CS)
   let x = 0, y = 0, z = 0;
-  return state.axisPoints.map((p) => {
+  return state.axisPoints.map((p, i) => {
     const px = num(p.x)||0, py = num(p.y)||0, pz = num(p.z)||0;
-    x += pz; y += py; z += px;  // X↔Z für alle Gelenke
+    if (i === 1) { x += px; y += py; z += pz; }  // A2: kein Swap
+    else         { x += pz; y += py; z += px; }   // A1, A3+: X↔Z
     return new THREE.Vector3(x, y, z);
   });
 }
