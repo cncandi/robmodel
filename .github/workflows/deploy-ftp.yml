@@ -48,6 +48,7 @@ jobs:
           protocol: ftp
           port: 21
           local-dir: ./
+          state-name: .ftp-deploy-sync-state-v2.json
           exclude: |
             **/.git*
             **/.git*/**
