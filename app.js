@@ -204,11 +204,28 @@ function rebuildRobotKinematics(){
 function axisVectorForJoint(i){
   return fixedAxisVector(i);
 }
+function axisWorldVector(i){
+  const axis=axisVectorForJoint(i);
+  if(axis==='x')return new THREE.Vector3(1,0,0);
+  if(axis==='y')return new THREE.Vector3(0,1,0);
+  return new THREE.Vector3(0,0,1);
+}
 function applyJointRotations(){
+  // Jede Achse dreht am eigenen Pivot, aber um die feste Ausrichtung des
+  // fachlichen World-/Roboter-Koordinatensystems. Dadurch bleibt z. B. A3
+  // auch nach gedrehter A1/A2-Bewegung weiterhin eine World-Y-Drehung.
+  axisPivotGroups.forEach(g=>g.quaternion.identity());
+  scene.updateMatrixWorld(true);
+
   axisPivotGroups.forEach((g,i)=>{
-    g.rotation.set(0,0,0);
-    const ref=(parseReferencePose()[i]||0);const a=deg(((state.jointAngles[i]||0)-ref)*(num(state.joints[i]?.rotationSign)??1)), axis=axisVectorForJoint(i);
-    if(axis==='x')g.rotation.x=a; else if(axis==='y')g.rotation.y=a; else g.rotation.z=a;
+    const ref=parseReferencePose()[i]||0;
+    const angle=deg(((state.jointAngles[i]||0)-ref)*(num(state.joints[i]?.rotationSign)??1));
+    const parentQuat=new THREE.Quaternion();
+    g.parent?.getWorldQuaternion(parentQuat);
+
+    const localAxis=axisWorldVector(i).applyQuaternion(parentQuat.invert()).normalize();
+    g.quaternion.setFromAxisAngle(localAxis,angle);
+    g.updateMatrixWorld(true);
   });
   scene.updateMatrixWorld(true);
 }
@@ -422,8 +439,8 @@ function renderAxisPointRows(){
 
 function fixedAxisType(i){return ['Rz','Ry','Ry','Rx','Ry','Rx'][i]||'Rz'}
 function nominalAxisVector(i){return ['z','y','y','x','y','x'][i]||'z'}
-function axisDirectionLabel(i){return fixedAxisType(i)+' · um '+nominalAxisVector(i).toUpperCase()}
-// v37: Die Achs-Drehvektoren werden immer im fachlichen 0°-Roboter-Koordinatensystem definiert.
+function axisDirectionLabel(i){return fixedAxisType(i)+' · World '+nominalAxisVector(i).toUpperCase()}
+// v37: Die Achs-Drehvektoren werden immer im fachlichen World-/Roboter-Koordinatensystem definiert.
 // Die STL-/Roboter-Transformation Rx/Ry/Rz aus der UI wird hier ausdrücklich NICHT berücksichtigt.
 function fixedAxisVector(i){return nominalAxisVector(i)}
 function setJointAnglesToReferencePose(){
