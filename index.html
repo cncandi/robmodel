@@ -138,8 +138,8 @@ try{init3d();}catch(e){showError('init3d: '+e);}
 // ── Event-Listener ───────────────────────────────────────────
 $('demoBtn').onclick=demo;$('downloadJson').onclick=downloadJson;$('downloadZip').onclick=downloadZip;$('resetView').onclick=resetView;$('toggleGrid').onclick=()=>grid.visible=!grid.visible;$('robotGround').onclick=()=>ground(robotGroup,'r');$('toolGround').onclick=()=>ground(toolGroup,'t');$('robotReset').onclick=()=>{state.robotTr=defaultRobotDisplayTransform();setInputs('r',state.robotTr);applyTransforms();fitCamera()};if($('jointReset'))$('jointReset').onclick=()=>{stopSimulation();setJointAnglesToReferencePose();renderJointAngleRows();renderRows();applyTransforms();};$('toolReset').onclick=()=>{state.toolTr={x:0,y:0,z:0,rx:0,ry:0,rz:0};setInputs('t',state.toolTr);applyTransforms();fitCamera()};
 
-// ── Demo-Modell beim Start + Render-Loop ─────────────────────
-try{demo();}catch(e){showError('demo: '+e);}
+// ── Leerer Startzustand + Render-Loop ────────────────────────
+try{renderAll();}catch(e){showError('renderAll: '+e);}
 animate();
 
 function init3d(){const canvas=$('viewer');renderer=new THREE.WebGLRenderer({canvas,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));scene=new THREE.Scene();scene.background=new THREE.Color(0x050b14);camera=new THREE.PerspectiveCamera(45,1,1,100000);camera.position.set(1600,-2200,1300);camera.up.set(0,0,1);controls=new OrbitControls(camera,canvas);controls.enablePan=true;controls.screenSpacePanning=true;controls.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};canvas.addEventListener('contextmenu',e=>e.preventDefault());canvas.addEventListener('auxclick',e=>{if(e.button===1){e.preventDefault();e.stopPropagation();}},true);canvas.addEventListener('mousedown',e=>{if(e.button===1){e.preventDefault();}},true);controls.target.set(450,0,550);controls.update();scene.add(new THREE.HemisphereLight(0xffffff,0x94a3b8,2.4));const d=new THREE.DirectionalLight(0xffffff,2.1);d.position.set(1500,-2000,2500);scene.add(d);grid=new THREE.GridHelper(4000,40,0x1b3454,0x0f2038);grid.rotation.x=Math.PI/2;scene.add(grid);scene.add(new THREE.AxesHelper(900));robotGroup=new THREE.Group();toolGroup=new THREE.Group();scene.add(robotGroup,toolGroup);axisPointGroup=new THREE.Group();scene.add(axisPointGroup);raycaster=new THREE.Raycaster();mouse=new THREE.Vector2();transformControls=new TransformControls(camera,renderer.domElement);transformControls.addEventListener('dragging-changed',e=>controls.enabled=!e.value);transformControls.addEventListener('objectChange',onAxisObjectMoved);scene.add(transformControls);renderer.domElement.addEventListener('pointerdown',pickAxisPoint);tcpMarker=new THREE.Group();tcpMarker.add(new THREE.Mesh(new THREE.SphereGeometry(28,20,12),new THREE.MeshStandardMaterial({color:'#8b5cf6',emissive:'#7c3aed',emissiveIntensity:.3})));tcpMarker.visible=false;toolGroup.add(tcpMarker);new ResizeObserver(resize).observe(canvas.parentElement);resize();setTimeout(()=>setView('iso'),0)}
@@ -313,11 +313,28 @@ function rebuildRobotKinematics(){
 function axisVectorForJoint(i){
   return fixedAxisVector(i);
 }
+function axisWorldVector(i){
+  const axis=axisVectorForJoint(i);
+  if(axis==='x')return new THREE.Vector3(1,0,0);
+  if(axis==='y')return new THREE.Vector3(0,1,0);
+  return new THREE.Vector3(0,0,1);
+}
 function applyJointRotations(){
+  // Jede Achse dreht am eigenen Pivot, aber um die feste Ausrichtung des
+  // fachlichen World-/Roboter-Koordinatensystems. Dadurch bleibt z. B. A3
+  // auch nach gedrehter A1/A2-Bewegung weiterhin eine World-Y-Drehung.
+  axisPivotGroups.forEach(g=>g.quaternion.identity());
+  scene.updateMatrixWorld(true);
+
   axisPivotGroups.forEach((g,i)=>{
-    g.rotation.set(0,0,0);
-    const ref=(parseReferencePose()[i]||0);const a=deg(((state.jointAngles[i]||0)-ref)*(num(state.joints[i]?.rotationSign)??1)), axis=axisVectorForJoint(i);
-    if(axis==='x')g.rotation.x=a; else if(axis==='y')g.rotation.y=a; else g.rotation.z=a;
+    const ref=parseReferencePose()[i]||0;
+    const angle=deg(((state.jointAngles[i]||0)-ref)*(num(state.joints[i]?.rotationSign)??1));
+    const parentQuat=new THREE.Quaternion();
+    g.parent?.getWorldQuaternion(parentQuat);
+
+    const localAxis=axisWorldVector(i).applyQuaternion(parentQuat.invert()).normalize();
+    g.quaternion.setFromAxisAngle(localAxis,angle);
+    g.updateMatrixWorld(true);
   });
   scene.updateMatrixWorld(true);
 }
@@ -531,8 +548,8 @@ function renderAxisPointRows(){
 
 function fixedAxisType(i){return ['Rz','Ry','Ry','Rx','Ry','Rx'][i]||'Rz'}
 function nominalAxisVector(i){return ['z','y','y','x','y','x'][i]||'z'}
-function axisDirectionLabel(i){return fixedAxisType(i)+' · um '+nominalAxisVector(i).toUpperCase()}
-// v37: Die Achs-Drehvektoren werden immer im fachlichen 0°-Roboter-Koordinatensystem definiert.
+function axisDirectionLabel(i){return fixedAxisType(i)+' · World '+nominalAxisVector(i).toUpperCase()}
+// v37: Die Achs-Drehvektoren werden immer im fachlichen World-/Roboter-Koordinatensystem definiert.
 // Die STL-/Roboter-Transformation Rx/Ry/Rz aus der UI wird hier ausdrücklich NICHT berücksichtigt.
 function fixedAxisVector(i){return nominalAxisVector(i)}
 function setJointAnglesToReferencePose(){

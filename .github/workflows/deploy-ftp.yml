@@ -13,31 +13,38 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate FTP secrets
+      - name: Validate FTP settings
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_HOST: ${{ secrets.FTP_HOST }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_USER: ${{ secrets.FTP_USER }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
+          FTP_TARGET_DIR: ${{ secrets.FTP_TARGET_DIR }}
         run: |
+          server="${FTP_SERVER:-$FTP_HOST}"
+          username="${FTP_USERNAME:-$FTP_USER}"
+          password="${FTP_PASSWORD:-$FTP_PASS}"
+          server_dir="${FTP_SERVER_DIR:-$FTP_TARGET_DIR}"
+
           missing=0
-          for key in FTP_SERVER FTP_USERNAME FTP_PASSWORD FTP_SERVER_DIR; do
+          for key in server username password server_dir; do
             if [ -z "${!key}" ]; then
-              echo "::error::$key is missing"
+              echo "::error::$key is missing. Configure FTP_SERVER/FTP_HOST, FTP_USERNAME/FTP_USER, FTP_PASSWORD/FTP_PASS and FTP_SERVER_DIR/FTP_TARGET_DIR in repository or organization secrets."
               missing=1
-            else
-              echo "$key is set"
             fi
           done
-          exit $missing
+          [ "$missing" -eq 0 ] || exit 1
 
       - name: Deploy repository to FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          server: ${{ secrets.FTP_SERVER || secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME || secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASSWORD || secrets.FTP_PASS }}
+          server-dir: ${{ secrets.FTP_SERVER_DIR || secrets.FTP_TARGET_DIR }}
           protocol: ftp
           port: 21
           local-dir: ./
