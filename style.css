@@ -214,3 +214,57 @@ body.bg-vivid { --bg:#0d0518; --bg2:#140825; --bg3:#1a0e35; --bg4:#221448; --acc
 .axis-stl-btn:hover { background: var(--blue); color: #fff; }
 .axis-stl-clear { font-size: .45em; padding: 2px 5px; background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; border-radius: 3px; cursor: pointer; flex-shrink: 0; }
 .axis-stl-clear:hover { background: rgba(239,68,68,.35); }
+
+/* ═══════════════════════════════════════════════════════
+   THEMES (identisch zu RobSimul)
+   --bg → --bg0, --bg2 → --bg1 usw. gemappt
+   ═══════════════════════════════════════════════════════ */
+
+/* bg-pro: Visual Studio / Windows Professional */
+body.bg-pro {
+  --bg:#1e1e1e; --bg2:#252526; --bg3:#2d2d30; --bg4:#3e3e42;
+  --bdr:#474747; --txt:#cccccc; --txt2:#9d9d9d; --txt3:#707070;
+  --acc:#0078d4; --blue:#0078d4;
+}
+
+/* bg-white: Hell / Papier */
+body.bg-white {
+  --bg:#f5f5f0; --bg2:#eaeae5; --bg3:#e0e0da; --bg4:#d5d5cf;
+  --bdr:#b8b8b2; --txt:#060e1e; --txt2:#0a1e38; --txt3:#1a3a5a;
+  --acc:#cc4400; --blue:#0055cc;
+}
+
+/* bg-minimal: Grau/Monochrom */
+body.bg-minimal {
+  --bg:#f4f4f4; --bg2:#ebebeb; --bg3:#e0e0e0; --bg4:#d4d4d4;
+  --bdr:#b0b0b0; --txt:#111111; --txt2:#333333; --txt3:#666666;
+  --acc:#222222; --blue:#0044aa;
+}
+
+/* bg-win11: Windows 11 */
+body.bg-win11 {
+  --bg:#f3f6fc; --bg2:#e8eef8; --bg3:#dde5f5; --bg4:#d0daef;
+  --bdr:#9aadcf; --txt:#0a0a14; --txt2:#1a2a4a; --txt3:#3a5080;
+  --acc:#0067c0; --blue:#0067c0;
+}
+
+/* bg-deep: Sehr dunkel, orange */
+body.bg-deep {
+  --bg:#000408; --bg2:#040810; --bg3:#080e18; --bg4:#0c1420;
+  --bdr:#1a2a3a; --txt:#e8f4ff; --txt2:#b0c8e0; --txt3:#6090b0;
+  --acc:#ff6600; --blue:#ff6600;
+}
+
+/* bg-vivid: Lila/Pink/Cyan */
+body.bg-vivid {
+  --bg:#0d0518; --bg2:#130820; --bg3:#1a0e2e; --bg4:#22123a;
+  --bdr:#4a2080; --txt:#f0e8ff; --txt2:#c8a8f0; --txt3:#9060c0;
+  --acc:#cc44ff; --blue:#cc44ff;
+}
+
+/* bg-matrix: Matrix-Grün */
+body.bg-matrix {
+  --bg:#000800; --bg2:#010d01; --bg3:#021202; --bg4:#031803;
+  --bdr:#0a3a0a; --txt:#a0ffa0; --txt2:#60cc60; --txt3:#308030;
+  --acc:#00cc44; --blue:#00cc44;
+}

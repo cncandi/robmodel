@@ -844,6 +844,25 @@ function initAxisStlEvents() {
   });
 }
 
+
+// ── Theme-System (wie RobSimul) ────────────────────────────────
+const THEMES      = ['dark','bg-pro','bg-white','bg-minimal','bg-win11','bg-deep','bg-vivid','bg-matrix'];
+const THEME_NAMES = ['Dark','Pro','White','Minimal','Win11','Deep','Vivid','Matrix'];
+const THEME_BG    = [0x070d1a,0x1e1e1e,0xf0f0eb,0xf4f4f4,0xf3f6fc,0x000408,0x1a0a2e,0x000800];
+const THEME_GRID  = [0x0e1e30,0x2d2d30,0xbbbbaa,0xcccccc,0xc8d8e8,0x0a1020,0x2a1040,0x001400];
+let _themeIdx = 0;
+
+function applyTheme(idx) {
+  _themeIdx = ((idx % THEMES.length) + THEMES.length) % THEMES.length;
+  THEMES.forEach(t => document.body.classList.remove(t));
+  if (THEMES[_themeIdx] !== 'dark') document.body.classList.add(THEMES[_themeIdx]);
+  if (scene) scene.background = new THREE.Color(THEME_BG[_themeIdx]);
+  if (grid)  { if(Array.isArray(grid.material)) grid.material.forEach(m=>m.color.set(THEME_GRID[_themeIdx])); else grid.material.color.set(THEME_GRID[_themeIdx]); }
+  const btn = $('themeBtn');
+  if (btn) btn.title = 'Theme: ' + THEME_NAMES[_themeIdx];
+  try { localStorage.setItem('robmodel_theme', _themeIdx); } catch(e){}
+}
+
 window.selectAxisPoint = selectAxisPoint;
 
 // ── Event-Listener ─────────────────────────────────────────────────
@@ -857,6 +876,9 @@ $('robotReset').onclick   = () => { state.robotTr=defaultRobotTr(); setInputs('r
 $('toolGround').onclick   = () => ground(toolGroup,'t');
 $('toolReset').onclick    = () => { state.toolTr=defaultToolTr(); setInputs('t',state.toolTr); applyTransforms(); fitCamera(); };
 initAxisStlEvents();
+// Theme laden + Button
+try { const saved = localStorage.getItem('robmodel_theme'); if(saved !== null) applyTheme(parseInt(saved)); } catch(e){}
+$('themeBtn').onclick = () => applyTheme(_themeIdx + 1);
 $('jointReset').onclick   = () => { stopSimulation(); setJointAnglesToReferencePose(); renderJointAngleRows(); renderRows(); applyTransforms(); };
 $('sourceZip').addEventListener('change', e => e.target.files[0] && loadSourceZip(e.target.files[0]).catch(err=>alert(err.message)));
 $('checkZip').addEventListener('change',  e => e.target.files[0] && loadPackageZip(e.target.files[0]).catch(err=>alert(err.message)));
