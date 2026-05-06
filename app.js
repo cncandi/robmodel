@@ -27,7 +27,7 @@ const KR8_TARGET = [
   { x: 135,  y: 0, z: 0 },
   { x: 0,   y: 0, z: 0 },
 ];
-const defOffset = i => ({ ...KR8_TARGET[i] });
+function defOffset(i) { return { ...KR8_TARGET[i] }; }
 
 // ── State ─────────────────────────────────────────────────────────
 const state = {
@@ -151,8 +151,8 @@ function resize() {
 function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
 
 // ── Transforms ─────────────────────────────────────────────────────
-const defaultRobotTr = () => ({ x: 0, y: 0, z: 0, rx: -90, ry: 0, rz: -90 });
-const defaultToolTr  = () => ({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 });
+function defaultRobotTr() { return { x: 0, y: 0, z: 0, rx: -90, ry: 0, rz: -90 }; }
+function defaultToolTr()  { return { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 }; }
 
 function readInputs(p) {
   return { x: num($(p+'X').value)||0, y: num($(p+'Y').value)||0, z: num($(p+'Z').value)||0,
@@ -195,9 +195,9 @@ function ground(group, p) {
 }
 
 // ── Kinematik ──────────────────────────────────────────────────────
-const fixedAxisType   = i => ['Rz','Ry','Ry','Rx','Ry','Rx'][i] || 'Rz';
-const nominalAxisVec  = i => ['z','y','y','x','y','x'][i] || 'z';
-const axisDirectionLabel = i => fixedAxisType(i) + ' · ' + nominalAxisVec(i).toUpperCase();
+function fixedAxisType(i)    { return ['Rz','Ry','Ry','Rx','Ry','Rx'][i] || 'Rz'; }
+function nominalAxisVec(i)   { return ['z','y','y','x','y','x'][i] || 'z'; }
+function axisDirectionLabel(i) { return fixedAxisType(i) + ' · ' + nominalAxisVec(i).toUpperCase(); }
 
 function cumulativeAxisPositions() {
   let x = 0, y = 0, z = 0;
@@ -420,8 +420,8 @@ function resetData() {
   state.tcp.abtragen={...state.tcp.auftragen};
 }
 
-const enableSave  = () => { $('downloadJson').disabled=false; $('downloadZip').disabled=false; };
-const disableSave = () => { $('downloadJson').disabled=true;  $('downloadZip').disabled=true; };
+function enableSave()  { $('downloadJson').disabled=false; $('downloadZip').disabled=false; }
+function disableSave() { $('downloadJson').disabled=true;  $('downloadZip').disabled=true; }
 
 async function loadSourceZip(file) {
   resetData(); state.mode='source';
