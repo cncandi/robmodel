@@ -7,7 +7,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
-body{font-family:'Consolas','Courier New',monospace;font-size:12px;
+body{font-family:'Consolas','Courier New',monospace;font-size:14px;
      background:var(--bg);color:var(--txt);display:flex;flex-direction:column;height:100vh}
 input,select,button{font:inherit;color:inherit}
 input[type="file"]{display:none}
@@ -15,8 +15,8 @@ input[type="file"]{display:none}
 /* ── HEADER ──────────────────────────────────────── */
 header.top{background:var(--bg4);border-bottom:2px solid var(--acc);
   padding:3px 8px;display:flex;align-items:center;gap:8px;flex-shrink:0}
-header.top .title h1{font-size:.95em;font-weight:700;color:var(--acc);letter-spacing:1px}
-header.top .title .subtitle{font-size:.62em;color:var(--txt3)}
+header.top .title h1{font-size:1.00em;font-weight:700;color:var(--acc);letter-spacing:1px}
+header.top .title .subtitle{font-size:.72em;color:var(--txt3)}
 header.top .toolbar{display:flex;align-items:center;gap:3px;flex:1}
 header.top button, header.top .filebtn{
   background:var(--bg3);border:1px solid var(--bdr);color:var(--txt2);
@@ -43,7 +43,7 @@ section.viewerCard canvas{position:absolute;inset:0;width:100%!important;height:
 .viewerHead button:hover{background:var(--acc);color:#fff}
 .row{display:flex;align-items:center}.gap4{gap:4px}
 .viewHelp{position:absolute;bottom:6px;left:0;right:0;text-align:center;
-  font-size:.62em;color:var(--txt3);pointer-events:none;z-index:10}
+  font-size:.72em;color:var(--txt3);pointer-events:none;z-index:10}
 .viewPresets{position:absolute;top:36px;left:6px;display:flex;flex-direction:column;gap:2px;z-index:10}
 .viewPresets button{padding:2px 5px;font-size:.65em;background:rgba(10,21,37,.85);
   border:1px solid var(--bdr);color:var(--txt2);border-radius:2px;cursor:pointer;width:42px}
@@ -76,7 +76,7 @@ aside.side::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px}
 .grid6{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-bottom:4px}
 .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-bottom:4px}
 .field{display:flex;flex-direction:column;gap:2px}
-.field label{font-size:.62em;color:var(--txt3);font-weight:600}
+.field label{font-size:.72em;color:var(--txt3);font-weight:600}
 .field input,.field select{background:var(--bg2);border:1px solid var(--bdr);border-radius:2px;
   padding:2px 3px;font-size:.78em;color:var(--txt);width:100%}
 .field input[type="text"]{width:100%}
