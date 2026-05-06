@@ -632,8 +632,8 @@ async function loadDemoKr8() {
       state.files.push({ path: fname, name: fname, size: buf.byteLength, type: 'STL' });
     }
     splitFiles();
-    state.robotTr=defaultRobotTr(); setInputs('r', state.robotTr);
-    state.toolTr=defaultToolTr();   setInputs('t', state.toolTr);
+    state.robotTr={x:0,y:0,z:0,rx:0,ry:0,rz:0}; setInputs('r', state.robotTr);
+    state.toolTr ={x:0,y:0,z:0,rx:0,ry:0,rz:0}; setInputs('t', state.toolTr);
     setJointAnglesToReferencePose();
     await loadStls(); enableSave(); renderAll(); setView('iso');
   } catch(e) {
