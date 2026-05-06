@@ -308,7 +308,7 @@ function parseReferencePose() {
   state.referencePose = [0,-90,90,0,0,0]; return state.referencePose;
 }
 function setJointAnglesToReferencePose() {
-  state.jointAngles = parseReferencePose().slice(0, 6);
+  state.jointAngles = [0, 0, 0, 0, 0, 0];  // Offset-System: 0 = Referenzpose
   while (state.jointAngles.length < 6) state.jointAngles.push(0);
 }
 
