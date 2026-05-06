@@ -836,8 +836,10 @@ function renderAxisStlRows() {
     const src = mapped || fallback;
     const name = src ? norm(src) : '—';
     const hasFile = !!src;
+    const col = colors[ax] || '#999999';
     return `<div class="axis-stl-row">
       <span class="axis-stl-label">${ax}</span>
+      <input type="color" class="axis-color-pick" data-ax="${ax}" value="${col}" title="Farbe ${ax}">
       <span class="axis-stl-name${hasFile ? ' has-file' : ''}" title="${name}">${name}</span>
       <button class="axis-stl-btn" data-ax="${ax}">+ STL</button>
       ${hasFile ? `<button class="axis-stl-clear" data-ax="${ax}">✕</button>` : ''}
@@ -845,7 +847,20 @@ function renderAxisStlRows() {
   }).join('');
 }
 
+function setAxisColor(ax, hex) {
+  colors[ax] = hex;
+  for (const [path, mesh] of meshes) {
+    const file = state.stls.find(f => f.path === path) || { name: mesh.name };
+    const key = (state.axisStlMap[ax] && norm(state.axisStlMap[ax]) === norm(file.name)) ? ax : partKey(file.name);
+    if (key === ax) mesh.material.color.set(hex);
+  }
+}
+
 function initAxisStlEvents() {
+  document.addEventListener('input', e => {
+    const cp = e.target.closest('.axis-color-pick');
+    if (cp) setAxisColor(cp.dataset.ax, cp.value);
+  });
   document.addEventListener('click', e => {
     const btn = e.target.closest('.axis-stl-btn');
     const clr = e.target.closest('.axis-stl-clear');
