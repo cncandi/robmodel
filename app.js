@@ -43,7 +43,7 @@ const state = {
   activeTcp: 'auftragen',
   axisPoints: ['A1','A2','A3','A4','A5','A6'].map((name, i) => ({ name, ...defOffset(i), rx: 0, ry: 0, rz: 0, source: 'KR8 Zielwert' })),
   selectedAxis: 0,
-  jointAngles: [0, 0, 0, 0, 0, 0],  // 0 = Referenzpose
+  jointAngles: [0, -90, 90, 0, 0, 0],
   axisStlMap: { A1:null, A2:null, A3:null, A4:null, A5:null, A6:null }, // manuelle STL-Zuweisung
   simulation: { active: false, axis: null, raf: null },
   joints: ['A1','A2','A3','A4','A5','A6'].map((n, i) => ({
@@ -567,7 +567,7 @@ function resetData() {
   meshes.clear();
   state.files=[]; state.stls=[]; state.xmls=[]; state.jsons=[];
   state.buffers=new Map(); state.packageJson=null; state.mode='leer'; state.robotName='';
-  state.jointAngles=[0,0,0,0,0,0]; state.referencePose=[0,-90,90,0,0,0];
+  state.jointAngles=[0,-90,90,0,0,0]; state.referencePose=[0,-90,90,0,0,0];
   if ($('refPose')) $('refPose').value='0,-90,90,0,0,0';
   state.robotTr={x:0,y:0,z:0,rx:0,ry:0,rz:0}; state.toolTr={x:0,y:0,z:0,rx:0,ry:0,rz:0};
   state.axisPoints=['A1','A2','A3','A4','A5','A6'].map((name,i)=>({name,...defOffset(i),rx:0,ry:0,rz:0,source:'KR8 Zielwert'}));
@@ -615,7 +615,7 @@ async function loadJsonFile(file) {
 
 function zeroAllTransforms() {
   state.robotTr={x:0,y:0,z:0,rx:0,ry:0,rz:0}; state.toolTr={x:0,y:0,z:0,rx:0,ry:0,rz:0};
-  state.jointAngles=[0,0,0,0,0,0];
+  state.jointAngles=[0,-90,90,0,0,0];
   setInputs('r',state.robotTr); setInputs('t',state.toolTr);
   renderJointAngleRows();
 }
