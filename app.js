@@ -585,8 +585,8 @@ function resetData() {
   state.tcp.abtragen={...state.tcp.auftragen};
 }
 
-function enableSave()  { $('downloadJson').disabled=false; $('downloadZip').disabled=false; }
-function disableSave() { $('downloadJson').disabled=true;  $('downloadZip').disabled=true; }
+function enableSave()  { $('downloadJson').disabled=false; $('downloadZip').disabled=false; $('roblibBtn').disabled=false; }
+function disableSave() { $('downloadJson').disabled=true;  $('downloadZip').disabled=true;  $('roblibBtn').disabled=true; }
 
 async function loadSourceZip(file) {
   resetData(); state.mode='source';
@@ -900,7 +900,73 @@ function initAxisStlEvents() {
 }
 
 
-// ── Theme-System (wie RobSimul) ────────────────────────────────
+// ── ROBLIB Upload ───────────────────────────────────────────────
+const ROBLIB_API = 'https://www.cnc-technik.de/robsimul/roblib/api.php';
+
+function openRoblibModal() {
+  $('rl-name').value   = state.robotName || '';
+  $('rl-achsen').value = 6;
+  $('rl-msg').style.display = 'none';
+  $('roblibModal').style.display = 'flex';
+}
+
+async function uploadToRoblib() {
+  const btn = $('rl-submit');
+  const msg = $('rl-msg');
+  const show = (text, ok) => {
+    msg.textContent = text;
+    msg.className = 'rl-msg ' + (ok ? 'rl-ok' : 'rl-err');
+    msg.style.display = '';
+  };
+
+  const fields = {
+    name:                   $('rl-name').value.trim(),
+    marke:                  $('rl-marke').value.trim(),
+    modell:                 $('rl-modell').value.trim(),
+    achsen:                 $('rl-achsen').value.trim(),
+    reichweite_mm:          $('rl-reichweite').value.trim(),
+    nutzlast_kg:            $('rl-nutzlast').value.trim(),
+    gewicht_kg:             $('rl-gewicht').value.trim(),
+    wiederholgenauigkeit_mm:$('rl-wdh').value.trim(),
+    user:                   $('rl-user').value.trim(),
+    pass:                   $('rl-pass').value,
+  };
+  for (const [k, v] of Object.entries(fields)) {
+    if (!v) { show('Feld "' + k + '" fehlt.', false); return; }
+  }
+
+  btn.disabled = true; btn.textContent = 'Lade…';
+  try {
+    // ZIP erzeugen
+    const zip  = new JSZip();
+    const base = zipName(state.robotName || 'robot');
+    zip.file(base + '.json', JSON.stringify(buildJson(), null, 2));
+    for (const [, mesh] of meshes) zip.file(mesh.name, exportBinaryStl(mesh));
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+    fd.append('zip', zipBlob, base + '.zip');
+    const thumb = $('rl-thumb').files[0];
+    if (thumb) fd.append('thumb', thumb, thumb.name);
+
+    const res  = await fetch(ROBLIB_API + '?action=upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.ok) {
+      show('✓ Erfolgreich hochgeladen: ' + data.robot.name, true);
+    } else {
+      show('Fehler: ' + data.error, false);
+    }
+  } catch (e) {
+    show('Netzwerkfehler: ' + e.message, false);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Hochladen';
+  }
+}
+
+$('roblibBtn').onclick  = openRoblibModal;
+$('roblibClose').onclick = () => { $('roblibModal').style.display = 'none'; };
+$('rl-submit').onclick  = uploadToRoblib;
 const THEMES      = ['dark','bg-pro','bg-white','bg-minimal','bg-win11','bg-deep','bg-vivid','bg-matrix'];
 const THEME_NAMES = ['Dark','Pro','White','Minimal','Win11','Deep','Vivid','Matrix'];
 const THEME_BG    = [0x070d1a,0x1e1e1e,0xf0f0eb,0xf4f4f4,0xf3f6fc,0x000408,0x1a0a2e,0x000800];
