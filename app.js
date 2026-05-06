@@ -60,7 +60,7 @@ const state = {
 
 // ── Three.js Variablen ────────────────────────────────────────────
 let scene, camera, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot;
-let axisPointGroup, axisLine, transformControls, raycaster, mouse;
+let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup;
 const meshes = new Map();
 const axisMeshes = [];
 const axisPivotGroups = [];
@@ -118,6 +118,8 @@ function init3d() {
 
   axisPointGroup = new THREE.Group();
   scene.add(axisPointGroup);
+  csHelperGroup = new THREE.Group();
+  scene.add(csHelperGroup);
 
   raycaster = new THREE.Raycaster();
   mouse = new THREE.Vector2();
@@ -330,6 +332,7 @@ function updateAxisPointVisuals() {
 
   const selected = axisMeshes[state.selectedAxis];
   if (selected) transformControls.attach(selected);
+  updateCSHelper();
 
   const badge = $('axisSelBadge');
   if (badge) {
@@ -370,9 +373,50 @@ function onAxisObjectMoved() {
   syncJointsFromAxisPoints(); rebuildRobotKinematics(); applyTransforms(); renderRows(); renderIssues();
 }
 
+
+function updateCSHelper() {
+  // Altes CS-Helper entfernen
+  while (csHelperGroup.children.length) csHelperGroup.children.pop();
+  if (!axisMeshes.length) return;
+
+  const pts = cumulativeAxisPositions();
+  const pos = pts[state.selectedAxis] || new THREE.Vector3();
+  const L = 380;   // Pfeillänge mm
+  const H = 30;    // Pfeilkopf
+  const axes = [
+    { dir: new THREE.Vector3(1,0,0), color: 0xff2222, label: 'X' },
+    { dir: new THREE.Vector3(0,1,0), color: 0x22dd22, label: 'Y' },
+    { dir: new THREE.Vector3(0,0,1), color: 0x2288ff, label: 'Z' },
+  ];
+  axes.forEach(({ dir, color, label }) => {
+    const arrow = new THREE.ArrowHelper(dir, pos, L, color, H, H * 0.6);
+    arrow.line.material.linewidth = 4;
+    arrow.renderOrder = 998;
+    csHelperGroup.add(arrow);
+
+    // Label-Sprite
+    const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0,0,128,128);
+    ctx.fillStyle = '#' + color.toString(16).padStart(6,'0');
+    ctx.font = 'bold 90px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, 64, 64);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(c), transparent: true, depthTest: false
+    }));
+    sp.scale.set(160, 160, 1);
+    sp.position.copy(pos).addScaledVector(dir, L + 100);
+    sp.renderOrder = 999;
+    csHelperGroup.add(sp);
+  });
+}
+
 function selectAxisPoint(i) {
   state.selectedAxis = Math.max(0, Math.min(5, Number(i) || 0));
   updateAxisPointVisuals();
+  updateCSHelper();
 }
 
 // ── STL laden ──────────────────────────────────────────────────────
