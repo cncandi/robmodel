@@ -618,7 +618,7 @@ async function loadJsonFile(file) {
 }
 
 async function loadDemoKr8() {
-  const BASE  = './stl/';
+  const BASE  = '../stl/';
   const FILES = ['podest.stl','a1.stl','a2.stl','a3.stl','a4.stl','a5.stl','a6.stl','tool1_tcp.stl'];
   resetData(); state.mode='source'; state.robotName='KR8';
   const btn = $('demoBtn');
