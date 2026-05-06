@@ -155,25 +155,27 @@ canvas#viewer { flex: 1; display: block; width: 100%; }
 /* ── Footer ─────────────────────────────────────── */
 .bottom {
   display: flex; gap: 0; border-top: 1px solid var(--bdr);
-  background: var(--bg2); max-height: 240px; overflow: hidden;
+  background: var(--bg2); overflow: hidden;
   flex-shrink: 0;
 }
 .panel {
-  flex: 1; overflow: auto; padding: 8px 10px;
-  scrollbar-width: thin; scrollbar-color: var(--bg4) transparent;
+  flex: 1; overflow: hidden; padding: 6px 8px;
 }
-.panel + .panel { border-left: 1px solid var(--bdr); }
-.panel h2 { font-size: .75em; font-weight: 600; color: var(--txt3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+.panel-combined { display: flex; flex-direction: column; }
+.panel-tables { display: flex; gap: 0; flex: 1; overflow: hidden; }
+.panel-sub { flex: 1; overflow: hidden; }
+.panel-divider { width: 1px; background: var(--bdr); flex-shrink: 0; margin: 0 6px; }
+.panel h2 { font-size: .56em; font-weight: 600; color: var(--txt3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
 
 /* Tables */
-table { width: 100%; border-collapse: collapse; font-size: .78em; }
+table { width: 100%; border-collapse: collapse; font-size: .585em; }
 thead tr { background: var(--bg3); }
-th { padding: 4px 6px; text-align: left; font-weight: 600; color: var(--txt2); white-space: nowrap; border-bottom: 1px solid var(--bdr); position: sticky; top: 0; background: var(--bg3); z-index: 1; }
-td { padding: 3px 4px; border-bottom: 1px solid rgba(255,255,255,.03); }
+th { padding: 3px 4px; text-align: left; font-weight: 600; color: var(--txt2); white-space: nowrap; border-bottom: 1px solid var(--bdr); position: sticky; top: 0; background: var(--bg3); z-index: 1; }
+td { padding: 2px 3px; border-bottom: 1px solid rgba(255,255,255,.03); }
 tr.sel td { background: rgba(37,99,235,.12); }
 tr:hover td { background: rgba(255,255,255,.03); }
 td input, td select {
-  background: transparent; border: none; width: 72px; padding: 2px 3px;
+  background: transparent; border: none; width: 54px; padding: 1px 2px;
   font-size: .85em; color: var(--txt);
 }
 td input:focus { background: var(--bg4); border: 1px solid var(--acc); border-radius: 2px; outline: none; }

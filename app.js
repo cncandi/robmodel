@@ -614,23 +614,6 @@ function renderIssues(){const issues=[];if(state.mode==='package')issues.push(..
 
 function packageIssues(){const issues=[];if(state.jsons.length!==1)issues.push(['bad',`Package: ${state.jsons.length} JSON (erwartet: 1).`]);if(!state.packageJson)issues.push(['bad','JSON nicht lesbar.']);if(!state.stls.length)issues.push(['bad','Keine STL.']);const j=state.packageJson;if(j){if(!Array.isArray(j.joints)||j.joints.length!==6)issues.push(['bad','joints: 6 Achsen erwartet.']);const refs=[];Object.values(j.stlFiles||{}).forEach(v=>{if(v?.name)refs.push(v.name)});Object.values(j.sceneModels||{}).forEach(v=>{if(v?.name)refs.push(v.name)});const stlSet=new Set(state.stls.map(f=>norm(f.name)));refs.forEach(r=>{if(!stlSet.has(norm(r)))issues.push(['warn',`STL fehlt: ${r}.stl`]);});}for(const f of state.stls){if(f.size>12000000)issues.push(['warn',`${f.name}: sehr groß (${fmt(f.size)}).`]);}return issues;}
 
-// ── Demo ───────────────────────────────────────────────────────────
-function demo(){
-  resetData(); state.mode='source';
-  state.files=['a1.stl','a2.stl','a3.stl','a4.stl','a5.stl','a6.stl','podest.stl','tool1_tcp.stl','irb.xml'].map(name=>({path:name,name,type:typeOf(name),size:0}));
-  splitFiles(); state.robotName='ABB IRB 4600-40/2.55';
-  setJointAnglesToReferencePose();
-  state.joints.forEach((j,i)=>{const mins=[-180,-90,-180,-179,-125,-179],maxs=[180,150,75,179,120,179];j.min=mins[i];j.max=maxs[i];j.offset=defOffset(i);state.axisPoints[i]={name:j.name,...defOffset(i),rx:0,ry:0,rz:0,source:'Demo'};});
-  state.tcp.auftragen={x:252,y:.75,z:194,rz:0,ry:90,rx:0,toolLength:0,toolStl:'tool1_tcp.stl',status:'Demo'};
-  state.tcp.abtragen={...state.tcp.auftragen};
-  state.robotTr=defaultRobotTr(); setInputs('r',state.robotTr);
-  makeDemoMeshes(); enableSave(); renderAll(); setView('iso');
-}
-function makeDemoMeshes(){
-  const mk=(name,color,x,y,z,sx,sy,sz,parent=robotGroup)=>{const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),new THREE.MeshStandardMaterial({color}));mesh.position.set(x,y,z);mesh.name=name;parent.add(mesh);meshes.set(name,mesh)};
-  mk('podest.stl','#333',0,0,80,260,260,160);mk('a1.stl','#fff',140,0,360,230,230,420);mk('a2.stl','#999',500,0,600,610,150,130);mk('a3.stl','#ff7f00',850,0,720,180,130,120);mk('a4.stl','#ff7f00',1180,0,720,630,100,100);mk('a5.stl','#999',1530,0,720,90,90,130);mk('a6.stl','#666',1630,0,740,90,90,150);mk('tool1_tcp.stl','#64748b',1780,0,740,180,80,80,toolGroup);
-  applyTransforms();
-}
 
 // ── Kameraansichten ────────────────────────────────────────────────
 function sceneBox(){const box=new THREE.Box3().setFromObject(robotGroup);box.expandByObject(toolGroup);box.expandByObject(axisPointGroup);if(!Number.isFinite(box.min.x)){box.min.set(-500,-500,0);box.max.set(1500,500,1500);}return box;}
@@ -647,7 +630,6 @@ function setView(view){
 window.selectAxisPoint = selectAxisPoint;
 
 // ── Event-Listener ─────────────────────────────────────────────────
-$('demoBtn').onclick    = demo;
 $('newBtn').onclick     = () => { resetData(); disableSave(); renderAll(); setView('iso'); };
 $('downloadJson').onclick = downloadJson;
 $('downloadZip').onclick  = downloadZip;

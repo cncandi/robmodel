@@ -31,7 +31,6 @@
       <label class="filebtn" for="checkZip" title="Package-ZIP prüfen">🔍 Package prüfen</label>
       <input id="checkZip" type="file" accept=".zip,application/zip">
 
-      <button id="demoBtn" title="Demo-Roboter laden">Demo</button>
       <button id="newBtn" title="Alles zurücksetzen">Neu</button>
       <span class="sep"></span>
       <button id="downloadJson" disabled title="JSON exportieren">⬇ JSON</button>
@@ -171,38 +170,43 @@
 
   <!-- ─── FOOTER / PARAMETER-TABELLEN ─────────────────────────── -->
   <footer class="bottom">
+    <section class="panel panel-combined">
+      <h2>Parameter &amp; Rotationspunkte</h2>
+      <div class="panel-tables">
 
-    <!-- Kinematik-Parameter -->
-    <section class="panel">
-      <h2>Parameter · Drehpunkte bei 0°</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Achse</th><th>Winkel °</th><th>Dreht</th>
-            <th>X</th><th>Y</th><th>Z</th>
-            <th>Min</th><th>Max</th><th>±</th><th>Sim</th>
-          </tr>
-        </thead>
-        <tbody id="jointRows"></tbody>
-      </table>
+        <!-- Kinematik-Parameter -->
+        <div class="panel-sub">
+          <table>
+            <thead>
+              <tr>
+                <th>Achse</th><th>Winkel °</th><th>Dreht</th>
+                <th>X</th><th>Y</th><th>Z</th>
+                <th>Min</th><th>Max</th><th>±</th><th>Sim</th>
+              </tr>
+            </thead>
+            <tbody id="jointRows"></tbody>
+          </table>
+        </div>
+
+        <div class="panel-divider"></div>
+
+        <!-- Achspunkte -->
+        <div class="panel-sub">
+          <table>
+            <thead>
+              <tr>
+                <th>Achse</th>
+                <th>X</th><th>Y</th><th>Z</th>
+                <th>Rx</th><th>Ry</th><th>Rz</th>
+                <th>Quelle</th>
+              </tr>
+            </thead>
+            <tbody id="axisPointRows"></tbody>
+          </table>
+        </div>
+
+      </div>
     </section>
-
-    <!-- Achspunkte -->
-    <section class="panel">
-      <h2>Rotationspunkte (Abstände zur Vorgängerachse)</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Achse</th>
-            <th>X</th><th>Y</th><th>Z</th>
-            <th>Rx</th><th>Ry</th><th>Rz</th>
-            <th>Quelle</th>
-          </tr>
-        </thead>
-        <tbody id="axisPointRows"></tbody>
-      </table>
-    </section>
-
   </footer>
 
 </div><!-- .wrap -->
