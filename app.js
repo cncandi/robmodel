@@ -20,12 +20,12 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 
 // ── KR8-Zielwerte (default) ───────────────────────────────────────
 const KR8_TARGET = [
-  { x: 175,  y: 0, z: 495 },  // A1
-  { x: 1095, y: 0, z: 0   },  // A2  (lokales X entlang Oberarm, nicht Z)
-  { x: 0,    y: 0, z: 175 },  // A3
-  { x: 1270, y: 0, z: 0   },  // A4
-  { x: 135,  y: 0, z: 0   },  // A5
-  { x: 0,    y: 0, z: 0   },  // A6
+  { x: 175,  y: 0, z: 495  },  // A1 (Offset Basis→A1-Achse)
+  { x: 0,    y: 0, z: 1095 },  // A2
+  { x: 0,    y: 0, z: 175  },  // A3
+  { x: 1270, y: 0, z: 0    },  // A4
+  { x: 135,  y: 0, z: 0    },  // A5
+  { x: 0,    y: 0, z: 0    },  // A6
 ];
 function defOffset(i) { return { ...KR8_TARGET[i] }; }
 
@@ -284,28 +284,31 @@ function updateAxisPointVisuals() {
   if (!axisPointGroup) return;
   clearAxisPointVisuals();
   const pts = cumulativeAxisPositions();
-  const ptsWithA0 = [new THREE.Vector3(0,0,0), ...pts];
+  // Viewport-Labels: Ursprung = A1, pts[0]=A2 … pts[4]=A6.
+  // pts[5] (A6-Offset 0,0,0) wird nicht separat visualisiert.
+  const ptsWithOrigin = [new THREE.Vector3(0,0,0), ...pts.slice(0,5)];
   const sphereGeo = new THREE.SphereGeometry(45, 24, 16);
 
-  // A0
-  const a0 = new THREE.Mesh(sphereGeo.clone(), new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
-  a0.name = 'A0 Ursprung';
-  axisPointGroup.add(a0, makeAxisLabel('A0', new THREE.Vector3(0,0,85)));
+  // A1 am Ursprung
+  const a1Origin = new THREE.Mesh(sphereGeo.clone(), new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
+  a1Origin.name = 'A1 Ursprung';
+  axisPointGroup.add(a1Origin, makeAxisLabel('A1', new THREE.Vector3(0,0,85)));
 
-  pts.forEach((p, i) => {
+  pts.slice(0,5).forEach((p, i) => {
+    const label = 'A' + (i + 2);   // A2 … A6
     const mat = new THREE.MeshStandardMaterial({
       color: i === state.selectedAxis ? 0x2563eb : 0xf59e0b,
       emissive: i === state.selectedAxis ? 0x0f3b85 : 0x7c2d12, emissiveIntensity: .15
     });
     const mesh = new THREE.Mesh(sphereGeo.clone(), mat);
-    mesh.position.copy(p); mesh.userData.axisIndex = i; mesh.name = state.axisPoints[i].name;
-    axisPointGroup.add(mesh, makeAxisLabel(state.axisPoints[i].name, p.clone().add(new THREE.Vector3(0,0,85))));
+    mesh.position.copy(p); mesh.userData.axisIndex = i; mesh.name = label;
+    axisPointGroup.add(mesh, makeAxisLabel(label, p.clone().add(new THREE.Vector3(0,0,85))));
     axisMeshes.push(mesh);
   });
 
-  if (ptsWithA0.length > 1) {
+  if (ptsWithOrigin.length > 1) {
     axisLine = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(ptsWithA0),
+      new THREE.BufferGeometry().setFromPoints(ptsWithOrigin),
       new THREE.LineBasicMaterial({ color: 0xff8a00, linewidth: 2 })
     );
     axisPointGroup.add(axisLine);
