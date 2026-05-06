@@ -120,16 +120,22 @@ const state={files:[],stls:[],xmls:[],jsons:[],buffers:new Map(),robotName:'',ac
   tcp:{auftragen:{x:null,y:null,z:null,rz:null,ry:null,rx:null,toolLength:0,toolStl:'',status:'manuell'},abtragen:{x:null,y:null,z:null,rz:null,ry:null,rx:null,toolLength:0,toolStl:'',status:'manuell'}}
 };
 let scene,camera,renderer,controls,grid,robotGroup,toolGroup,tcpMarker,axisPointGroup,axisLine,transformControls,raycaster,mouse;const meshes=new Map(),axisMeshes=[],axisPivotGroups=[],loader=new STLLoader();
-init3d();demo();animate();
+// ── Fehler-Anzeige ─────────────────────────────────────────
+function showError(msg){
+  const d=document.createElement('div');
+  d.style.cssText='position:fixed;top:0;left:0;right:0;background:#c00;color:#fff;padding:8px 12px;z-index:9999;font-family:monospace;font-size:12px;white-space:pre-wrap';
+  d.textContent='FEHLER: '+msg;document.body.prepend(d);console.error(msg);
+}
+window.addEventListener('error',e=>showError(e.message+' ('+e.filename+':'+e.lineno+')'));
+window.addEventListener('unhandledrejection',e=>showError(String(e.reason)));
 
-window.addEventListener('error', e => {
-  const el = document.getElementById('viewer');
-  if (el) { el.style.display='none'; }
-  const msg = document.createElement('div');
-  msg.style.cssText='position:fixed;top:0;left:0;right:0;background:#c00;color:#fff;padding:10px;z-index:9999;font-family:monospace;font-size:13px';
-  msg.textContent = 'JS Fehler: ' + (e.message || e) + (e.filename ? ' · ' + e.filename + ':' + e.lineno : '');
-  document.body.prepend(msg);
-});
+// ── Event-Listener (immer zuerst, unabhängig von init-Fehlern) ──
+$('demoBtn').onclick=demo;$('downloadJson').onclick=downloadJson;$('downloadZip').onclick=downloadZip;$('resetView').onclick=resetView;$('toggleGrid').onclick=()=>grid.visible=!grid.visible;$('robotGround').onclick=()=>ground(robotGroup,'r');$('toolGround').onclick=()=>ground(toolGroup,'t');$('robotReset').onclick=()=>{state.robotTr=defaultRobotDisplayTransform();setInputs('r',state.robotTr);applyTransforms();fitCamera()};if($('jointReset'))$('jointReset').onclick=()=>{stopSimulation();setJointAnglesToReferencePose();renderJointAngleRows();renderRows();applyTransforms();};$('toolReset').onclick=()=>{state.toolTr={x:0,y:0,z:0,rx:0,ry:0,rz:0};setInputs('t',state.toolTr);applyTransforms();fitCamera()};
+
+// ── Initialisierung ──────────────────────────────────────────
+try{init3d();}catch(e){showError('init3d: '+e);}
+try{demo();}catch(e){showError('demo: '+e);}
+animate();
 
 function init3d(){const canvas=$('viewer');renderer=new THREE.WebGLRenderer({canvas,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));scene=new THREE.Scene();scene.background=new THREE.Color(0x050b14);camera=new THREE.PerspectiveCamera(45,1,1,100000);camera.position.set(1600,-2200,1300);camera.up.set(0,0,1);controls=new OrbitControls(camera,canvas);controls.enablePan=true;controls.screenSpacePanning=true;controls.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};canvas.addEventListener('contextmenu',e=>e.preventDefault());canvas.addEventListener('auxclick',e=>{if(e.button===1){e.preventDefault();e.stopPropagation();}},true);canvas.addEventListener('mousedown',e=>{if(e.button===1){e.preventDefault();}},true);controls.target.set(450,0,550);controls.update();scene.add(new THREE.HemisphereLight(0xffffff,0x94a3b8,2.4));const d=new THREE.DirectionalLight(0xffffff,2.1);d.position.set(1500,-2000,2500);scene.add(d);grid=new THREE.GridHelper(4000,40,0x1b3454,0x0f2038);grid.rotation.x=Math.PI/2;scene.add(grid);scene.add(new THREE.AxesHelper(900));robotGroup=new THREE.Group();toolGroup=new THREE.Group();scene.add(robotGroup,toolGroup);axisPointGroup=new THREE.Group();scene.add(axisPointGroup);raycaster=new THREE.Raycaster();mouse=new THREE.Vector2();transformControls=new TransformControls(camera,renderer.domElement);transformControls.addEventListener('dragging-changed',e=>controls.enabled=!e.value);transformControls.addEventListener('objectChange',onAxisObjectMoved);scene.add(transformControls);renderer.domElement.addEventListener('pointerdown',pickAxisPoint);tcpMarker=new THREE.Group();tcpMarker.add(new THREE.Mesh(new THREE.SphereGeometry(28,20,12),new THREE.MeshStandardMaterial({color:'#8b5cf6',emissive:'#7c3aed',emissiveIntensity:.3})));tcpMarker.visible=false;toolGroup.add(tcpMarker);new ResizeObserver(resize).observe(canvas.parentElement);resize();setTimeout(()=>setView('iso'),0)}
 function resize(){const r=$('viewer').parentElement.getBoundingClientRect();const w=r.width||window.innerWidth;const h=r.height||window.innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
@@ -744,7 +750,6 @@ document.getElementById('btnTheme').addEventListener('click',()=>{
 $('newBtn').onclick=newProject;$('jsonInput').addEventListener('change',e=>e.target.files[0]&&loadJsonFile(e.target.files[0]));
 $('sourceZip').addEventListener('change',e=>e.target.files[0]&&loadSourceZip(e.target.files[0]).catch(err=>alert(err.message)));
 $('checkZip').addEventListener('change',e=>e.target.files[0]&&loadPackageZip(e.target.files[0]).catch(err=>alert(err.message)));
-$('demoBtn').onclick=demo;$('downloadJson').onclick=downloadJson;$('downloadZip').onclick=downloadZip;$('resetView').onclick=resetView;$('toggleGrid').onclick=()=>grid.visible=!grid.visible;$('robotGround').onclick=()=>ground(robotGroup,'r');$('toolGround').onclick=()=>ground(toolGroup,'t');$('robotReset').onclick=()=>{state.robotTr=defaultRobotDisplayTransform();setInputs('r',state.robotTr);applyTransforms();fitCamera()};if($('jointReset'))$('jointReset').onclick=()=>{stopSimulation();setJointAnglesToReferencePose();renderJointAngleRows();renderRows();applyTransforms();};$('toolReset').onclick=()=>{state.toolTr={x:0,y:0,z:0,rx:0,ry:0,rz:0};setInputs('t',state.toolTr);applyTransforms();fitCamera()};
 ['rX','rY','rZ','rRx','rRy','rRz','tX','tY','tZ','tRx','tRy','tRz'].forEach(id=>$(id).addEventListener('input',applyTransforms));if($('refPose'))$('refPose').addEventListener('input',()=>{setJointAnglesToReferencePose();renderJointAngleRows();applyJointRotations();renderJson();renderIssues()});
 qsa('.tab').forEach(t=>t.onclick=()=>{state.activeTcp=t.dataset.mode;renderTcp();renderJson();renderIssues()});qsa('[data-view]').forEach(b=>{b.addEventListener('auxclick',e=>{e.preventDefault();e.stopPropagation();});b.addEventListener('mousedown',e=>{if(e.button!==0){e.preventDefault();e.stopPropagation();}});});
 document.addEventListener('input',e=>{const t=e.target;if(t.dataset.jointAngle!==undefined){state.jointAngles[Number(t.dataset.jointAngle)]=num(t.value)||0;applyJointRotations();renderJointAngleRows();renderJson();renderIssues();return;}if(t.dataset.tcp){state.tcp[state.activeTcp][t.dataset.tcp]=['toolStl','status'].includes(t.dataset.tcp)?t.value:num(t.value);renderTcp();renderJson();renderIssues()}if(t.dataset.axisPoint!==undefined){const p=state.axisPoints[Number(t.dataset.axisPoint)],f=t.dataset.axisField;p[f]=num(t.value);p.source='manuell';syncJointsFromAxisPoints();rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();renderRows();renderJson();renderIssues()}if(t.dataset.j!==undefined){const idx=Number(t.dataset.j),j=state.joints[idx],f=t.dataset.f;if(['x','y','z'].includes(f)){j.offset[f]=num(t.value);state.axisPoints[idx][f]=num(t.value);state.axisPoints[idx].source='manuell';rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();renderAxisPointRows();}else if(['min','max','rotationSign'].includes(f)){j[f]=num(t.value);if(f==='rotationSign')applyJointRotations();}else j[f]=t.value;renderJson();renderIssues()}});
