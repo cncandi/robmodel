@@ -316,35 +316,81 @@ function clearAxisPointVisuals() {
 }
 
 
+// ── Skeleton-Zylinder (wie RobSimul) ────────────────────────────
+const skeletonCyls = [];   // Zylinder-Meshes
+const skeletonSphs = [];   // Kugel-Meshes
+const LINK_R  = [28,20,16,12,8,6];   // Zylinderradius pro Link
+const JOINT_R = [40,38,30,24,20,16]; // Kugelradius pro Gelenk
+const LINK_COLOR  = 0xcc4400;
+const JOINT_COLOR = 0xe8a020;
+
+function buildSkeletonCylinder(from, to, radius) {
+  const v1 = from.clone(), v2 = to.clone();
+  const dir = new THREE.Vector3().subVectors(v2, v1);
+  const len = dir.length(); if (len < 1) return null;
+  const geo = new THREE.CylinderGeometry(radius, radius, len, 10);
+  const mat = new THREE.MeshPhongMaterial({ color: LINK_COLOR, shininess: 80, specular: 0x444444 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.copy(v1).addScaledVector(dir.normalize(), len * .5);
+  const up = new THREE.Vector3(0,1,0);
+  const ax = new THREE.Vector3().crossVectors(up, dir).normalize();
+  const ang = Math.acos(Math.max(-1, Math.min(1, up.dot(dir))));
+  if (ax.length() > 0.001) mesh.quaternion.setFromAxisAngle(ax, ang);
+  else if (dir.y < 0) mesh.rotation.z = Math.PI;
+  mesh.userData.isSkelCyl = true;
+  return mesh;
+}
+
+function rebuildSkeletonMeshes(pts) {
+  // Alte Zylinder/Kugeln aus axisPointGroup entfernen
+  for (const m of [...skeletonCyls, ...skeletonSphs]) axisPointGroup.remove(m);
+  skeletonCyls.length = 0; skeletonSphs.length = 0;
+
+  // Zylinder zwischen aufeinanderfolgenden Punkten
+  for (let i = 0; i < pts.length - 1; i++) {
+    const cyl = buildSkeletonCylinder(pts[i], pts[i+1], LINK_R[i] || 5);
+    if (cyl) { axisPointGroup.add(cyl); skeletonCyls.push(cyl); }
+  }
+  // Kugeln an Gelenkpunkten (ab Index 1 = A1)
+  for (let i = 1; i < pts.length; i++) {
+    const mat = new THREE.MeshPhongMaterial({
+      color: JOINT_COLOR, shininess: 120, specular: 0x666666
+    });
+    const sph = new THREE.Mesh(new THREE.SphereGeometry(JOINT_R[i-1] || 10, 12, 8), mat);
+    sph.position.copy(pts[i]);
+    sph.userData.isSkelSph = true;
+    axisPointGroup.add(sph); skeletonSphs.push(sph);
+  }
+}
+
 function updateSkeletonPositions() {
   if (!axisPivotGroups.length || !axisPointGroup) return;
   scene.updateMatrixWorld(true);
 
-  // Live-Positionen der 6 Pivots holen
+  // Live-Positionen
   const livePts = [new THREE.Vector3(0,0,0)];
   axisPivotGroups.forEach(g => {
     const wp = new THREE.Vector3(); g.getWorldPosition(wp); livePts.push(wp);
   });
   const pts6 = livePts.slice(0,6);
 
-  // Kugeln + Labels verschieben
+  // Zylinder neu bauen (da Position+Rotation sich ändert)
+  rebuildSkeletonMeshes(pts6);
+
+  // Kugeln + Labels (Sprites) verschieben
   axisPointGroup.children.forEach(child => {
     const idx = child.userData.skeletonIdx;
     if (idx === undefined) return;
     if (child.isSprite) {
       child.position.copy(pts6[idx]).add(new THREE.Vector3(0,0,85));
-    } else {
+    } else if (!child.userData.isSkelCyl && !child.userData.isSkelSph) {
       child.position.copy(pts6[idx]);
     }
   });
 
-  // Linie aktualisieren
-  if (axisLine) {
-    axisLine.geometry.setFromPoints(pts6);
-    axisLine.geometry.attributes.position.needsUpdate = true;
-  }
+  // Linie ausblenden (Zylinder ersetzen sie)
+  if (axisLine) axisLine.visible = false;
 
-  // CS-Helper neu positionieren
   updateCSHelper();
 }
 
