@@ -208,11 +208,11 @@ function nominalAxisVec(i)   { return ['z','y','y','x','y','x'][i] || 'z'; }
 function axisDirectionLabel(i) { return fixedAxisType(i) + ' · ' + nominalAxisVec(i).toUpperCase(); }
 
 function cumulativeAxisPositions() {
-  // Exakt wie RobSimul: pivot[0]=(0,0,0), pivot[i] bei off[i-1]
-  // Display X-Spalte (p.x) → Three.Z (oben)
-  // Display Z-Spalte (p.z) → Three.X (horizontal)
+  // RobSimul-Logik: pivot[0]=(0,0,0), pivot[i] bei off[i-1]
+  // GLOBAL für ALLE Gelenke: Display X (p.x) → Three.Z | Display Z (p.z) → Three.X
+  // A2 sieht numerisch gleich aus weil Ry(-90°) es intern kompensiert
   let x=0, y=0, z=0;
-  const pts = [new THREE.Vector3(0,0,0)]; // pivot[0] immer Ursprung
+  const pts = [new THREE.Vector3(0,0,0)];
   for (let i=0; i<5; i++) {
     const p = state.axisPoints[i];
     x += num(p.z)||0;  // Display Z → Three.X
@@ -220,7 +220,7 @@ function cumulativeAxisPositions() {
     z += num(p.x)||0;  // Display X → Three.Z
     pts.push(new THREE.Vector3(x,y,z));
   }
-  return pts; // 6 Positionen für pivot[0..5]
+  return pts;
 }
 
 function syncJointsFromAxisPoints() {
