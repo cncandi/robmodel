@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RobSimul KR8-Konverter</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
+  <script type="importmap">
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"}}
+  </script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -88,10 +92,10 @@
 </div>
 
 <script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
-import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/controls/OrbitControls.js';
-import { STLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/loaders/STLLoader.js';
-import { TransformControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/controls/TransformControls.js';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
 
 const $=id=>document.getElementById(id), qsa=s=>[...document.querySelectorAll(s)];
 const num=v=>{if(v===null||v===undefined||v==='')return null;const n=Number(String(v).replace(',','.'));return Number.isFinite(n)?n:null};
@@ -126,14 +130,15 @@ function showError(msg){
   d.style.cssText='position:fixed;top:0;left:0;right:0;background:#c00;color:#fff;padding:8px 12px;z-index:9999;font-family:monospace;font-size:12px;white-space:pre-wrap';
   d.textContent='FEHLER: '+msg;document.body.prepend(d);console.error(msg);
 }
-window.addEventListener('error',e=>showError(e.message+' ('+e.filename+':'+e.lineno+')'));
 window.addEventListener('unhandledrejection',e=>showError(String(e.reason)));
-
-// ── Event-Listener (immer zuerst, unabhängig von init-Fehlern) ──
-$('demoBtn').onclick=demo;$('downloadJson').onclick=downloadJson;$('downloadZip').onclick=downloadZip;$('resetView').onclick=resetView;$('toggleGrid').onclick=()=>grid.visible=!grid.visible;$('robotGround').onclick=()=>ground(robotGroup,'r');$('toolGround').onclick=()=>ground(toolGroup,'t');$('robotReset').onclick=()=>{state.robotTr=defaultRobotDisplayTransform();setInputs('r',state.robotTr);applyTransforms();fitCamera()};if($('jointReset'))$('jointReset').onclick=()=>{stopSimulation();setJointAnglesToReferencePose();renderJointAngleRows();renderRows();applyTransforms();};$('toolReset').onclick=()=>{state.toolTr={x:0,y:0,z:0,rx:0,ry:0,rz:0};setInputs('t',state.toolTr);applyTransforms();fitCamera()};
 
 // ── Initialisierung ──────────────────────────────────────────
 try{init3d();}catch(e){showError('init3d: '+e);}
+
+// ── Event-Listener ───────────────────────────────────────────
+$('demoBtn').onclick=demo;$('downloadJson').onclick=downloadJson;$('downloadZip').onclick=downloadZip;$('resetView').onclick=resetView;$('toggleGrid').onclick=()=>grid.visible=!grid.visible;$('robotGround').onclick=()=>ground(robotGroup,'r');$('toolGround').onclick=()=>ground(toolGroup,'t');$('robotReset').onclick=()=>{state.robotTr=defaultRobotDisplayTransform();setInputs('r',state.robotTr);applyTransforms();fitCamera()};if($('jointReset'))$('jointReset').onclick=()=>{stopSimulation();setJointAnglesToReferencePose();renderJointAngleRows();renderRows();applyTransforms();};$('toolReset').onclick=()=>{state.toolTr={x:0,y:0,z:0,rx:0,ry:0,rz:0};setInputs('t',state.toolTr);applyTransforms();fitCamera()};
+
+// ── Demo-Modell beim Start + Render-Loop ─────────────────────
 try{demo();}catch(e){showError('demo: '+e);}
 animate();
 
