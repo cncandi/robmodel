@@ -82,7 +82,12 @@ window.addEventListener('unhandledrejection', e => showError(String(e.reason)));
 
 // ── Init ───────────────────────────────────────────────────────────
 try { init3d(); } catch (e) { showError('init3d: ' + e); }
-try { renderAll(); } catch (e) { showError('renderAll: ' + e); }
+try {
+  rebuildRobotKinematics();   // Pivot-Chain beim Start aufbauen
+  applyJointRotations();      // Referenzpose anwenden
+  renderAll();
+  updateAxisPointVisuals();
+} catch (e) { showError('renderAll: ' + e); }
 animate();
 
 // ── 3D-Szene ───────────────────────────────────────────────────────
