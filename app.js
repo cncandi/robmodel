@@ -64,7 +64,6 @@ let axisPointGroup, axisLine, transformControls, raycaster, mouse;
 const meshes = new Map();
 const axisMeshes = [];
 const axisPivotGroups = [];
-const stlWraps = [];  // STL-Wrapper-Groups für unabhängige STL-Rotation
 const loader = new STLLoader();
 
 // ── Fehleranzeige ──────────────────────────────────────────────────
@@ -166,14 +165,17 @@ function setInputs(p, tr) {
 function applyTransforms() {
   state.robotTr = readInputs('r');
   state.toolTr  = readInputs('t');
-  // robotGroup: nur für unzugeordnete STL-Meshes
+  // robotGroup: nur für unzugeordnete Meshes (Sockel etc.)
   robotGroup.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
   robotGroup.rotation.set(deg(state.robotTr.rx), deg(state.robotTr.ry), deg(state.robotTr.rz));
-  // kinematicsRoot: NUR Position (Koordinatensystem bleibt unberührt)
+  // kinematicsRoot: nur Position — Koordinatensystem bleibt weltachsenausgerichtet
   kinematicsRoot.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
-  // Alle STL-Wrapper-Gruppen mit neuer STL-Rotation aktualisieren
+  // STL-Rotation live auf alle Pivot-Meshes anwenden
   const _rx = deg(state.robotTr.rx), _ry = deg(state.robotTr.ry), _rz = deg(state.robotTr.rz);
-  stlWraps.forEach(w => w.rotation.set(_rx, _ry, _rz));
+  for (const [, mesh] of meshes) {
+    const file = state.stls.find(f => f.path === [...meshes.keys()].find(k => meshes.get(k)===mesh)) || {};
+    if (!isTool(file)) mesh.rotation.set(_rx, _ry, _rz);
+  }
   if (axisPointGroup) { axisPointGroup.position.set(0,0,0); axisPointGroup.rotation.set(0,0,0); axisPointGroup.scale.set(1,1,1); }
   toolGroup.position.set(state.toolTr.x, state.toolTr.y, state.toolTr.z);
   toolGroup.rotation.set(deg(state.toolTr.rx), deg(state.toolTr.ry), deg(state.toolTr.rz));
@@ -235,10 +237,9 @@ function rebuildRobotKinematics() {
       g.position.copy((pts[i] || new THREE.Vector3()).clone().sub(pts[i-1] || new THREE.Vector3()));
     }
   }
-  stlWraps.length = 0;
-  const rx = deg(state.robotTr.rx), ry = deg(state.robotTr.ry), rz = deg(state.robotTr.rz);
   for (const [path, mesh] of meshes) {
-    mesh.position.set(0,0,0); mesh.rotation.set(0,0,0); mesh.scale.set(1,1,1);
+    mesh.position.set(0,0,0); mesh.scale.set(1,1,1);
+    mesh.rotation.set(deg(state.robotTr.rx), deg(state.robotTr.ry), deg(state.robotTr.rz));
     const file = state.stls.find(f => f.path === path) || { name: mesh.name };
     if (isTool(file)) { toolGroup.add(mesh); continue; }
     const key = partKey(file.name);
@@ -246,16 +247,9 @@ function rebuildRobotKinematics() {
     if (m) {
       const idx = Number(m[1]) - 1;
       const pivot = pts[idx] || new THREE.Vector3();
-      // STL-Wrapper: dreht nur den Mesh, nicht die Kinematik-Achse
-      const wrap = new THREE.Group();
-      wrap.rotation.set(rx, ry, rz);
-      stlWraps.push(wrap);
-      wrap.add(mesh);
-      axisPivotGroups[idx].add(wrap);
+      axisPivotGroups[idx].add(mesh);
       mesh.position.copy(pivot.clone().multiplyScalar(-1));
-    } else {
-      robotGroup.add(mesh); // unzugeordnete Meshes: robotGroup trägt STL-Rotation
-    }
+    } else { robotGroup.add(mesh); }
   }
   applyJointRotations();
 }
