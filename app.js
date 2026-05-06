@@ -831,8 +831,11 @@ function renderAxisStlRows() {
   const el = $('axisStlRows');
   if (!el) return;
   el.innerHTML = ['A1','A2','A3','A4','A5','A6'].map(ax => {
-    const name = state.axisStlMap[ax] ? norm(state.axisStlMap[ax]) : '—';
-    const hasFile = state.axisStlMap[ax] !== null;
+    const mapped = state.axisStlMap[ax];
+    const fallback = state.stls.find(f => partKey(f.name) === ax)?.name || null;
+    const src = mapped || fallback;
+    const name = src ? norm(src) : '—';
+    const hasFile = !!src;
     return `<div class="axis-stl-row">
       <span class="axis-stl-label">${ax}</span>
       <span class="axis-stl-name${hasFile ? ' has-file' : ''}" title="${name}">${name}</span>
