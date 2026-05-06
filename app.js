@@ -383,10 +383,17 @@ function updateCSHelper() {
   const pos = pts[state.selectedAxis] || new THREE.Vector3();
   const L = 380;   // Pfeillänge mm
   const H = 30;    // Pfeilkopf
-  const axes = [
-    { dir: new THREE.Vector3(1,0,0), color: 0xff2222, label: 'X' },
-    { dir: new THREE.Vector3(0,1,0), color: 0x22dd22, label: 'Y' },
-    { dir: new THREE.Vector3(0,0,1), color: 0x2288ff, label: 'Z' },
+  // A1/A2: Input X→Welt-X, Z→Welt-Z
+  // A3+:   Input X→Welt-Z, Z→Welt-X  (wegen X↔Z-Swap durch A2-Rotation)
+  const swapped = state.selectedAxis >= 2;
+  const axes = swapped ? [
+    { dir: new THREE.Vector3(0,0,1),  color: 0xff2222, label: 'X' },  // X → Welt Z
+    { dir: new THREE.Vector3(0,1,0),  color: 0x22dd22, label: 'Y' },
+    { dir: new THREE.Vector3(1,0,0),  color: 0x2288ff, label: 'Z' },  // Z → Welt X
+  ] : [
+    { dir: new THREE.Vector3(1,0,0),  color: 0xff2222, label: 'X' },
+    { dir: new THREE.Vector3(0,1,0),  color: 0x22dd22, label: 'Y' },
+    { dir: new THREE.Vector3(0,0,1),  color: 0x2288ff, label: 'Z' },
   ];
   axes.forEach(({ dir, color, label }) => {
     const arrow = new THREE.ArrowHelper(dir, pos, L, color, H, H * 0.6);
