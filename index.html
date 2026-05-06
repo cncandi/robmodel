@@ -33,6 +33,7 @@
 
       <button id="themeBtn" title="Theme wechseln">🎨</button>
       <button id="demoBtn" title="KR8 Demo laden (RobSimul STL)">Test</button>
+      <button id="roblibBtn" title="In ROBLIB hochladen" disabled>→ roblib</button>
       <button id="newBtn" title="Alles zurücksetzen">Neu</button>
       <span class="sep"></span>
       <button id="downloadJson" disabled title="JSON exportieren">⬇ JSON</button>
@@ -196,5 +197,32 @@
 </div><!-- .wrap -->
 
 <script type="module" src="app.js"></script>
+<!-- ── ROBLIB UPLOAD MODAL ──────────────────────────────────── -->
+<div id="roblibModal" class="rl-overlay" style="display:none">
+  <div class="rl-modal">
+    <div class="rl-modal-head">
+      <span>→ ROBLIB hochladen</span>
+      <button class="rl-close" id="roblibClose">✕</button>
+    </div>
+    <div class="rl-modal-body">
+      <div class="rl-grid">
+        <label>Name *<input id="rl-name" type="text" placeholder="KR 8 R1420"></label>
+        <label>Marke *<input id="rl-marke" type="text" placeholder="KUKA"></label>
+        <label>Modell *<input id="rl-modell" type="text" placeholder="KR 8 R1420"></label>
+        <label>Achsen *<input id="rl-achsen" type="number" value="6" min="1" max="9"></label>
+        <label>Reichweite (mm) *<input id="rl-reichweite" type="number" placeholder="1420"></label>
+        <label>Nutzlast (kg) *<input id="rl-nutzlast" type="number" placeholder="8"></label>
+        <label>Gewicht (kg) *<input id="rl-gewicht" type="number" placeholder="270"></label>
+        <label>Wiederholgenauigkeit (mm) *<input id="rl-wdh" type="number" step="0.001" placeholder="0.03"></label>
+        <label class="rl-span2">Thumbnail (optional)<input id="rl-thumb" type="file" accept="image/*"></label>
+        <label>Benutzer *<input id="rl-user" type="text" autocomplete="username"></label>
+        <label>Passwort *<input id="rl-pass" type="password" autocomplete="current-password"></label>
+      </div>
+      <div id="rl-msg" class="rl-msg" style="display:none"></div>
+      <button id="rl-submit" class="rl-submit">Hochladen</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
