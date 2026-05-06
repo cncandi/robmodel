@@ -98,7 +98,7 @@ animate();
 // ── 3D-Szene ───────────────────────────────────────────────────────
 function init3d() {
   const canvas = $('viewer');
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x050b14);
@@ -907,6 +907,22 @@ function openRoblibModal() {
   $('rl-name').value   = state.robotName || '';
   $('rl-achsen').value = 6;
   $('rl-msg').style.display = 'none';
+
+  // Canvas-Screenshot als Thumbnail vorbelegen
+  try {
+    renderer.render(scene, camera);
+    const canvas = renderer.domElement;
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const file = new File([blob], 'screenshot.jpg', { type: 'image/jpeg' });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      $('rl-thumb').files = dt.files;
+      $('rl-thumb-preview').src = URL.createObjectURL(blob);
+      $('rl-thumb-preview').style.display = 'block';
+    }, 'image/jpeg', 0.92);
+  } catch(e) { /* kein Screenshot möglich */ }
+
   $('roblibModal').style.display = 'flex';
 }
 
