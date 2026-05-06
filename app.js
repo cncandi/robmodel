@@ -744,7 +744,7 @@ function applyJsonToState(j) {
 function buildJson() {
   return {
     name: state.robotName||'Robot',
-    joints: state.joints.map((j,i)=>({name:j.name,axis:fixedAxisType(i),offset:{x:num(j.offset?.x)??0,y:num(j.offset?.y)??0,z:num(j.offset?.z)??0},min:num(j.min),max:num(j.max)})),
+    joints: state.joints.map((j,i)=>({name:j.name,axis:fixedAxisType(i),offset:{x:num(j.offset?.z)??0,y:num(j.offset?.y)??0,z:num(j.offset?.x)??0},min:num(j.min),max:num(j.max)})),
     stlRefAngles: parseReferencePose(),
     tcp: { auftragen: { ...state.tcp.auftragen }, abtragen: { ...state.tcp.abtragen } },
     stlFiles: Object.fromEntries(['A1','A2','A3','A4','A5','A6'].map(k=>[k,{name:'—',posx:0,posy:0,posz:0,posrx:0,posry:0,posrz:0,color:'#e8a020'}])),
