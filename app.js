@@ -51,7 +51,7 @@ const state = {
     axis: ['Rz','Ry','Ry','Rx','Ry','Rx'][i],
     offset: defOffset(i),
     min: null, max: null,
-    rotationSign: [-1,1,1,-1,1,-1][i], status: 'KR8 Zielwert'
+    rotationSign: [-1,1,1,-1,-1,-1][i], status: 'KR8 Zielwert'
   })),
   tcp: {
     auftragen: { x: null, y: null, z: null, rz: null, ry: null, rx: null, toolLength: 0, toolStl: '', status: 'manuell' },
