@@ -43,7 +43,7 @@ const state = {
   activeTcp: 'auftragen',
   axisPoints: ['A1','A2','A3','A4','A5','A6'].map((name, i) => ({ name, ...defOffset(i), rx: 0, ry: 0, rz: 0, source: 'KR8 Zielwert' })),
   selectedAxis: 0,
-  jointAngles: [0, 0, 0, 0, 0, 0],  // 0 = Referenzpose
+  jointAngles: [0, -90, 90, 0, 0, 0],  // Referenzpose als Default
   axisStlMap: { A1:null, A2:null, A3:null, A4:null, A5:null, A6:null }, // manuelle STL-Zuweisung
   simulation: { active: false, axis: null, raf: null },
   joints: ['A1','A2','A3','A4','A5','A6'].map((n, i) => ({
@@ -287,11 +287,10 @@ function rebuildRobotKinematics() {
 }
 
 function applyJointRotations() {
-  // Display-Winkel 0 = Referenzpose → Offset von Referenzpose anwenden
+  // Mechanische Winkel direkt — 0,-90,90,0,0,0 = Referenzpose
   const r = Math.PI / 180;
-  const ref = parseReferencePose();
   axisPivotGroups.forEach((g, i) => {
-    const a = ((state.jointAngles[i] || 0) - (ref[i] || 0)) * (num(state.joints[i]?.rotationSign) ?? 1) * r;
+    const a = (state.jointAngles[i] || 0) * (num(state.joints[i]?.rotationSign) ?? 1) * r;
     const v = nominalAxisVec(i);
     g.rotation.set(0, 0, 0);
     if      (v === 'x') g.rotation.x = a;
