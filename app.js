@@ -291,6 +291,7 @@ function applyJointRotations() {
     else                g.rotation.z = a;
   });
   scene.updateMatrixWorld(true);
+  updateSkeletonPositions();
 }
 
 function parseReferencePose() {
@@ -312,6 +313,39 @@ function clearAxisPointVisuals() {
   }
   axisMeshes.length = 0;
   if (transformControls) transformControls.detach();
+}
+
+
+function updateSkeletonPositions() {
+  if (!axisPivotGroups.length || !axisPointGroup) return;
+  scene.updateMatrixWorld(true);
+
+  // Live-Positionen der 6 Pivots holen
+  const livePts = [new THREE.Vector3(0,0,0)];
+  axisPivotGroups.forEach(g => {
+    const wp = new THREE.Vector3(); g.getWorldPosition(wp); livePts.push(wp);
+  });
+  const pts6 = livePts.slice(0,6);
+
+  // Kugeln + Labels verschieben
+  axisPointGroup.children.forEach(child => {
+    const idx = child.userData.skeletonIdx;
+    if (idx === undefined) return;
+    if (child.isSprite) {
+      child.position.copy(pts6[idx]).add(new THREE.Vector3(0,0,85));
+    } else {
+      child.position.copy(pts6[idx]);
+    }
+  });
+
+  // Linie aktualisieren
+  if (axisLine) {
+    axisLine.geometry.setFromPoints(pts6);
+    axisLine.geometry.attributes.position.needsUpdate = true;
+  }
+
+  // CS-Helper neu positionieren
+  updateCSHelper();
 }
 
 function updateAxisPointVisuals() {
@@ -341,7 +375,10 @@ function updateAxisPointVisuals() {
     mesh.position.copy(p);
     mesh.userData.axisIndex = i - 1;
     mesh.name = label;
-    axisPointGroup.add(mesh, makeAxisLabel(label, p.clone().add(new THREE.Vector3(0,0,85))));
+    mesh.userData.skeletonIdx = i;
+    const lbl = makeAxisLabel(label, p.clone().add(new THREE.Vector3(0,0,85)));
+    lbl.userData.skeletonIdx = i;
+    axisPointGroup.add(mesh, lbl);
     if (!isOrigin) axisMeshes.push(mesh);
   });
 
