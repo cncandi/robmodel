@@ -369,24 +369,26 @@ function updateSkeletonPositions() {
   if (!axisPivotGroups.length || !axisPointGroup) return;
   scene.updateMatrixWorld(true);
 
-  // Live-Positionen
-  const livePts = [new THREE.Vector3(0,0,0)];
+  // Pivot-Weltpositionen holen
+  const pivotPts = [];
   axisPivotGroups.forEach(g => {
-    const wp = new THREE.Vector3(); g.getWorldPosition(wp); livePts.push(wp);
+    const wp = new THREE.Vector3(); g.getWorldPosition(wp); pivotPts.push(wp);
   });
-  const pts6 = livePts.slice(0,6);
+  const skelPts = [new THREE.Vector3(0,0,0), ...pivotPts];
 
-  // Zylinder neu bauen (da Position+Rotation sich ändert)
-  rebuildSkeletonMeshes(pts6);
+  // Zylinder + Kugeln neu bauen
+  rebuildSkeletonMeshes(skelPts);
 
-  // Kugeln + Labels (Sprites) verschieben
+  // Labels + Hit-Kugeln verschieben
   axisPointGroup.children.forEach(child => {
     const idx = child.userData.skeletonIdx;
-    if (idx === undefined) return;
+    if (idx === undefined || child.userData.isSkelCyl || child.userData.isSkelSph) return;
+    const p = pivotPts[idx];
+    if (!p) return;
     if (child.isSprite) {
-      child.position.copy(pts6[idx]).add(new THREE.Vector3(0,0,85));
-    } else if (!child.userData.isSkelCyl && !child.userData.isSkelSph) {
-      child.position.copy(pts6[idx]);
+      child.position.copy(p).add(new THREE.Vector3(0, 0, (JOINT_R[idx]||10)*2+20));
+    } else {
+      child.position.copy(p);
     }
   });
 
@@ -401,33 +403,33 @@ function updateAxisPointVisuals() {
   clearAxisPointVisuals();
   scene.updateMatrixWorld(true);
 
-  // Live-Weltpositionen der Pivot-Gruppen
-  const livePts = [new THREE.Vector3(0,0,0)];
+  // Pivot-Weltpositionen A1-A6
+  const pivotPts = [];
   if (axisPivotGroups.length) {
     axisPivotGroups.forEach(g => {
-      const wp = new THREE.Vector3(); g.getWorldPosition(wp); livePts.push(wp);
+      const wp = new THREE.Vector3(); g.getWorldPosition(wp); pivotPts.push(wp);
     });
   } else {
-    cumulativeAxisPositions().forEach(p => livePts.push(p));
+    cumulativeAxisPositions().forEach(p => pivotPts.push(p));
   }
-  const pts6 = livePts.slice(0, 6);
 
-  // ── RobSimul-Stil: Zylinder + abgestufte Kugeln ──────────────
-  rebuildSkeletonMeshes(pts6);
+  // Skeleton: Ursprung → A1 → A2 → … → A6 (7 Punkte, 6 Zylinder)
+  const skelPts = [new THREE.Vector3(0,0,0), ...pivotPts];
+  rebuildSkeletonMeshes(skelPts);
 
-  // ── Auswählbare (unsichtbare) Raycaster-Kugeln + Labels ──────
-  pts6.forEach((p, i) => {
-    if (i === 0) return; // A1 (Ursprung) nicht selektierbar
-    const hitGeo = new THREE.SphereGeometry(JOINT_R[i-1] || 10, 8, 6);
+  // Labels + unsichtbare Raycaster-Kugeln: A1-A6 an den Pivot-Positionen
+  pivotPts.forEach((p, i) => {
+    const label = 'A' + (i + 1);
+    const hitGeo = new THREE.SphereGeometry(JOINT_R[i] || 10, 8, 6);
     const hitMat = new THREE.MeshBasicMaterial({ visible: false });
     const hit = new THREE.Mesh(hitGeo, hitMat);
     hit.position.copy(p);
-    hit.userData.axisIndex = i - 1;
-    hit.name = 'A' + (i + 1);
+    hit.userData.axisIndex = i;
+    hit.name = label;
     axisPointGroup.add(hit);
     axisMeshes.push(hit);
 
-    const lbl = makeAxisLabel('A' + (i + 1), p.clone().add(new THREE.Vector3(0, 0, JOINT_R[i-1] * 2 + 20)));
+    const lbl = makeAxisLabel(label, p.clone().add(new THREE.Vector3(0, 0, (JOINT_R[i] || 10) * 2 + 20)));
     lbl.userData.skeletonIdx = i;
     axisPointGroup.add(lbl);
   });
