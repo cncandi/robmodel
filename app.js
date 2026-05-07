@@ -1230,11 +1230,21 @@ function openRosModal() {
       const brand = r.name.split(' ')[0];
       const colors = {ABB:'#ff6600',Fanuc:'#ffcc00',Franka:'#0066ff',KUKA:'#ff6600',UR:'#004488',Universal:'#004488',Yaskawa:'#006600'};
       const col = colors[brand] || '#2563eb';
-      return `<div onclick="rosSelectRobot(${i})" style="padding:6px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:8px;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background=''">
+      return `<div data-ros-idx="${i}" style="padding:6px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:8px">
         <span style="font-family:monospace;font-size:10px;padding:1px 5px;border-radius:3px;background:${col}22;color:${col};border:1px solid ${col}44;white-space:nowrap">${brand.toUpperCase()}</span>
         <span style="font-family:monospace;font-size:12px;color:#d8e8f0">${r.name}</span>
       </div>`;
     }).join('');
+    // Event delegation — works in ES module scope
+    list.onclick = e => {
+      const row = e.target.closest('[data-ros-idx]');
+      if (!row) return;
+      const r = ROS_ROBOTS[parseInt(row.dataset.rosIdx)];
+      $('ros-url').value = r.url;
+      $('ros-analyze').click();
+    };
+    list.onmouseover = e => { const row = e.target.closest('[data-ros-idx]'); if (row) row.style.background='rgba(255,255,255,.06)'; };
+    list.onmouseout  = e => { const row = e.target.closest('[data-ros-idx]'); if (row) row.style.background=''; };
   }
 }
 $('importRosBtn').onclick = openRosModal;
