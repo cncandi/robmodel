@@ -626,18 +626,19 @@ async function loadDemoKr8() {
   const btn = $('demoBtn');
   if (btn) { btn.disabled=true; btn.textContent='Lade…'; }
   try {
-    // KR8 R1420 Achsgrenzen (aus RobSimul JOINTS_DEF)
-    const KR8_LIMITS = [
-      {min:-170, max:170},   // A1
-      {min:-185, max:65},    // A2
-      {min:-120, max:180},   // A3
-      {min:-165, max:165},   // A4
-      {min:-115, max:140},   // A5
-      {min:-180, max:180},   // A6
-    ];
-    KR8_LIMITS.forEach((lim, i) => {
-      if (state.joints[i]) { state.joints[i].min = lim.min; state.joints[i].max = lim.max; }
-    });
+    // Achsgrenzen aus KR8-JSON laden
+    const kr8Res = await fetch('./kr8_robsimul_v37_zielwerte.json');
+    if (kr8Res.ok) {
+      const kr8 = await kr8Res.json();
+      if (Array.isArray(kr8.joints)) {
+        kr8.joints.forEach((j,i) => {
+          if (state.joints[i]) {
+            state.joints[i].min = num(j.min) ?? -180;
+            state.joints[i].max = num(j.max) ??  180;
+          }
+        });
+      }
+    }
     for (const fname of FILES) {
       const res = await fetch(BASE + fname);
       if (!res.ok) throw new Error(fname + ': HTTP ' + res.status);
