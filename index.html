@@ -29,6 +29,9 @@
       <button id="themeBtn" title="Theme wechseln">🌙</button>
       <button id="demoBtn" title="KR8 Beispiel laden">Example</button>
       <button id="roblibBtn" title="In ROBLIB hochladen" disabled>→ roblib</button>
+      <span style="width:1px;background:rgba(255,255,255,.15);margin:0 4px;align-self:stretch"></span>
+      <button id="toolModeWorld" class="tool-mode-btn active" onclick="setToolMode('world')" title="Werkzeug fix im Weltkoordinatensystem">🌍</button>
+      <button id="toolModeA6"    class="tool-mode-btn"        onclick="setToolMode('a6')"    title="Werkzeug an A6 — bewegt sich mit Roboter">🔩</button>
       <button id="newBtn" title="Alles zurücksetzen">Neu</button>
       <button id="downloadJson" style="display:none" disabled>⬇ JSON</button>
       <button id="downloadZip" style="display:none" disabled>💾 Save ZIP</button>
@@ -113,10 +116,6 @@
         <div class="card-head">
           <h2>Tool-STL</h2>
           <span class="badge info" id="toolBadge">—</span>
-        </div>
-        <div style="display:flex;gap:4px;margin-bottom:8px">
-          <button id="toolModeWorld" class="tool-mode-btn active" onclick="setToolMode('world')" title="Werkzeug fix im Weltkoordinatensystem">🌍 Ungebunden</button>
-          <button id="toolModeA6"    class="tool-mode-btn"        onclick="setToolMode('a6')"    title="Werkzeug an A6 — bewegt sich mit dem Roboter">🔩 An A6</button>
         </div>
         <div class="grid6">
           <div class="field"><label>X</label><input id="tX" type="number" step="0.1" value="0"></div>
