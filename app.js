@@ -192,21 +192,27 @@ function setToolMode(mode) {
   applyTransforms();
 }
 
-function detachToolFromA6() {
+function attachToolToA6() {
+  if (!axisPivotGroups || !axisPivotGroups[5]) return;
+  const _rx = deg(state.robotTr.rx), _ry = deg(state.robotTr.ry), _rz = deg(state.robotTr.rz);
   for (const [path, mesh] of meshes) {
     const file = state.stls.find(f => f.path === path) || { name: mesh.name };
-    if (isTool(file) && mesh.parent !== toolGroup) {
-      toolGroup.attach(mesh);
+    if (isTool(file)) {
+      if (mesh.parent !== axisPivotGroups[5]) axisPivotGroups[5].add(mesh);
+      mesh.position.set(0, 0, 0);
+      mesh.rotation.set(_rx, _ry, _rz);
     }
   }
 }
 
-function attachToolToA6() {
-  if (!axisPivotGroups || !axisPivotGroups[5]) return;
+function detachToolFromA6() {
+  const _rx = deg(state.robotTr.rx), _ry = deg(state.robotTr.ry), _rz = deg(state.robotTr.rz);
   for (const [path, mesh] of meshes) {
     const file = state.stls.find(f => f.path === path) || { name: mesh.name };
-    if (isTool(file) && mesh.parent !== axisPivotGroups[5]) {
-      axisPivotGroups[5].attach(mesh);
+    if (isTool(file)) {
+      if (mesh.parent !== toolGroup) toolGroup.add(mesh);
+      mesh.position.set(0, 0, 0);
+      mesh.rotation.set(_rx, _ry, _rz);
     }
   }
 }
