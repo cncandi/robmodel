@@ -1002,12 +1002,23 @@ function openRoblibModal() {
 }
 
 async function uploadToRoblib() {
-  const btn = $('rl-submit');
-  const msg = $('rl-msg');
+  const btn  = $('rl-submit');
+  const msg  = $('rl-msg');
+  const wrap = $('rl-progress-wrap');
+  const bar  = $('rl-progress-bar');
+  const lbl  = $('rl-progress-label');
+  const pct  = $('rl-progress-pct');
+
   const show = (text, ok) => {
-    msg.textContent = text;
-    msg.className = 'rl-msg ' + (ok ? 'rl-ok' : 'rl-err');
-    msg.style.display = '';
+    msg.textContent = text; msg.className = 'rl-msg ' + (ok ? 'rl-ok' : 'rl-err');
+    msg.style.display = ''; wrap.style.display = 'none';
+  };
+  const setProgress = (label, percent) => {
+    wrap.style.display = ''; msg.style.display = 'none';
+    lbl.textContent = label;
+    pct.textContent = Math.round(percent) + '%';
+    bar.style.width = percent + '%';
+    bar.style.background = percent === 100 ? '#22c55e' : '#2563eb';
   };
 
   const fields = {
@@ -1028,15 +1039,17 @@ async function uploadToRoblib() {
 
   btn.disabled = true; btn.textContent = 'Lade…';
   try {
-    // ZIP erzeugen — Tool immer in World-Koordinaten exportieren
+    // 1. ZIP erstellen
+    setProgress('Erstelle ZIP…', 5);
     const prevMode = toolMountMode;
     if (prevMode !== 'world') { detachToolFromA6(); scene.updateMatrixWorld(true); }
     const zip  = new JSZip();
     const base = zipName(state.robotName || 'robot');
     zip.file(base + '.json', JSON.stringify(buildJson(), null, 2));
     for (const [, mesh] of meshes) zip.file(mesh.name, exportBinaryStl(mesh));
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const zipBlob = await zip.generateAsync({ type: 'blob' }, m => setProgress('Komprimiere…', 5 + m.percent * 0.4));
     if (prevMode !== 'world') attachToolToA6();
+    setProgress('Lade hoch…', 45);
 
     const fd = new FormData();
     for (const [k, v] of Object.entries(fields)) fd.append(k, v);
@@ -1044,15 +1057,29 @@ async function uploadToRoblib() {
     const thumb = $('rl-thumb').files[0];
     if (thumb) fd.append('thumb', thumb, thumb.name);
 
-    const res  = await fetch(ROBLIB_API + '?action=upload', { method: 'POST', body: fd });
-    const data = await res.json();
+    // 2. XHR mit Upload-Progress
+    const data = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', ROBLIB_API + '?action=upload');
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) setProgress('Lade hoch…', 45 + (e.loaded / e.total) * 50);
+      };
+      xhr.onload = () => {
+        try { resolve(JSON.parse(xhr.responseText)); }
+        catch (e) { reject(new Error('Ungültige Serverantwort')); }
+      };
+      xhr.onerror = () => reject(new Error('Verbindungsfehler'));
+      xhr.send(fd);
+    });
+
     if (data.ok) {
-      show('✓ Erfolgreich hochgeladen: ' + data.robot.name, true);
+      setProgress('Fertig!', 100);
+      setTimeout(() => show('✓ Hochgeladen: ' + data.robot.name, true), 600);
     } else {
       show('Fehler: ' + data.error, false);
     }
   } catch (e) {
-    show('Netzwerkfehler: ' + e.message, false);
+    show('Fehler: ' + e.message, false);
   } finally {
     btn.disabled = false; btn.textContent = 'Hochladen';
   }
