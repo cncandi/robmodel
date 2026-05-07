@@ -763,7 +763,10 @@ function buildJson() {
   }));
   const tcp = state.tcp.auftragen;
   const toolName = norm(state.toolName || tcp.toolStl || '') || 'tool1_tcp';
-  return {
+  const tcpX = num(tcp.x), tcpY = num(tcp.y), tcpZ = num(tcp.z);
+  const tcpA = num(tcp.rz), tcpB = num(tcp.ry), tcpC = num(tcp.rx);
+  const hasTcp = [tcpX,tcpY,tcpZ,tcpA,tcpB,tcpC].some(v => v !== null && v !== 0);
+  const result = {
     name: state.robotName || 'Robot',
     joints: state.joints.map((j,i) => ({
       name: j.name,
@@ -773,13 +776,14 @@ function buildJson() {
       max: num(j.max) ??  180
     })),
     stlRefAngles: parseReferencePose(),
-    tcp: { x: num(tcp.x)??0, y: num(tcp.y)??0, z: num(tcp.z)??0, a: num(tcp.rz)??0, b: num(tcp.ry)??0, c: num(tcp.rx)??0 },
     stlFiles,
     sceneModels: {
       pedestal: { px:0, py:0, pz:0, rx:0, ry:0, rz:0, name: 'podest' },
       tool:     { px:0, py:0, pz:0, rx:0, ry:0, rz:0, name: toolName }
     }
   };
+  if (hasTcp) result.tcp = { x: tcpX??0, y: tcpY??0, z: tcpZ??0, a: tcpA??0, b: tcpB??0, c: tcpC??0 };
+  return result;
 }
 
 // ── Export ─────────────────────────────────────────────────────────
