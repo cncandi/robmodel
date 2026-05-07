@@ -178,6 +178,29 @@ function readInputs(p) {
 function setInputs(p, tr) {
   ['X','Y','Z','Rx','Ry','Rz'].forEach(k => $(p+k).value = tr[k.toLowerCase()] || 0);
 }
+// ── Tool-Mount-Modus ────────────────────────────────────────────
+let toolMountMode = 'world'; // 'world' | 'a6'
+
+function setToolMode(mode) {
+  toolMountMode = mode;
+  ['world','a6'].forEach(m => {
+    const btn = $('toolMode' + m.charAt(0).toUpperCase() + m.slice(1));
+    if (btn) btn.classList.toggle('active', m === mode);
+  });
+  // Sofort neu anwenden
+  if (mode === 'world') detachToolFromA6();
+  applyTransforms();
+}
+
+function detachToolFromA6() {
+  for (const [path, mesh] of meshes) {
+    const file = state.stls.find(f => f.path === path) || { name: mesh.name };
+    if (isTool(file) && mesh.parent !== toolGroup) {
+      toolGroup.attach(mesh);
+    }
+  }
+}
+
 function attachToolToA6() {
   if (!axisPivotGroups || !axisPivotGroups[5]) return;
   for (const [path, mesh] of meshes) {
@@ -203,7 +226,7 @@ function applyTransforms() {
   if (axisPointGroup) { axisPointGroup.position.set(0,0,0); axisPointGroup.rotation.set(0,0,0); axisPointGroup.scale.set(1,1,1); }
   applyJointRotations();
   scene.updateMatrixWorld(true);
-  attachToolToA6();
+  if (toolMountMode === 'a6') attachToolToA6(); else detachToolFromA6();
   renderIssues();
 }
 
