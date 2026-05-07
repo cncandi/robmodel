@@ -26,6 +26,7 @@
       <input id="sourceZip" type="file" accept=".zip,application/zip">
       <input id="jsonInput" type="file" accept=".json,application/json" style="display:none">
       <input id="checkZip" type="file" accept=".zip,application/zip" style="display:none">
+      <button id="importRosBtn" title="Von GitHub/ROS importieren">🔗 Import</button>
       <button id="themeBtn" title="Theme wechseln">🌙</button>
       <button id="demoBtn" title="KR8 Beispiel laden">Example</button>
       <button id="roblibBtn" title="In ROBLIB hochladen" disabled>→ roblib</button>
@@ -225,6 +226,40 @@
         </div>
       </div>
       <button id="rl-submit" class="rl-submit">Hochladen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ROS Import Modal ──────────────────────────────────────── -->
+<div id="rosModal" class="rl-overlay" style="display:none">
+  <div class="rl-modal" style="width:min(620px,96vw)">
+    <div class="rl-modal-head">
+      <span>🔗 GitHub / ROS Import</span>
+      <button class="rl-close" id="rosClose">✕</button>
+    </div>
+    <div class="rl-modal-body">
+      <div style="margin-bottom:10px">
+        <label style="font-family:monospace;font-size:11px;color:#6a8fa8;display:block;margin-bottom:4px;letter-spacing:.05em">GITHUB URL (z.B. https://github.com/ros-industrial/universal_robot/tree/melodic-devel/ur_description)</label>
+        <div style="display:flex;gap:6px">
+          <input id="ros-url" type="text" placeholder="https://github.com/owner/repo/tree/branch/package"
+            style="flex:1;background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:7px 10px;color:#d8e8f0;font-family:monospace;font-size:12px;outline:none">
+          <button id="ros-analyze" style="padding:7px 14px;background:rgba(37,99,235,.3);border:1px solid #2563eb;color:#60a5fa;border-radius:4px;font-family:monospace;font-size:12px;cursor:pointer;white-space:nowrap">Analysieren</button>
+        </div>
+      </div>
+      <div id="ros-status" style="font-family:monospace;font-size:11px;color:#6a8fa8;margin-bottom:8px;min-height:16px"></div>
+      <div id="ros-progress-wrap" style="display:none;margin-bottom:10px">
+        <div style="background:rgba(255,255,255,.08);border-radius:4px;height:6px;overflow:hidden">
+          <div id="ros-progress-bar" style="height:100%;width:0%;background:#2563eb;border-radius:4px;transition:width .3s"></div>
+        </div>
+      </div>
+      <div id="ros-result" style="display:none">
+        <div style="font-family:monospace;font-size:11px;color:#6a8fa8;margin-bottom:6px;letter-spacing:.05em">GEFUNDENE ACHSEN</div>
+        <div id="ros-axis-table" style="background:#0f2030;border-radius:4px;padding:8px;margin-bottom:10px;font-family:monospace;font-size:11px"></div>
+        <div style="font-family:monospace;font-size:11px;color:#6a8fa8;margin-bottom:6px;letter-spacing:.05em">ROBOTER-NAME</div>
+        <input id="ros-robot-name" type="text" style="width:100%;background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 10px;color:#d8e8f0;font-family:monospace;font-size:12px;outline:none;margin-bottom:10px">
+        <button id="ros-load" style="width:100%;padding:9px;background:#2563eb;color:#fff;border:none;border-radius:5px;font-family:monospace;font-size:13px;font-weight:600;cursor:pointer">Laden &amp; in RobModel öffnen</button>
+      </div>
+      <div id="ros-msg" style="display:none;padding:8px 12px;border-radius:4px;font-family:monospace;font-size:12px;margin-top:8px"></div>
     </div>
   </div>
 </div>
