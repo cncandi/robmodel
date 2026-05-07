@@ -1050,6 +1050,8 @@ async function uploadToRoblib() {
 }
 
 $('roblibBtn').onclick  = openRoblibModal;
+$('toolModeWorld').onclick = () => setToolMode('world');
+$('toolModeA6').onclick    = () => setToolMode('a6');
 $('roblibClose').onclick = () => { $('roblibModal').style.display = 'none'; };
 $('rl-submit').onclick  = uploadToRoblib;
 const THEMES      = ['dark','bg-pro','bg-white','bg-minimal','bg-win11','bg-deep','bg-vivid','bg-matrix'];
