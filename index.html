@@ -215,6 +215,15 @@
         <label>Passwort *<input id="rl-pass" type="password" autocomplete="current-password"></label>
       </div>
       <div id="rl-msg" class="rl-msg" style="display:none"></div>
+      <div id="rl-progress-wrap" style="display:none;margin-bottom:10px">
+        <div style="font-family:monospace;font-size:11px;color:#6a8fa8;margin-bottom:4px">
+          <span id="rl-progress-label">Erstelle ZIP…</span>
+          <span id="rl-progress-pct" style="float:right">0%</span>
+        </div>
+        <div style="background:rgba(255,255,255,.08);border-radius:4px;height:6px;overflow:hidden">
+          <div id="rl-progress-bar" style="height:100%;width:0%;background:#2563eb;border-radius:4px;transition:width .2s"></div>
+        </div>
+      </div>
       <button id="rl-submit" class="rl-submit">Hochladen</button>
     </div>
   </div>
