@@ -654,6 +654,9 @@ async function loadDemoKr8() {
     state.robotTr={x:0,y:0,z:0,rx:0,ry:0,rz:0}; setInputs('r', state.robotTr);
     state.toolTr ={x:0,y:0,z:0,rx:0,ry:0,rz:0}; setInputs('t', state.toolTr);
     setJointAnglesToReferencePose();
+    // KR8 TCP (tool1_tcp): x=364.5mm, z=46.5mm, ry=90°
+    state.tcp.auftragen = { x:364.5, y:0, z:46.5, rx:0, ry:90, rz:0, toolLength:0, toolStl:'tool1_tcp', status:'KR8 Demo' };
+    state.tcp.abtragen  = { ...state.tcp.auftragen };
     await loadStls(); enableSave(); renderAll(); setView('iso');
   } catch(e) {
     alert('Demo-Load fehlgeschlagen: ' + e.message);
@@ -765,7 +768,6 @@ function buildJson() {
   const toolName = norm(state.toolName || tcp.toolStl || '') || 'tool1_tcp';
   const tcpX = num(tcp.x), tcpY = num(tcp.y), tcpZ = num(tcp.z);
   const tcpA = num(tcp.rz), tcpB = num(tcp.ry), tcpC = num(tcp.rx);
-  const hasTcp = [tcpX,tcpY,tcpZ,tcpA,tcpB,tcpC].some(v => v !== null && v !== 0);
   const result = {
     name: state.robotName || 'Robot',
     joints: state.joints.map((j,i) => ({
@@ -776,6 +778,7 @@ function buildJson() {
       max: num(j.max) ??  180
     })),
     stlRefAngles: parseReferencePose(),
+    tcp: { x: tcpX??0, y: tcpY??0, z: tcpZ??0, a: tcpA??0, b: tcpB??0, c: tcpC??0 },
     stlFiles,
     sceneModels: {
       pedestal: { px:0, py:0, pz:0, rx:0, ry:0, rz:0, name: 'podest' },
