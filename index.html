@@ -24,21 +24,14 @@
     <div class="toolbar">
       <label class="filebtn primary" for="sourceZip" title="STL-ZIP oder Package-ZIP laden">📦 Load ZIP</label>
       <input id="sourceZip" type="file" accept=".zip,application/zip">
-
-      <label class="filebtn" for="jsonInput" title="JSON-Konfiguration laden">📄 JSON laden</label>
-      <input id="jsonInput" type="file" accept=".json,application/json">
-
-      <label class="filebtn" for="checkZip" title="Package-ZIP prüfen">🔍 Package prüfen</label>
-      <input id="checkZip" type="file" accept=".zip,application/zip">
-
-      <button id="themeBtn" title="Theme wechseln">🎨</button>
-      <button id="demoBtn" title="KR8 Demo laden (RobSimul STL)">Test</button>
-      <button id="roblibBtn" title="In ROBLIB hochladen" disabled>→ roblib</button>
+      <input id="jsonInput" type="file" accept=".json,application/json" style="display:none">
+      <input id="checkZip" type="file" accept=".zip,application/zip" style="display:none">
+      <button id="themeBtn" title="Theme wechseln">🌙</button>
+      <button id="demoBtn" title="KR8 Beispiel laden">Example</button>
       <button id="newBtn" title="Alles zurücksetzen">Neu</button>
-      <span class="sep"></span>
-      <button id="downloadJson" disabled title="JSON exportieren">⬇ JSON</button>
-      <button id="downloadZip" class="orange" disabled title="ZIP mit STL exportieren">💾 Save ZIP</button>
-      <span class="sep"></span>
+      <button id="roblibBtn" style="display:none" disabled>→ roblib</button>
+      <button id="downloadJson" style="display:none" disabled>⬇ JSON</button>
+      <button id="downloadZip" style="display:none" disabled>💾 Save ZIP</button>
     </div>
   </header>
 
