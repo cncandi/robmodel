@@ -114,6 +114,10 @@
           <h2>Tool-STL</h2>
           <span class="badge info" id="toolBadge">—</span>
         </div>
+        <div style="display:flex;gap:4px;margin-bottom:8px">
+          <button id="toolModeWorld" class="tool-mode-btn active" onclick="setToolMode('world')" title="Werkzeug fix im Weltkoordinatensystem">🌍 Ungebunden</button>
+          <button id="toolModeA6"    class="tool-mode-btn"        onclick="setToolMode('a6')"    title="Werkzeug an A6 — bewegt sich mit dem Roboter">🔩 An A6</button>
+        </div>
         <div class="grid6">
           <div class="field"><label>X</label><input id="tX" type="number" step="0.1" value="0"></div>
           <div class="field"><label>Y</label><input id="tY" type="number" step="0.1" value="0"></div>
