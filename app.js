@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { OrbitControls }    from 'three/addons/controls/OrbitControls.js';
 import { STLLoader }        from 'three/addons/loaders/STLLoader.js';
+import { ColladaLoader }    from 'three/addons/loaders/ColladaLoader.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────
@@ -1157,8 +1158,64 @@ const dz=$('dropZone');
 dz.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)loadSourceZip(f).catch(err=>alert(err.message));});
 
 
+// ── STL-Export aus BufferGeometry ───────────────────────────────
+function stlFromGeometry(geo) {
+  const g = geo.index ? geo.toNonIndexed() : geo.clone();
+  const pos = g.getAttribute('position');
+  const tri = Math.floor(pos.count / 3);
+  const buf = new ArrayBuffer(84 + tri * 50);
+  const view = new DataView(buf);
+  view.setUint32(80, tri, true);
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3();
+  let off = 84;
+  for (let i = 0; i < tri; i++) {
+    a.fromBufferAttribute(pos,i*3); b.fromBufferAttribute(pos,i*3+1); c.fromBufferAttribute(pos,i*3+2);
+    n.subVectors(c,b).cross(a.clone().sub(b)).normalize();
+    [n.x,n.y,n.z,a.x,a.y,a.z,b.x,b.y,b.z,c.x,c.y,c.z].forEach(v=>{view.setFloat32(off,v,true);off+=4;});
+    view.setUint16(off,0,true); off+=2;
+  }
+  g.dispose(); return buf;
+}
+
 // ── ROS / GitHub Import ──────────────────────────────────────────
 let _rosData = null;
+
+// ── Kuratierte Roboterliste ──────────────────────────────────────
+const ROS_ROBOTS = [
+  // ABB
+  {name:'ABB IRB 120',    url:'https://github.com/ros-industrial/abb/tree/kinetic-devel/abb_irb120_support'},
+  {name:'ABB IRB 1200',   url:'https://github.com/ros-industrial/abb/tree/kinetic-devel/abb_irb1200_support'},
+  {name:'ABB IRB 1600',   url:'https://github.com/ros-industrial/abb/tree/kinetic-devel/abb_irb1600_support'},
+  {name:'ABB IRB 2400',   url:'https://github.com/ros-industrial/abb/tree/kinetic-devel/abb_irb2400_support'},
+  {name:'ABB IRB 4400',   url:'https://github.com/ros-industrial/abb/tree/kinetic-devel/abb_irb4400_support'},
+  {name:'ABB IRB 6640',   url:'https://github.com/ros-industrial/abb/tree/kinetic-devel/abb_irb6640_support'},
+  // Fanuc
+  {name:'Fanuc CR-7iA',           url:'https://github.com/ros-industrial/fanuc/tree/kinetic-devel/fanuc_cr7ia_support'},
+  {name:'Fanuc LR Mate 200iD',    url:'https://github.com/ros-industrial/fanuc/tree/kinetic-devel/fanuc_lrmate200id_support'},
+  {name:'Fanuc M-10iA',           url:'https://github.com/ros-industrial/fanuc/tree/kinetic-devel/fanuc_m10ia_support'},
+  {name:'Fanuc M-20iA',           url:'https://github.com/ros-industrial/fanuc/tree/kinetic-devel/fanuc_m20ia_support'},
+  {name:'Fanuc M-710iC/50',       url:'https://github.com/ros-industrial/fanuc/tree/kinetic-devel/fanuc_m710ic_support'},
+  // Franka
+  {name:'Franka Panda',   url:'https://github.com/frankaemika/franka_ros/tree/develop/franka_description'},
+  // KUKA
+  {name:'KUKA KR 3',      url:'https://github.com/ros-industrial/kuka_experimental/tree/kinetic-devel/kuka_kr3_support'},
+  {name:'KUKA KR 6 R700', url:'https://github.com/ros-industrial/kuka_experimental/tree/kinetic-devel/kuka_kr6_support'},
+  {name:'KUKA KR 10',     url:'https://github.com/ros-industrial/kuka_experimental/tree/kinetic-devel/kuka_kr10_support'},
+  {name:'KUKA KR 16',     url:'https://github.com/ros-industrial/kuka_experimental/tree/kinetic-devel/kuka_kr16_support'},
+  {name:'KUKA KR 210',    url:'https://github.com/ros-industrial/kuka_experimental/tree/kinetic-devel/kuka_kr210_support'},
+  // Universal Robots
+  {name:'UR3',  url:'https://github.com/ros-industrial/universal_robot/tree/melodic-devel/ur_description'},
+  {name:'UR5',  url:'https://github.com/ros-industrial/universal_robot/tree/melodic-devel/ur_description'},
+  {name:'UR10', url:'https://github.com/ros-industrial/universal_robot/tree/melodic-devel/ur_description'},
+  // Yaskawa / Motoman
+  {name:'Yaskawa GP7',    url:'https://github.com/ros-industrial/motoman/tree/melodic-devel/motoman_gp7_support'},
+  {name:'Yaskawa GP12',   url:'https://github.com/ros-industrial/motoman/tree/melodic-devel/motoman_gp12_support'},
+  {name:'Yaskawa MH5',    url:'https://github.com/ros-industrial/motoman/tree/melodic-devel/motoman_mh5_support'},
+  {name:'Yaskawa MH12',   url:'https://github.com/ros-industrial/motoman/tree/melodic-devel/motoman_mh12_support'},
+].sort((a,b) => a.name.localeCompare(b.name));
+
+
+const colladaLoader = new ColladaLoader();
 
 function openRosModal() {
   $('rosModal').style.display = 'flex';
@@ -1166,8 +1223,27 @@ function openRosModal() {
   $('ros-result').style.display = 'none';
   $('ros-msg').style.display = 'none';
   $('ros-progress-wrap').style.display = 'none';
+  // Render robot list
+  const list = $('ros-robot-list');
+  if (list) {
+    list.innerHTML = ROS_ROBOTS.map((r,i) => {
+      const brand = r.name.split(' ')[0];
+      const colors = {ABB:'#ff6600',Fanuc:'#ffcc00',Franka:'#0066ff',KUKA:'#ff6600',UR:'#004488',Universal:'#004488',Yaskawa:'#006600'};
+      const col = colors[brand] || '#2563eb';
+      return `<div onclick="rosSelectRobot(${i})" style="padding:6px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:8px;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background=''">
+        <span style="font-family:monospace;font-size:10px;padding:1px 5px;border-radius:3px;background:${col}22;color:${col};border:1px solid ${col}44;white-space:nowrap">${brand.toUpperCase()}</span>
+        <span style="font-family:monospace;font-size:12px;color:#d8e8f0">${r.name}</span>
+      </div>`;
+    }).join('');
+  }
 }
 $('importRosBtn').onclick = openRosModal;
+
+function rosSelectRobot(idx) {
+  const r = ROS_ROBOTS[idx];
+  $('ros-url').value = r.url;
+  $('ros-analyze').click();
+}
 $('rosClose').onclick = () => { $('rosModal').style.display = 'none'; };
 
 function rosParseUrl(url) {
@@ -1284,7 +1360,7 @@ $('ros-analyze').onclick = async function() {
     const allFiles = tree.tree.map(f => f.path);
 
     // Find STL files
-    const stlFiles = allFiles.filter(p => p.startsWith(base) && /\.stl$/i.test(p));
+    const stlFiles = allFiles.filter(p => p.startsWith(base) && /\.stl$|\.dae$/i.test(p));
     // Find URDF files
     const urdfFiles = allFiles.filter(p => p.startsWith(base) && /\.urdf$|\.urdf\.xacro$/.test(p) && !p.includes('test'));
 
@@ -1306,6 +1382,7 @@ $('ros-analyze').onclick = async function() {
 
     // Group STL by visual/ preference
     const visualStls = stlFiles.filter(p => /visual|meshes/i.test(p));
+    const stlOnly = stlFiles.filter(p => /\.stl$/i.test(p));
     const meshPool = (visualStls.length ? visualStls : stlFiles);
 
     // Auto-map axes: use URDF chain or filename heuristics
@@ -1398,10 +1475,33 @@ $('ros-load').onclick = async function() {
     const loadStlFile = async (stlPath, targetName) => {
       if (!stlPath) return;
       rosSetStatus('Lade ' + stlPath.split('/').pop() + '…', Math.round(loaded/total*90));
-      const buf = new Uint8Array(await rosRawBinary(rawBase + stlPath));
-      state.buffers.set(targetName, buf);
-      state.files.push({ path: targetName, name: targetName, size: buf.byteLength, type: 'STL' });
-      loaded++;
+      const isDae = /\.dae$/i.test(stlPath);
+      if (isDae) {
+        // Load DAE and convert geometry to STL buffer
+        await new Promise((res, rej) => {
+          colladaLoader.load(rawBase + stlPath, dae => {
+            const geo = new THREE.BufferGeometry();
+            const meshes3 = [];
+            dae.scene.traverse(c => { if (c.isMesh && c.geometry) meshes3.push(c); });
+            if (meshes3.length) {
+              // Merge geometries
+              const { mergeGeometries } = THREE;
+              const merged = meshes3.length > 1
+                ? (mergeGeometries ? mergeGeometries(meshes3.map(m=>{const g=m.geometry.clone();g.applyMatrix4(m.matrixWorld);return g;})) : meshes3[0].geometry.clone())
+                : meshes3[0].geometry.clone();
+              const buf = stlFromGeometry(merged);
+              state.buffers.set(targetName, new Uint8Array(buf));
+              state.files.push({ path: targetName, name: targetName, size: buf.byteLength, type: 'STL' });
+            }
+            loaded++; res();
+          }, undefined, rej);
+        });
+      } else {
+        const buf = new Uint8Array(await rosRawBinary(rawBase + stlPath));
+        state.buffers.set(targetName, buf);
+        state.files.push({ path: targetName, name: targetName, size: buf.byteLength, type: 'STL' });
+        loaded++;
+      }
     };
 
     // Load axis STLs
