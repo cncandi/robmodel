@@ -768,7 +768,7 @@ function buildJson() {
   const toolName = norm(state.toolName || tcp.toolStl || '') || 'tool1_tcp';
   const tcpX = num(tcp.x), tcpY = num(tcp.y), tcpZ = num(tcp.z);
   const tcpA = num(tcp.rz), tcpB = num(tcp.ry), tcpC = num(tcp.rx);
-  const result = {
+  return {
     name: state.robotName || 'Robot',
     joints: state.joints.map((j,i) => ({
       name: j.name,
@@ -785,8 +785,6 @@ function buildJson() {
       tool:     { px:0, py:0, pz:0, rx:0, ry:0, rz:0, name: toolName }
     }
   };
-  if (hasTcp) result.tcp = { x: tcpX??0, y: tcpY??0, z: tcpZ??0, a: tcpA??0, b: tcpB??0, c: tcpC??0 };
-  return result;
 }
 
 // ── Export ─────────────────────────────────────────────────────────
