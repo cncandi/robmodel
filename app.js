@@ -1487,28 +1487,50 @@ $('ros-load').onclick = async function() {
       rosSetStatus('Lade ' + stlPath.split('/').pop() + '…', Math.round(loaded/total*90));
       const isDae = /\.dae$/i.test(stlPath);
       if (isDae) {
-        // Load DAE and convert geometry to STL buffer
         await new Promise((res, rej) => {
           colladaLoader.load(rawBase + stlPath, dae => {
-            const geo = new THREE.BufferGeometry();
-            const meshes3 = [];
-            dae.scene.traverse(c => { if (c.isMesh && c.geometry) meshes3.push(c); });
-            if (meshes3.length) {
-              // Merge geometries
-              const { mergeGeometries } = THREE;
-              const merged = meshes3.length > 1
-                ? (mergeGeometries ? mergeGeometries(meshes3.map(m=>{const g=m.geometry.clone();g.applyMatrix4(m.matrixWorld);return g;})) : meshes3[0].geometry.clone())
-                : meshes3[0].geometry.clone();
-              const buf = stlFromGeometry(merged);
-              state.buffers.set(targetName, new Uint8Array(buf));
-              state.files.push({ path: targetName, name: targetName, size: buf.byteLength, type: 'STL' });
-            }
-            loaded++; res();
-          }, undefined, rej);
+            try {
+              const meshes3 = [];
+              dae.scene.updateMatrixWorld(true);
+              dae.scene.traverse(c => { if (c.isMesh && c.geometry) meshes3.push(c); });
+              if (meshes3.length) {
+                // Merge all sub-meshes into one geometry (scale m→mm)
+                const combined = new THREE.BufferGeometry();
+                const positions = [];
+                meshes3.forEach(m => {
+                  const g = m.geometry.clone();
+                  g.applyMatrix4(m.matrixWorld);
+                  const pos = g.getAttribute('position');
+                  for (let k = 0; k < pos.count; k++) {
+                    positions.push(pos.getX(k)*1000, pos.getY(k)*1000, pos.getZ(k)*1000);
+                  }
+                  g.dispose();
+                });
+                combined.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+                combined.computeVertexNormals();
+                const buf = stlFromGeometry(combined);
+                state.buffers.set(targetName, new Uint8Array(buf));
+                state.files.push({ path: targetName, name: targetName, size: buf.byteLength, type: 'STL' });
+                combined.dispose();
+              }
+              loaded++; res();
+            } catch(e) { loaded++; res(); } // skip bad mesh
+          }, undefined, e => { loaded++; res(); }); // skip on error
         });
       } else {
-        const buf = new Uint8Array(await rosRawBinary(rawBase + stlPath));
-        state.buffers.set(targetName, buf);
+        // STL: load and scale m→mm
+        const raw = await rosRawBinary(rawBase + stlPath);
+        const geo = loader.parse(raw);
+        geo.computeVertexNormals();
+        // Scale vertices ×1000 (ROS uses meters, RobModel uses mm)
+        const pos = geo.getAttribute('position');
+        for (let k = 0; k < pos.count; k++) {
+          pos.setXYZ(k, pos.getX(k)*1000, pos.getY(k)*1000, pos.getZ(k)*1000);
+        }
+        pos.needsUpdate = true;
+        const buf = stlFromGeometry(geo);
+        geo.dispose();
+        state.buffers.set(targetName, new Uint8Array(buf));
         state.files.push({ path: targetName, name: targetName, size: buf.byteLength, type: 'STL' });
         loaded++;
       }
