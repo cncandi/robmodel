@@ -239,13 +239,15 @@
     </div>
     <div class="rl-modal-body">
       <div style="margin-bottom:10px">
-        <label style="font-family:monospace;font-size:11px;color:#6a8fa8;display:block;margin-bottom:4px;letter-spacing:.05em">GITHUB URL (z.B. https://github.com/ros-industrial/universal_robot/tree/melodic-devel/ur_description)</label>
+        <label style="font-family:monospace;font-size:11px;color:#6a8fa8;display:block;margin-bottom:4px;letter-spacing:.05em">GITHUB URL</label>
         <div style="display:flex;gap:6px">
           <input id="ros-url" type="text" placeholder="https://github.com/owner/repo/tree/branch/package"
             style="flex:1;background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:7px 10px;color:#d8e8f0;font-family:monospace;font-size:12px;outline:none">
           <button id="ros-analyze" style="padding:7px 14px;background:rgba(37,99,235,.3);border:1px solid #2563eb;color:#60a5fa;border-radius:4px;font-family:monospace;font-size:12px;cursor:pointer;white-space:nowrap">Analysieren</button>
         </div>
       </div>
+      <div style="font-family:monospace;font-size:11px;color:#6a8fa8;margin-bottom:6px;letter-spacing:.05em">BEKANNTE ROBOTER — KLICKEN ZUM LADEN</div>
+      <div id="ros-robot-list" style="max-height:220px;overflow-y:auto;background:#060e14;border-radius:4px;border:1px solid rgba(255,255,255,.08);margin-bottom:10px"></div>
       <div id="ros-status" style="font-family:monospace;font-size:11px;color:#6a8fa8;margin-bottom:8px;min-height:16px"></div>
       <div id="ros-progress-wrap" style="display:none;margin-bottom:10px">
         <div style="background:rgba(255,255,255,.08);border-radius:4px;height:6px;overflow:hidden">
