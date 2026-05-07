@@ -178,6 +178,16 @@ function readInputs(p) {
 function setInputs(p, tr) {
   ['X','Y','Z','Rx','Ry','Rz'].forEach(k => $(p+k).value = tr[k.toLowerCase()] || 0);
 }
+function attachToolToA6() {
+  if (!axisPivotGroups || !axisPivotGroups[5]) return;
+  for (const [path, mesh] of meshes) {
+    const file = state.stls.find(f => f.path === path) || { name: mesh.name };
+    if (isTool(file) && mesh.parent !== axisPivotGroups[5]) {
+      axisPivotGroups[5].attach(mesh);
+    }
+  }
+}
+
 function applyTransforms() {
   state.robotTr = readInputs('r');
   state.toolTr  = readInputs('t');
@@ -193,6 +203,7 @@ function applyTransforms() {
   if (axisPointGroup) { axisPointGroup.position.set(0,0,0); axisPointGroup.rotation.set(0,0,0); axisPointGroup.scale.set(1,1,1); }
   applyJointRotations();
   scene.updateMatrixWorld(true);
+  attachToolToA6();
   renderIssues();
 }
 
