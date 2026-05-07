@@ -742,13 +742,30 @@ function applyJsonToState(j) {
 }
 
 function buildJson() {
+  const axNames = ['A1','A2','A3','A4','A5','A6'];
+  const stlFiles = Object.fromEntries(axNames.map((ax, i) => {
+    const src = state.axisStlMap[ax] || state.stls.find(f => partKey(f.name) === ax)?.name || '';
+    const name = norm(src) || ('a'+(i+1));
+    return [ax, { name, posx:0, posy:0, posz:0, posrx:0, posry:0, posrz:0, color: colors[ax] || '#e8a020' }];
+  }));
+  const tcp = state.tcp.auftragen;
+  const toolName = norm(state.toolName || tcp.toolStl || '') || 'tool1_tcp';
   return {
-    name: state.robotName||'Robot',
-    joints: state.joints.map((j,i)=>({name:j.name,axis:fixedAxisType(i),offset:{x:num(j.offset?.z)??0,y:num(j.offset?.y)??0,z:num(j.offset?.x)??0},min:num(j.min),max:num(j.max)})),
+    name: state.robotName || 'Robot',
+    joints: state.joints.map((j,i) => ({
+      name: j.name,
+      axis: fixedAxisType(i),
+      offset: { x: num(j.offset?.z)??0, y: num(j.offset?.y)??0, z: num(j.offset?.x)??0 },
+      min: num(j.min) ?? -180,
+      max: num(j.max) ??  180
+    })),
     stlRefAngles: parseReferencePose(),
-    tcp: { auftragen: { ...state.tcp.auftragen }, abtragen: { ...state.tcp.abtragen } },
-    stlFiles: Object.fromEntries(['A1','A2','A3','A4','A5','A6'].map(k=>[k,{name:'—',posx:0,posy:0,posz:0,posrx:0,posry:0,posrz:0,color:'#e8a020'}])),
-    sceneModels: { pedestal:{px:0,py:0,pz:0,rx:0,ry:0,rz:0,name:'podest'}, tool:{px:0,py:0,pz:0,rx:0,ry:0,rz:0,name:state.toolName||'tool1_tcp'} }
+    tcp: { x: num(tcp.x)??0, y: num(tcp.y)??0, z: num(tcp.z)??0, a: num(tcp.rz)??0, b: num(tcp.ry)??0, c: num(tcp.rx)??0 },
+    stlFiles,
+    sceneModels: {
+      pedestal: { px:0, py:0, pz:0, rx:0, ry:0, rz:0, name: 'podest' },
+      tool:     { px:0, py:0, pz:0, rx:0, ry:0, rz:0, name: toolName }
+    }
   };
 }
 
