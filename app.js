@@ -1156,3 +1156,304 @@ const dz=$('dropZone');
 ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag-over');}));
 dz.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)loadSourceZip(f).catch(err=>alert(err.message));});
 
+
+// ── ROS / GitHub Import ──────────────────────────────────────────
+let _rosData = null;
+
+function openRosModal() {
+  $('rosModal').style.display = 'flex';
+  $('ros-status').textContent = '';
+  $('ros-result').style.display = 'none';
+  $('ros-msg').style.display = 'none';
+  $('ros-progress-wrap').style.display = 'none';
+}
+$('importRosBtn').onclick = openRosModal;
+$('rosClose').onclick = () => { $('rosModal').style.display = 'none'; };
+
+function rosParseUrl(url) {
+  // https://github.com/owner/repo/tree/branch/path/to/pkg
+  const m = url.match(/github\.com\/([^/]+)\/([^/]+)(?:\/tree\/([^/]+))?(?:\/(.+))?/);
+  if (!m) return null;
+  return { owner: m[1], repo: m[2], branch: m[3] || 'main', path: m[4] || '' };
+}
+
+async function rosApiFetch(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('GitHub API: ' + r.status);
+  return r.json();
+}
+
+async function rosRawFetch(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('Raw fetch: ' + r.status);
+  return r.text();
+}
+
+async function rosRawBinary(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('Download: ' + r.status);
+  return r.arrayBuffer();
+}
+
+function rosSetStatus(txt, pct) {
+  $('ros-status').textContent = txt;
+  if (pct !== undefined) {
+    $('ros-progress-wrap').style.display = 'block';
+    $('ros-progress-bar').style.width = pct + '%';
+  }
+}
+
+function rosMsg(txt, ok) {
+  const el = $('ros-msg');
+  el.textContent = txt;
+  el.style.cssText = 'display:block;padding:8px 12px;border-radius:4px;font-family:monospace;font-size:12px;margin-top:8px;' +
+    (ok ? 'background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.3)'
+        : 'background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3)');
+}
+
+// Parse URDF XML → joint chain info
+function rosParseUrdf(xmlStr) {
+  const doc = new DOMParser().parseFromString(xmlStr, 'text/xml');
+  const robotName = doc.querySelector('robot')?.getAttribute('name') || '';
+
+  // Build joint map
+  const joints = [];
+  doc.querySelectorAll('joint').forEach(j => {
+    const type = j.getAttribute('type');
+    if (!['revolute','continuous','prismatic'].includes(type)) return;
+    const name   = j.getAttribute('name') || '';
+    const parent = j.querySelector('parent')?.getAttribute('link') || '';
+    const child  = j.querySelector('child')?.getAttribute('link') || '';
+    const origin = j.querySelector('origin');
+    const xyz    = (origin?.getAttribute('xyz') || '0 0 0').split(' ').map(Number);
+    const rpy    = (origin?.getAttribute('rpy') || '0 0 0').split(' ').map(Number);
+    const limit  = j.querySelector('limit');
+    const lower  = limit ? parseFloat(limit.getAttribute('lower') || '-3.14') : -3.14;
+    const upper  = limit ? parseFloat(limit.getAttribute('upper') || '3.14')  :  3.14;
+    const axis   = (j.querySelector('axis')?.getAttribute('xyz') || '0 0 1').split(' ').map(Number);
+    joints.push({ name, type, parent, child, xyz, rpy, lower, upper, axis });
+  });
+
+  // Build link→mesh map
+  const meshMap = {};
+  doc.querySelectorAll('link').forEach(l => {
+    const lname = l.getAttribute('name') || '';
+    const mesh  = l.querySelector('visual mesh');
+    if (mesh) {
+      let fn = (mesh.getAttribute('filename') || '').replace(/^.*\//, '').replace(/\.dae$/i, '.stl');
+      meshMap[lname] = fn;
+    }
+  });
+
+  // Traverse kinematic chain from base to tip
+  const chain = [];
+  let current = null;
+  // Find root link (parent not appearing as child)
+  const childLinks = new Set(joints.map(j => j.child));
+  const roots = joints.filter(j => !childLinks.has(j.parent));
+  if (roots.length) current = roots[0].parent;
+
+  let safety = 0;
+  while (current && safety++ < 20) {
+    const next = joints.find(j => j.parent === current);
+    if (!next) break;
+    chain.push({ ...next, parentMesh: meshMap[current] || '', childMesh: meshMap[next.child] || '' });
+    current = next.child;
+  }
+
+  return { robotName, chain, meshMap };
+}
+
+$('ros-analyze').onclick = async function() {
+  const url = $('ros-url').value.trim();
+  if (!url) return;
+  const info = rosParseUrl(url);
+  if (!info) { rosMsg('Ungültige GitHub-URL', false); return; }
+  $('ros-result').style.display = 'none';
+  $('ros-msg').style.display = 'none';
+  _rosData = null;
+
+  try {
+    rosSetStatus('Analysiere Repository…', 10);
+    // Fetch full tree
+    const treeUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/git/trees/${info.branch}?recursive=1`;
+    const tree = await rosApiFetch(treeUrl);
+    if (!tree.tree) throw new Error(tree.message || 'Kein Tree gefunden');
+
+    const base = info.path ? info.path + '/' : '';
+    const allFiles = tree.tree.map(f => f.path);
+
+    // Find STL files
+    const stlFiles = allFiles.filter(p => p.startsWith(base) && /\.stl$/i.test(p));
+    // Find URDF files
+    const urdfFiles = allFiles.filter(p => p.startsWith(base) && /\.urdf$|\.urdf\.xacro$/.test(p) && !p.includes('test'));
+
+    rosSetStatus(`Gefunden: ${stlFiles.length} STL, ${urdfFiles.length} URDF`, 30);
+
+    if (!stlFiles.length) throw new Error('Keine STL-Dateien gefunden. Pfad prüfen.');
+
+    // Try to load URDF
+    let parsed = null;
+    for (const uf of urdfFiles.slice(0, 3)) {
+      try {
+        const rawUrl = `https://raw.githubusercontent.com/${info.owner}/${info.repo}/${info.branch}/${uf}`;
+        rosSetStatus('Lese URDF: ' + uf.split('/').pop(), 50);
+        const xmlStr = await rosRawFetch(rawUrl);
+        parsed = rosParseUrdf(xmlStr);
+        if (parsed.chain.length >= 4) break;
+      } catch(e) { /* try next */ }
+    }
+
+    // Group STL by visual/ preference
+    const visualStls = stlFiles.filter(p => /visual|meshes/i.test(p));
+    const meshPool = (visualStls.length ? visualStls : stlFiles);
+
+    // Auto-map axes: use URDF chain or filename heuristics
+    const axisMap = [];
+    if (parsed && parsed.chain.length >= 4) {
+      for (let i = 0; i < Math.min(6, parsed.chain.length); i++) {
+        const j = parsed.chain[i];
+        // Find matching STL in meshPool
+        const stl = meshPool.find(p => {
+          const fn = p.toLowerCase().split('/').pop();
+          return fn === j.childMesh.toLowerCase() ||
+                 fn.replace('.stl','') === j.childMesh.toLowerCase().replace('.stl','');
+        }) || meshPool.find(p => {
+          const fn = p.toLowerCase();
+          return fn.includes('link_' + (i+1)) || fn.includes('link' + (i+1)) ||
+                 fn.includes('_' + (i+1) + '.stl') || fn.includes('a' + (i+1) + '.stl');
+        }) || meshPool[i] || '';
+
+        const xyzMm = j.xyz.map(v => Math.round(v * 1000));
+        axisMap.push({
+          axis: 'A' + (i+1),
+          stl: stl.split('/').pop(),
+          stlPath: stl,
+          x: xyzMm[0], y: xyzMm[1], z: xyzMm[2],
+          minDeg: Math.round(j.lower * 180 / Math.PI),
+          maxDeg: Math.round(j.upper * 180 / Math.PI),
+          axisType: j.axis
+        });
+      }
+    } else {
+      // Heuristic: sort and map
+      const sorted = meshPool
+        .filter(p => /link[\s_-]?[1-6]|a[1-6]\.stl|joint[1-6]/i.test(p))
+        .sort();
+      for (let i = 0; i < Math.min(6, sorted.length || meshPool.length); i++) {
+        const stl = sorted[i] || meshPool[i] || '';
+        axisMap.push({ axis: 'A' + (i+1), stl: stl.split('/').pop(), stlPath: stl, x:0, y:0, z:0, minDeg:-180, maxDeg:180, axisType:[0,0,1] });
+      }
+    }
+
+    // Also find base/podest and tool STL
+    const podestStl = meshPool.find(p => /base|pedest|world|link_0/i.test(p)) || '';
+    const toolStl   = meshPool.find(p => /tool|tcp|ee|flange|wrist|link_[7-9]/i.test(p)) || '';
+
+    _rosData = {
+      info, tree: allFiles, stlFiles, meshPool,
+      axisMap, podestStl, toolStl,
+      robotName: parsed?.robotName || info.repo,
+      parsed
+    };
+
+    // Show result
+    $('ros-robot-name').value = _rosData.robotName;
+    $('ros-axis-table').innerHTML = axisMap.map((a, i) => `
+      <div style="display:grid;grid-template-columns:32px 1fr 60px 60px 50px 50px;gap:4px;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+        <span style="color:#60a5fa;font-weight:700">${a.axis}</span>
+        <span style="color:#d8e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.stlPath}">${a.stl || '—'}</span>
+        <span style="color:#6a8fa8">x:${a.x}</span>
+        <span style="color:#6a8fa8">z:${a.z}</span>
+        <span style="color:#4ade80">${a.minDeg}°</span>
+        <span style="color:#f87171">${a.maxDeg}°</span>
+      </div>`).join('') +
+      (podestStl ? `<div style="color:#6a8fa8;margin-top:4px;font-size:10px">Basis: ${podestStl.split('/').pop()}</div>` : '') +
+      (toolStl   ? `<div style="color:#6a8fa8;font-size:10px">Tool: ${toolStl.split('/').pop()}</div>` : '');
+
+    $('ros-result').style.display = 'block';
+    rosSetStatus(`✓ ${axisMap.length} Achsen erkannt${parsed ? ' (URDF)' : ' (Heuristik)'}`, 100);
+
+  } catch(e) {
+    rosMsg('Fehler: ' + e.message, false);
+    rosSetStatus('', undefined);
+    $('ros-progress-wrap').style.display = 'none';
+  }
+};
+
+$('ros-load').onclick = async function() {
+  if (!_rosData) return;
+  const { info, axisMap, podestStl, toolStl, parsed } = _rosData;
+  const robotName = $('ros-robot-name').value.trim() || info.repo;
+  const rawBase = `https://raw.githubusercontent.com/${info.owner}/${info.repo}/${info.branch}/`;
+
+  const btn = $('ros-load');
+  btn.disabled = true;
+  resetData(); state.mode = 'source'; state.robotName = robotName;
+
+  try {
+    const total = axisMap.length + (podestStl ? 1 : 0) + (toolStl ? 1 : 0);
+    let loaded = 0;
+
+    const loadStlFile = async (stlPath, targetName) => {
+      if (!stlPath) return;
+      rosSetStatus('Lade ' + stlPath.split('/').pop() + '…', Math.round(loaded/total*90));
+      const buf = new Uint8Array(await rosRawBinary(rawBase + stlPath));
+      state.buffers.set(targetName, buf);
+      state.files.push({ path: targetName, name: targetName, size: buf.byteLength, type: 'STL' });
+      loaded++;
+    };
+
+    // Load axis STLs
+    for (let i = 0; i < axisMap.length; i++) {
+      const a = axisMap[i];
+      if (a.stlPath) await loadStlFile(a.stlPath, 'a' + (i+1) + '.stl');
+    }
+    if (podestStl) await loadStlFile(podestStl, 'podest.stl');
+    if (toolStl)   await loadStlFile(toolStl, 'tool1_tcp.stl');
+
+    splitFiles();
+    state.stls.forEach(f => {
+      const key = partKey(f.name);
+      if (/^A[1-6]$/.test(key)) state.axisStlMap[key] = f.name;
+    });
+
+    // Apply joint data from URDF chain
+    if (parsed?.chain) {
+      parsed.chain.slice(0, 6).forEach((j, i) => {
+        if (state.joints[i]) {
+          // Convert xyz (meters) to mm, x↔z swap for RobModel display
+          state.joints[i].offset = {
+            x: Math.round(j.xyz[2] * 1000), // z in URDF → x in RobModel display
+            y: Math.round(j.xyz[1] * 1000),
+            z: Math.round(j.xyz[0] * 1000)  // x in URDF → z in RobModel display
+          };
+          state.axisPoints[i].x = state.joints[i].offset.x;
+          state.axisPoints[i].y = state.joints[i].offset.y;
+          state.axisPoints[i].z = state.joints[i].offset.z;
+          state.joints[i].min = Math.round(j.lower * 180 / Math.PI);
+          state.joints[i].max = Math.round(j.upper * 180 / Math.PI);
+          // Determine axis type from URDF axis vector
+          const ax = j.axis.map(Math.abs);
+          const maxIdx = ax.indexOf(Math.max(...ax));
+          state.joints[i].axis = ['Rx','Ry','Rz'][maxIdx];
+        }
+      });
+      syncJointsFromAxisPoints?.();
+    }
+
+    state.robotTr = {x:0,y:0,z:0,rx:0,ry:0,rz:0}; setInputs('r', state.robotTr);
+    state.toolTr  = {x:0,y:0,z:0,rx:0,ry:0,rz:0}; setInputs('t', state.toolTr);
+    setJointAnglesToReferencePose();
+    await loadStls(); enableSave(); renderAll(); setView('iso');
+    $('rosModal').style.display = 'none';
+    rosSetStatus('', undefined);
+    $('ros-progress-wrap').style.display = 'none';
+
+  } catch(e) {
+    rosMsg('Fehler beim Laden: ' + e.message, false);
+    resetData(); renderAll();
+  } finally {
+    btn.disabled = false; btn.textContent = 'Laden & in RobModel öffnen';
+  }
+};
