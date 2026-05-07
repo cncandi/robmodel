@@ -1028,12 +1028,15 @@ async function uploadToRoblib() {
 
   btn.disabled = true; btn.textContent = 'Lade…';
   try {
-    // ZIP erzeugen
+    // ZIP erzeugen — Tool immer in World-Koordinaten exportieren
+    const prevMode = toolMountMode;
+    if (prevMode !== 'world') { detachToolFromA6(); scene.updateMatrixWorld(true); }
     const zip  = new JSZip();
     const base = zipName(state.robotName || 'robot');
     zip.file(base + '.json', JSON.stringify(buildJson(), null, 2));
     for (const [, mesh] of meshes) zip.file(mesh.name, exportBinaryStl(mesh));
     const zipBlob = await zip.generateAsync({ type: 'blob' });
+    if (prevMode !== 'world') attachToolToA6();
 
     const fd = new FormData();
     for (const [k, v] of Object.entries(fields)) fd.append(k, v);
