@@ -626,6 +626,19 @@ async function loadDemoKr8() {
   const btn = $('demoBtn');
   if (btn) { btn.disabled=true; btn.textContent='Lade…'; }
   try {
+    // Achsgrenzen aus KR8-JSON laden
+    const kr8Res = await fetch('./kr8_robsimul_v37_zielwerte.json');
+    if (kr8Res.ok) {
+      const kr8 = await kr8Res.json();
+      if (Array.isArray(kr8.joints)) {
+        kr8.joints.forEach((j,i) => {
+          if (state.joints[i]) {
+            state.joints[i].min = num(j.min) ?? -180;
+            state.joints[i].max = num(j.max) ??  180;
+          }
+        });
+      }
+    }
     for (const fname of FILES) {
       const res = await fetch(BASE + fname);
       if (!res.ok) throw new Error(fname + ': HTTP ' + res.status);
