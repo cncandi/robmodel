@@ -202,7 +202,7 @@ function attachToolToA6() {
       if (mesh.parent !== axisPivotGroups[5]) axisPivotGroups[5].add(mesh);
       mesh.position.set(0, 0, 0);
       // +180° um X damit Werkzeug korrekt ausgerichtet ist
-      mesh.rotation.set(_rx + Math.PI, _ry, _rz);
+      mesh.rotation.set(_rx, _ry, _rz + Math.PI);
     }
   }
 }
