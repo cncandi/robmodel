@@ -1003,6 +1003,22 @@ function openRoblibModal() {
   $('roblibModal').style.display = 'flex';
 }
 
+// Type change handler — show/hide robot-specific fields
+function rlTypeChanged() {
+  const type = $('rl-type')?.value || 'robot';
+  const fields = $('rl-robot-fields');
+  if (fields) {
+    const labels = fields.querySelectorAll('label');
+    labels.forEach(l => l.style.display = type === 'robot' ? '' : 'none');
+  }
+  const nameField = $('rl-name');
+  if (nameField) {
+    const placeholders = {robot:'KR 8 R1420', endeffektor:'Greifer 2-Finger', umfeld:'Sicherheitszaun'};
+    nameField.placeholder = placeholders[type] || '';
+  }
+}
+$('rl-type')?.addEventListener('change', rlTypeChanged);
+
 async function uploadToRoblib() {
   const btn  = $('rl-submit');
   const msg  = $('rl-msg');
@@ -1023,20 +1039,29 @@ async function uploadToRoblib() {
     bar.style.background = percent === 100 ? '#22c55e' : '#2563eb';
   };
 
+  const type = $('rl-type')?.value || 'robot';
   const fields = {
-    name:                   $('rl-name').value.trim(),
-    marke:                  $('rl-marke').value.trim(),
-    modell:                 $('rl-modell').value.trim(),
-    achsen:                 $('rl-achsen').value.trim(),
-    reichweite_mm:          $('rl-reichweite').value.trim(),
-    nutzlast_kg:            $('rl-nutzlast').value.trim(),
-    gewicht_kg:             $('rl-gewicht').value.trim(),
-    wiederholgenauigkeit_mm:$('rl-wdh').value.trim(),
-    user:                   $('rl-user').value.trim(),
-    pass:                   $('rl-pass').value,
+    name:  $('rl-name').value.trim(),
+    type,
+    user:  $('rl-user').value.trim(),
+    pass:  $('rl-pass').value,
   };
-  for (const [k, v] of Object.entries(fields)) {
-    if (!v) { show('Feld "' + k + '" fehlt.', false); return; }
+  if (!fields.name) { show('Name fehlt.', false); return; }
+  if (!fields.user || !fields.pass) { show('Zugangsdaten fehlen.', false); return; }
+  // Robot-specific fields
+  if (type === 'robot') {
+    Object.assign(fields, {
+      marke:                   $('rl-marke').value.trim(),
+      modell:                  $('rl-modell').value.trim(),
+      achsen:                  $('rl-achsen').value.trim(),
+      reichweite_mm:           $('rl-reichweite').value.trim(),
+      nutzlast_kg:             $('rl-nutzlast').value.trim(),
+      gewicht_kg:              $('rl-gewicht').value.trim(),
+      wiederholgenauigkeit_mm: $('rl-wdh').value.trim(),
+    });
+    for (const [k,v] of Object.entries(fields)) {
+      if (!v && !['type','pass'].includes(k)) { show('Feld "'+k+'" fehlt.', false); return; }
+    }
   }
 
   btn.disabled = true; btn.textContent = 'Lade…';
