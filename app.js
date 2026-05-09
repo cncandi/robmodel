@@ -625,6 +625,9 @@ function resetData() {
   state.joints=['A1','A2','A3','A4','A5','A6'].map((n,i)=>({name:n,axis:fixedAxisType(i),offset:defOffset(i),min:null,max:null,rotationSign:1,status:'KR8 Zielwert'}));
   state.tcp.auftragen={x:null,y:null,z:null,rz:null,ry:null,rx:null,toolLength:0,toolStl:'',status:'manuell'};
   state.tcp.abtragen={...state.tcp.auftragen};
+  state.effStl  = null;
+  state.umfStls = [];
+  renderEffRow?.(); renderUmfRows?.();
 }
 
 function enableSave()  { $('downloadJson').disabled=false; $('downloadZip').disabled=false; $('roblibBtn').disabled=false; }
@@ -827,6 +830,9 @@ function buildJson() {
       tool:     { px:0, py:0, pz:0, rx:0, ry:0, rz:0, name: toolName }
     }
   };
+  if (state.effStl)        result.endeffektor = { name: norm(state.effStl.name), stl: 'endeffektor.stl', px:0, py:0, pz:0, rx:0, ry:0, rz:0 };
+  if (state.umfStls?.length) result.umfeld = state.umfStls.map((u,i) => ({ name: norm(u.name), stl: 'umfeld_'+(i+1)+'.stl', px:0, py:0, pz:0, rx:0, ry:0, rz:0 }));
+  return result;
 }
 
 // ── Export ─────────────────────────────────────────────────────────
@@ -977,7 +983,64 @@ function initAxisStlEvents() {
 }
 
 
-// ── ROBLIB Upload ───────────────────────────────────────────────
+// ── Endeffektor & Umfeld STL ────────────────────────────────────
+// state.effStl  = { path, name, buf }  (ein Endeffektor)
+// state.umfStls = [{ path, name, buf }]  (mehrere Umfeld-Teile)
+
+function renderEffRow() {
+  const el = $('effStlRows');
+  const badge = $('effBadge');
+  if (!el) return;
+  if (state.effStl) {
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px;color:#d8e8f0">
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${norm(state.effStl.name)}</span>
+      <button id="effClearBtn" style="background:rgba(204,51,51,.2);border:1px solid rgba(204,51,51,.4);color:#f87171;border-radius:3px;padding:2px 6px;font-size:12px;cursor:pointer">✕</button>
+    </div>`;
+    $('effClearBtn').onclick = () => { state.effStl = null; renderEffRow(); };
+    if (badge) badge.textContent = norm(state.effStl.name);
+  } else {
+    el.innerHTML = '';
+    if (badge) badge.textContent = '—';
+  }
+}
+
+function renderUmfRows() {
+  const el = $('umfStlRows');
+  const badge = $('umfBadge');
+  if (!el) return;
+  el.innerHTML = (state.umfStls || []).map((u, i) =>
+    `<div style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px;color:#d8e8f0">
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${norm(u.name)}</span>
+      <button data-umf-idx="${i}" style="background:rgba(204,51,51,.2);border:1px solid rgba(204,51,51,.4);color:#f87171;border-radius:3px;padding:1px 5px;font-size:11px;cursor:pointer">✕</button>
+    </div>`
+  ).join('');
+  el.querySelectorAll('[data-umf-idx]').forEach(btn => {
+    btn.onclick = () => { state.umfStls.splice(parseInt(btn.dataset.umfIdx), 1); renderUmfRows(); };
+  });
+  if (badge) badge.textContent = (state.umfStls || []).length;
+}
+
+// File inputs
+$('effStlInput').addEventListener('change', async e => {
+  const file = e.target.files[0]; if (!file) return;
+  const buf = new Uint8Array(await file.arrayBuffer());
+  state.effStl = { path: file.name, name: file.name, buf };
+  renderEffRow();
+  e.target.value = '';
+});
+
+$('umfStlInput').addEventListener('change', async e => {
+  const files = Array.from(e.target.files);
+  if (!state.umfStls) state.umfStls = [];
+  for (const file of files) {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    state.umfStls.push({ path: file.name, name: file.name, buf });
+  }
+  renderUmfRows();
+  e.target.value = '';
+});
+
+// ── Endeffektor & Umfeld ────────────────────────────────────────
 const ROBLIB_API = 'https://www.cnc-technik.de/robsimul/roblib/api.php';
 
 function openRoblibModal() {
@@ -1074,6 +1137,8 @@ async function uploadToRoblib() {
     const base = zipName(state.robotName || 'robot');
     zip.file(base + '.json', JSON.stringify(buildJson(), null, 2));
     for (const [, mesh] of meshes) zip.file(mesh.name, exportBinaryStl(mesh));
+    if (state.effStl?.buf) zip.file('endeffektor.stl', state.effStl.buf);
+    if (state.umfStls?.length) state.umfStls.forEach((u, i) => zip.file('umfeld_' + (i+1) + '.stl', u.buf));
     const zipBlob = await zip.generateAsync({ type: 'blob' }, m => setProgress('Komprimiere…', 5 + m.percent * 0.4));
     if (prevMode !== 'world') attachToolToA6();
     setProgress('Lade hoch…', 45);
