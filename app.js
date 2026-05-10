@@ -161,25 +161,29 @@ function init3d() {
 let effTcpHelper = null;
 
 function updateEffTcpMarker() {
-  if (effTcpHelper) { scene.remove(effTcpHelper); effTcpHelper = null; }
+  if (effTcpHelper) {
+    if (effTcpHelper.parent) effTcpHelper.parent.remove(effTcpHelper);
+    effTcpHelper = null;
+  }
   if (!state.effStl || !scene) return;
   const eo = state.effOffset || {};
   const g = new THREE.Group();
-  const axes = new THREE.AxesHelper(60);
-  g.add(axes);
-  // Kleine Kugel als Ursprungsmarker
+  g.add(new THREE.AxesHelper(60));
   g.add(new THREE.Mesh(
     new THREE.SphereGeometry(8, 10, 8),
     new THREE.MeshStandardMaterial({ color: '#a855f7', emissive: '#7c3aed', emissiveIntensity:.5 })
   ));
+  // Offset vom TCP-Ursprung
   g.position.set(eo.x||0, eo.y||0, eo.z||0);
   g.rotation.set(
     (eo.rx||0)*Math.PI/180,
     (eo.ry||0)*Math.PI/180,
     (eo.rz||0)*Math.PI/180
   );
-  // An A6 hängen wenn vorhanden, sonst in toolGroup
-  const parent = (toolMountMode==='a6' && axisPivotGroups[5]) ? axisPivotGroups[5] : toolGroup;
+  // An A6 → lokales KS von A6; an World → toolGroup (Weltkoordinaten)
+  const parent = (toolMountMode === 'a6' && axisPivotGroups && axisPivotGroups[5])
+    ? axisPivotGroups[5]
+    : toolGroup;
   parent.add(g);
   effTcpHelper = g;
 }
@@ -215,9 +219,9 @@ function setToolMode(mode) {
     const btn = $('toolMode' + m.charAt(0).toUpperCase() + m.slice(1));
     if (btn) btn.classList.toggle('active', m === mode);
   });
-  // Sofort neu anwenden
   if (mode === 'world') detachToolFromA6();
   applyTransforms();
+  updateEffTcpMarker();
 }
 
 function attachToolToA6() {
@@ -262,6 +266,7 @@ function applyTransforms() {
   applyJointRotations();
   scene.updateMatrixWorld(true);
   if (toolMountMode === 'a6') attachToolToA6(); else detachToolFromA6();
+  updateEffTcpMarker();
   
 }
 
