@@ -55,7 +55,7 @@ section.viewerCard canvas{position:absolute;inset:0;width:100%!important;height:
   color:var(--txt3);font-size:17px;pointer-events:none}
 
 /* ── SEITENLEISTE ────────────────────────────────── */
-aside.side{width:230px;background:var(--bg2);border-left:1px solid var(--bdr);
+aside.side{width:280px;background:var(--bg2);border-left:1px solid var(--bdr);
   overflow-y:auto;overflow-x:hidden;flex-shrink:0;
   scrollbar-width:thin;scrollbar-color:var(--bg4) transparent;padding:6px}
 aside.side::-webkit-scrollbar{width:4px}
