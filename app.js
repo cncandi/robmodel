@@ -198,12 +198,15 @@ function updateEffTcpMarker() {
     new THREE.MeshStandardMaterial({ color: '#a855f7', emissive: '#7c3aed', emissiveIntensity:.6 })
   ));
 
-  g.position.set(eo.x||0, eo.y||0, eo.z||0);
-  g.rotation.set(
+  // Grundausrichtung A6: Y+90° (Z zeigt nach vorne), dann User-Offset drauf
+  const euler = new THREE.Euler(
     (eo.rx||0)*Math.PI/180,
-    (eo.ry||0)*Math.PI/180,
-    (eo.rz||0)*Math.PI/180
+    (eo.ry||0)*Math.PI/180 + Math.PI/2,
+    (eo.rz||0)*Math.PI/180,
+    'XYZ'
   );
+  g.position.set(eo.x||0, eo.y||0, eo.z||0);
+  g.rotation.copy(euler);
   const parent = (toolMountMode === 'a6' && axisPivotGroups[5]) ? axisPivotGroups[5] : toolGroup;
   parent.add(g);
   effTcpHelper = g;
