@@ -707,7 +707,7 @@ async function loadDemoKr8() {
     alert('Demo-Load fehlgeschlagen: ' + e.message);
     resetData(); renderAll();
   } finally {
-    if (btn) { btn.disabled=false; btn.textContent='Test'; }
+    if (btn) { btn.disabled=false; btn.textContent='Example'; }
   }
 }
 
