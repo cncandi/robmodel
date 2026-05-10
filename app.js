@@ -91,7 +91,7 @@ try {
   state.jointAngles = [0, -90, 90, 0, 0, 0];
   applyJointRotations();
   renderAll();
-  renderJointAngleRows();
+  
   updateAxisPointVisuals();
 } catch (e) { showError('renderAll: ' + e); }
 animate();
@@ -235,7 +235,7 @@ function applyTransforms() {
   applyJointRotations();
   scene.updateMatrixWorld(true);
   if (toolMountMode === 'a6') attachToolToA6(); else detachToolFromA6();
-  renderIssues();
+  
 }
 
 function fitCamera() {
@@ -519,7 +519,7 @@ function onAxisObjectMoved() {
   const local = mesh.position.clone().sub(prev);
   const p = state.axisPoints[idx];
   p.x = Number(local.x.toFixed(3)); p.y = Number(local.y.toFixed(3)); p.z = Number(local.z.toFixed(3)); p.source = 'manuell';
-  syncJointsFromAxisPoints(); rebuildRobotKinematics(); applyTransforms(); renderRows(); renderIssues();
+  syncJointsFromAxisPoints(); rebuildRobotKinematics(); applyTransforms(); renderRows(); 
 }
 
 
@@ -715,7 +715,7 @@ function zeroAllTransforms() {
   state.robotTr={x:0,y:0,z:0,rx:0,ry:0,rz:0}; state.toolTr={x:0,y:0,z:0,rx:0,ry:0,rz:0};
   state.jointAngles=[0,-90,90,0,0,0];
   setInputs('r',state.robotTr); setInputs('t',state.toolTr);
-  renderJointAngleRows();
+  
 }
 
 // ── XML-Parser ─────────────────────────────────────────────────────
@@ -874,17 +874,17 @@ function simulateAxis(axisIndex){
     else if(phase<=2)value=lerp(max,min,smooth(phase-1));
     else value=lerp(min,startValue,smooth(phase-2));
     state.jointAngles=base.slice();state.jointAngles[axisIndex]=value;
-    applyJointRotations();renderJointAngleRows();
+    applyJointRotations();
     if(t<1&&state.simulation.active&&state.simulation.axis===axisIndex){state.simulation.raf=requestAnimationFrame(step);}
-    else{state.jointAngles=base.slice();state.jointAngles[axisIndex]=startValue;applyJointRotations();renderJointAngleRows();state.simulation={active:false,axis:null,raf:null};}
+    else{state.jointAngles=base.slice();state.jointAngles[axisIndex]=startValue;applyJointRotations();state.simulation={active:false,axis:null,raf:null};}
   };
   state.simulation.raf=requestAnimationFrame(step);
 }
 
 // ── Render-Funktionen ──────────────────────────────────────────────
-function renderAll(){renderAxisStlRows();renderRows();renderJointAngleRows();updateAxisPointVisuals();renderTcp();renderIssues();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';const tb=$('toolBadge');if(tb)tb.textContent=state.tcp.auftragen.toolStl||state.toolName||'—';}
+function renderAll(){renderAxisStlRows();renderRows();updateAxisPointVisuals();renderTcp();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';}
 
-function renderJointAngleRows(){const el=$('jointAngleRows');if(!el)return;el.innerHTML=state.jointAngles.map((v,i)=>`<div class="field"><label>${state.joints[i]?.name||'A'+(i+1)} ${fixedAxisType(i)}</label><input data-joint-angle="${i}" type="number" step="1" value="${v??0}"></div>`).join('');}
+function {const el=$('jointAngleRows');if(!el)return;el.innerHTML=state.jointAngles.map((v,i)=>`<div class="field"><label>${state.joints[i]?.name||'A'+(i+1)} ${fixedAxisType(i)}</label><input data-joint-angle="${i}" type="number" step="1" value="${v??0}"></div>`).join('');}
 
 
 function renderRows(){$('jointRows').innerHTML=state.joints.map((j,i)=>{
@@ -909,9 +909,7 @@ function renderRows(){$('jointRows').innerHTML=state.joints.map((j,i)=>{
 
 function renderTcp(){qsa('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===state.activeTcp));const tcp=state.tcp[state.activeTcp];qsa('[data-tcp]').forEach(i=>i.value=tcp?.[i.dataset.tcp]??'');const x=num(tcp?.x),y=num(tcp?.y),z=num(tcp?.z);tcpMarker.visible=x!==null||y!==null||z!==null;tcpMarker.position.set(x||0,y||0,z||0);}
 
-function renderIssues(){const issues=[];if(state.mode==='package')issues.push(...packageIssues());else{if(!state.files.length)issues.push(['warn','Keine Datei geladen.']);if(!state.xmls.length&&state.mode==='source')issues.push(['warn','XML fehlt.']);if(!state.stls.length&&state.files.length)issues.push(['warn','Keine STL-Dateien.']);if(state.files.length&&!state.tcp.auftragen.toolStl)issues.push(['warn','Tool-STL nicht gefunden.']);if(state.files.length&&!state.axisPoints.some(p=>String(p.source).includes('XML')))issues.push(['warn','Rotationspunkte nicht aus XML gelesen.']);state.joints.forEach(j=>{if(j.min===null||j.max===null)issues.push(['warn',`${j.name}: Achsgrenzen fehlen.`]);});}if(!issues.length)issues.push(['ok','Alle Prüfpunkte OK.']);$('issues').innerHTML=issues.map(([t,m])=>`<div class="issue ${t}"><span class="badge ${t}">${t==='bad'?'Fehler':t==='ok'?'OK':'Prüfen'}</span> ${esc(m)}</div>`).join('');}
 
-function packageIssues(){const issues=[];if(state.jsons.length!==1)issues.push(['bad',`Package: ${state.jsons.length} JSON (erwartet: 1).`]);if(!state.packageJson)issues.push(['bad','JSON nicht lesbar.']);if(!state.stls.length)issues.push(['bad','Keine STL.']);const j=state.packageJson;if(j){if(!Array.isArray(j.joints)||j.joints.length!==6)issues.push(['bad','joints: 6 Achsen erwartet.']);const refs=[];Object.values(j.stlFiles||{}).forEach(v=>{if(v?.name)refs.push(v.name)});Object.values(j.sceneModels||{}).forEach(v=>{if(v?.name)refs.push(v.name)});const stlSet=new Set(state.stls.map(f=>norm(f.name)));refs.forEach(r=>{if(!stlSet.has(norm(r)))issues.push(['warn',`STL fehlt: ${r}.stl`]);});}for(const f of state.stls){if(f.size>12000000)issues.push(['warn',`${f.name}: sehr groß (${fmt(f.size)}).`]);}return issues;}
 
 
 // ── Kameraansichten ────────────────────────────────────────────────
@@ -1321,18 +1319,18 @@ document.querySelector('label[for="sourceZip"]').addEventListener('click', e => 
 });
 $('checkZip').addEventListener('change',  e => e.target.files[0] && loadPackageZip(e.target.files[0]).catch(err=>alert(err.message)));
 $('jsonInput').addEventListener('change',  e => e.target.files[0] && loadJsonFile(e.target.files[0]));
-if($('refPose'))$('refPose').addEventListener('input',()=>{setJointAnglesToReferencePose();renderJointAngleRows();applyJointRotations();renderIssues();});
+if($('refPose'))$('refPose').addEventListener('input',()=>{setJointAnglesToReferencePose();applyJointRotations();});
 // Hidden inputs for JS compat — still trigger applyTransforms
 ['rX','rY','rZ','rRx','rRy','rRz','tX','tY','tZ','tRx','tRy','tRz'].forEach(id=>{const el=$(id);if(el)el.addEventListener('input',applyTransforms);});
-qsa('.tab').forEach(t=>t.onclick=()=>{state.activeTcp=t.dataset.mode;renderTcp();renderIssues();});
+qsa('.tab').forEach(t=>t.onclick=()=>{state.activeTcp=t.dataset.mode;renderTcp();});
 qsa('[data-view]').forEach(b=>{b.addEventListener('click',e=>{if(e.button===0)setView(b.dataset.view);});b.addEventListener('mousedown',e=>{if(e.button!==0)e.preventDefault();});});
 
 document.addEventListener('input',e=>{
   const t=e.target;
-  if(t.dataset.jointAngle!==undefined){state.jointAngles[Number(t.dataset.jointAngle)]=num(t.value)||0;applyJointRotations();renderJointAngleRows();renderIssues();return;}
-  if(t.dataset.tcp){state.tcp[state.activeTcp][t.dataset.tcp]=['toolStl','status'].includes(t.dataset.tcp)?t.value:num(t.value);renderTcp();renderIssues();}
-  if(t.dataset.axisPoint!==undefined){const p=state.axisPoints[Number(t.dataset.axisPoint)],f=t.dataset.axisField;p[f]=num(t.value);p.source='manuell';syncJointsFromAxisPoints();rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();renderRows();renderIssues();}
-  if(t.dataset.j!==undefined){const idx=Number(t.dataset.j),j=state.joints[idx],f=t.dataset.f;if(['x','y','z'].includes(f)){j.offset[f]=num(t.value);state.axisPoints[idx][f]=num(t.value);state.axisPoints[idx].source='manuell';rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();}else if(['min','max'].includes(f))j[f]=num(t.value);else if(f==='rotationSign'){j[f]=num(t.value);applyJointRotations();}else j[f]=t.value;renderIssues();}
+  if(t.dataset.jointAngle!==undefined){state.jointAngles[Number(t.dataset.jointAngle)]=num(t.value)||0;applyJointRotations();return;}
+  if(t.dataset.tcp){state.tcp[state.activeTcp][t.dataset.tcp]=['toolStl','status'].includes(t.dataset.tcp)?t.value:num(t.value);renderTcp();}
+  if(t.dataset.axisPoint!==undefined){const p=state.axisPoints[Number(t.dataset.axisPoint)],f=t.dataset.axisField;p[f]=num(t.value);p.source='manuell';syncJointsFromAxisPoints();rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();renderRows();}
+  if(t.dataset.j!==undefined){const idx=Number(t.dataset.j),j=state.joints[idx],f=t.dataset.f;if(['x','y','z'].includes(f)){j.offset[f]=num(t.value);state.axisPoints[idx][f]=num(t.value);state.axisPoints[idx].source='manuell';rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();}else if(['min','max'].includes(f))j[f]=num(t.value);else if(f==='rotationSign'){j[f]=num(t.value);applyJointRotations();}else j[f]=t.value;}
   // Farb-Picker in Parameterzeile
   if(t.dataset.axisColor){const ax=t.dataset.axisColor;colors[ax]=t.value;updateMeshColor(ax,t.value);renderRows();}
 });
