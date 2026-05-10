@@ -903,7 +903,10 @@ function renderRows(){$('jointRows').innerHTML=state.joints.map((j,i)=>{
     <td><input data-j="${i}" data-f="max" value="${j.max??''}"></td>
     <td><select class="dirSel" data-j="${i}" data-f="rotationSign"><option value="1" ${(num(j.rotationSign)??1)>=0?'selected':''}>+</option><option value="-1" ${(num(j.rotationSign)??1)<0?'selected':''}>−</option></select></td>
     <td><input type="color" data-axis-color="${ax}" value="${col}" style="width:26px;height:22px;border:none;border-radius:3px;cursor:pointer;padding:0" title="Farbe ${ax}"></td>
-    <td style="max-width:70px;overflow:hidden"><span data-axis-stl-label="${ax}" title="${stlName}" style="font-size:10px;color:#6a8fa8;cursor:pointer;white-space:nowrap">${stlName}</span><input type="file" data-axis-stl-input="${ax}" accept=".stl" style="display:none"></td>
+    <td style="max-width:80px">
+      <button data-axis-stl-label="${ax}" style="font-size:10px;padding:2px 5px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:#6a8fa8;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;width:100%" title="${stlName} — klicken zum Laden">${stlName}</button>
+      <input type="file" data-axis-stl-input="${ax}" accept=".stl" style="display:none">
+    </td>
     <td><button class="simBtn" data-sim-axis="${i}">▶</button></td>
   </tr>`;}).join('');}
 
@@ -1339,14 +1342,14 @@ document.addEventListener('input',e=>{
 document.addEventListener('click',e=>{
   const t=e.target;
   if(t.dataset.simAxis!==undefined)simulateAxis(Number(t.dataset.simAxis));
-  // STL-Label in Parameterzeile → Datei-Dialog öffnen
+  // STL-Button in Parameterzeile
   if(t.dataset.axisStlLabel){
-    const input=t.parentElement.querySelector('[data-axis-stl-input]');
-    if(input)input.click();
+    const input = t.parentElement.querySelector('[data-axis-stl-input]');
+    if(input) input.click();
     return;
   }
   const row=t.closest?.('[data-param-row]');
-  if(row&&!t.matches('input,select,button,label,span[data-axis-stl-label]'))selectAxisPoint(row.dataset.paramRow);
+  if(row&&!t.matches('input,select,button,label'))selectAxisPoint(row.dataset.paramRow);
 });
 
 // STL-Datei aus Parameterzeile laden (delegiert über document)
@@ -1358,8 +1361,10 @@ document.addEventListener('change', e => {
     file.arrayBuffer().then(buf => {
       const u8 = new Uint8Array(buf);
       state.buffers.set(file.name, u8);
-      const existing = state.stls.find(f => partKey(f.name) === ax);
-      if (!existing) state.files.push({ path: file.name, name: file.name, size: buf.byteLength, type: 'STL' });
+      // Alte Datei dieser Achse aus state.files entfernen
+      state.files = state.files.filter(f => partKey(f.name) !== ax || f.name === file.name);
+      if (!state.files.find(f => f.name === file.name))
+        state.files.push({ path: file.name, name: file.name, size: buf.byteLength, type: 'STL' });
       state.axisStlMap[ax] = file.name;
       splitFiles();
       loadStls().then(() => { renderRows(); enableSave(); });
