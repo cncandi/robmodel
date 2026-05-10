@@ -165,25 +165,26 @@ function updateEffTcpMarker() {
     if (effTcpHelper.parent) effTcpHelper.parent.remove(effTcpHelper);
     effTcpHelper = null;
   }
-  if (!state.effStl || !scene) return;
+  // Marker zeigen wenn An A6 aktiv ODER Endeffektor geladen
+  const showMarker = toolMountMode === 'a6' || !!state.effStl;
+  if (!showMarker || !scene) return;
+  if (toolMountMode === 'a6' && (!axisPivotGroups || !axisPivotGroups[5])) return;
+
   const eo = state.effOffset || {};
   const g = new THREE.Group();
-  g.add(new THREE.AxesHelper(60));
+  const axes = new THREE.AxesHelper(80);
+  g.add(axes);
   g.add(new THREE.Mesh(
-    new THREE.SphereGeometry(8, 10, 8),
-    new THREE.MeshStandardMaterial({ color: '#a855f7', emissive: '#7c3aed', emissiveIntensity:.5 })
+    new THREE.SphereGeometry(10, 12, 8),
+    new THREE.MeshStandardMaterial({ color: '#a855f7', emissive: '#7c3aed', emissiveIntensity:.6, depthTest: false })
   ));
-  // Offset vom TCP-Ursprung
   g.position.set(eo.x||0, eo.y||0, eo.z||0);
   g.rotation.set(
     (eo.rx||0)*Math.PI/180,
     (eo.ry||0)*Math.PI/180,
     (eo.rz||0)*Math.PI/180
   );
-  // An A6 → lokales KS von A6; an World → toolGroup (Weltkoordinaten)
-  const parent = (toolMountMode === 'a6' && axisPivotGroups && axisPivotGroups[5])
-    ? axisPivotGroups[5]
-    : toolGroup;
+  const parent = (toolMountMode === 'a6' && axisPivotGroups[5]) ? axisPivotGroups[5] : toolGroup;
   parent.add(g);
   effTcpHelper = g;
 }
