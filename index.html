@@ -82,22 +82,29 @@
       <section class="card">
         <div class="card-head">
           <h2>🔧 Endeffektor</h2>
-          <span class="badge info" id="effBadge">—</span>
-        </div>
-        <!-- Lokale STL -->
-        <div id="effStlRows"></div>
-        <div class="btn-row">
-          <label class="filebtn" for="effStlInput">+ STL</label>
-          <input type="file" id="effStlInput" accept=".stl" style="display:none">
-          <button id="effClearBtn">✕ Entfernen</button>
-        </div>
-        <!-- Library -->
-        <div style="border-top:1px solid rgba(255,255,255,.08);margin-top:8px;padding-top:6px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-            <span style="font-size:10px;letter-spacing:.06em;color:#6a8fa8;font-family:monospace">LIBRARY</span>
-            <button id="effLibRefreshBtn" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:3px;padding:2px 8px;font-size:11px;cursor:pointer">↻</button>
+          <div style="display:flex;gap:4px;align-items:center">
+            <span class="badge info" id="effBadge">—</span>
+            <button id="effClearBtn" title="Entfernen" style="background:rgba(204,51,51,.2);border:1px solid rgba(204,51,51,.4);color:#f87171;border-radius:3px;padding:1px 6px;font-size:11px;cursor:pointer">✕</button>
           </div>
-          <div id="effLibList" style="max-height:110px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace">Klicke ↻ zum Laden…</div>
+        </div>
+        <div id="effStlRows"></div>
+        <!-- Library -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:10px;letter-spacing:.06em;color:#6a8fa8;font-family:monospace">LIBRARY</span>
+          <button id="effLibRefreshBtn" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:3px;padding:2px 8px;font-size:11px;cursor:pointer">↻</button>
+        </div>
+        <div id="effLibList" style="max-height:100px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace;margin-bottom:8px">Klicke ↻ zum Laden…</div>
+        <!-- TCP-Offset -->
+        <div style="border-top:1px solid rgba(255,255,255,.08);padding-top:6px">
+          <div style="font-size:10px;letter-spacing:.06em;color:#6a8fa8;font-family:monospace;margin-bottom:4px">TCP-OFFSET</div>
+          <div class="grid6">
+            <div class="field"><label>X</label><input id="eff-ox" type="number" step="0.1" value="0"></div>
+            <div class="field"><label>Y</label><input id="eff-oy" type="number" step="0.1" value="0"></div>
+            <div class="field"><label>Z</label><input id="eff-oz" type="number" step="0.1" value="0"></div>
+            <div class="field"><label>Rx</label><input id="eff-orx" type="number" step="0.1" value="0"></div>
+            <div class="field"><label>Ry</label><input id="eff-ory" type="number" step="0.1" value="0"></div>
+            <div class="field"><label>Rz</label><input id="eff-orz" type="number" step="0.1" value="0"></div>
+          </div>
         </div>
       </section>
 
@@ -109,8 +116,9 @@
         </div>
       </section>
 
-      <!-- Hidden inputs (brauchen wir für JS-Kompatibilität) -->
+      <!-- Hidden inputs -->
       <input id="axisStlInput" type="file" accept=".stl" style="display:none">
+      <input id="effStlInput"  type="file" accept=".stl" style="display:none">
       <input id="umfStlInput"  type="file" accept=".stl" style="display:none">
       <input id="jsonInput"    type="file" accept=".json" style="display:none">
       <input id="checkZip"     type="file" accept=".zip" style="display:none">
