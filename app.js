@@ -293,21 +293,20 @@ function detachToolFromA6() {
 function applyTransforms() {
   state.robotTr = readInputs('r');
   state.toolTr  = readInputs('t');
-  // Gruppen: nur Position, keine Rotation (Rotation liegt auf den Meshes)
   const _rx = deg(state.robotTr.rx), _ry = deg(state.robotTr.ry), _rz = deg(state.robotTr.rz);
+  // STL-Korrektur auf gesamte robotGroup (korrekte Rotation aller Achsen + Meshes)
   robotGroup.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
-  robotGroup.rotation.set(0, 0, 0);
-  kinematicsRoot.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
+  robotGroup.rotation.set(_rx, _ry, _rz);
+  kinematicsRoot.position.set(0, 0, 0);
+  kinematicsRoot.rotation.set(0, 0, 0);
   toolGroup.position.set(state.toolTr.x, state.toolTr.y, state.toolTr.z);
   toolGroup.rotation.set(0, 0, 0);
-  // STL-Korrektur auf ALLE Meshes gleichmäßig anwenden (Roboter, Podest, Tool)
-  for (const [, mesh] of meshes) mesh.rotation.set(_rx, _ry, _rz);
+  for (const [, mesh] of meshes) mesh.rotation.set(0, 0, 0);
   if (axisPointGroup) { axisPointGroup.position.set(0,0,0); axisPointGroup.rotation.set(0,0,0); axisPointGroup.scale.set(1,1,1); }
   applyJointRotations();
   scene.updateMatrixWorld(true);
   if (toolMountMode === 'a6') attachToolToA6(); else detachToolFromA6();
   updateEffTcpMarker();
-  
 }
 
 function fitCamera() {
