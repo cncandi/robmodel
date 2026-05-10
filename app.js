@@ -24,11 +24,11 @@ const colors = { Base:'#333333', A1:'#ffffff', A2:'#999999', A3:'#ff7f00', A4:'#
 
 // ── KR8-Zielwerte (default) ───────────────────────────────────────
 const KR8_TARGET = [
-  { x: 450,  y: 0, z: 150  },  // A1 Rz  — Display X=Three.Z(oben), Display Z=Three.X(horiz)
+  { x: 150,  y: 0, z: 450  },  // A1 Rz  — X=horizontal (Three.X), Z=vertikal (Three.Z)
   { x: 0,    y: 0, z: 610  },  // A2 Ry
-  { x: 200,  y: 0, z: 0    },  // A3 Ry
-  { x: 0,    y: 0, z: 630  },  // A4 Rx
-  { x: 0,    y: 0, z: 80   },  // A5 Ry
+  { x: 0,    y: 0, z: 200  },  // A3 Ry
+  { x: 630,  y: 0, z: 0    },  // A4 Rx
+  { x: 80,   y: 0, z: 0    },  // A5 Ry
   { x: 0,    y: 0, z: 0    },  // A6 Rx
 ];
 function defOffset(i) { return { ...KR8_TARGET[i] }; }
@@ -336,25 +336,12 @@ function nominalAxisVec(i)   { return ['z','y','y','x','y','x'][i] || 'z'; }
 function axisDirectionLabel(i) { return fixedAxisType(i) + ' · ' + nominalAxisVec(i).toUpperCase(); }
 
 function cumulativeAxisPositions() {
-  // Regeln aus Excel (World→Skeleton-Logik, pivot[0] immer Ursprung):
-  // Seg1(A1): XZ tauschen  → Three.X=p.z, Three.Z=p.x
-  // Seg2(A2): unverändert  → Three.X=p.x, Three.Z=p.z
-  // Seg3(A3): Z→X          → Three.X=0,   Three.Z=p.x
-  // Seg4(A4): X→Z          → Three.X=p.z, Three.Z=0
-  // Seg5(A5): X→Z          → Three.X=p.z, Three.Z=0
-  const rules = [
-    (p) => ({ dx: num(p.z)||0, dz: num(p.x)||0 }),  // A1: XZ tauschen
-    (p) => ({ dx: num(p.x)||0, dz: num(p.z)||0 }),  // A2: unverändert
-    (p) => ({ dx: 0,           dz: num(p.x)||0 }),  // A3: Z→X
-    (p) => ({ dx: num(p.z)||0, dz: 0           }),  // A4: X→Z
-    (p) => ({ dx: num(p.z)||0, dz: 0           }),  // A5: X→Z
-  ];
+  // X=horizontal (Three.X), Z=vertikal (Three.Z) — einheitlich, kein Sonderfall
   let x=0, y=0, z=0;
   const pts = [new THREE.Vector3(0,0,0)];
   for (let i=0; i<5; i++) {
     const p = state.axisPoints[i];
-    const {dx, dz} = rules[i](p);
-    x += dx; y += num(p.y)||0; z += dz;
+    x += num(p.x)||0; y += num(p.y)||0; z += num(p.z)||0;
     pts.push(new THREE.Vector3(x,y,z));
   }
   return pts;
@@ -910,7 +897,7 @@ function applyJsonToState(j) {
   state.robotName=j.name||state.robotName;
   if(Array.isArray(j.stlRefAngles)&&j.stlRefAngles.length===6){state.referencePose=j.stlRefAngles.map(v=>Number(v)||0);if($('refPose'))$('refPose').value=state.referencePose.join(',');}
   if(Array.isArray(j.jointAngles)&&j.jointAngles.length===6)state.jointAngles=j.jointAngles.map(v=>Number(v)||0);
-  if(Array.isArray(j.joints)){state.joints=j.joints.map((v,i)=>({name:v.name||('A'+(i+1)),axis:fixedAxisType(i),offset:{x:num(v.offset?.z)??null,y:num(v.offset?.y)??null,z:num(v.offset?.x)??null},min:num(v.min),max:num(v.max),rotationSign:num(v.rotationSign??v.rotationDirection??v.dir)??1,status:v.status||'JSON'}));state.axisPoints=state.joints.map((v,i)=>({name:v.name||('A'+(i+1)),x:num(v.offset?.z),y:num(v.offset?.y),z:num(v.offset?.x),rx:0,ry:0,rz:0,source:'JSON'}));}
+  if(Array.isArray(j.joints)){state.joints=j.joints.map((v,i)=>({name:v.name||('A'+(i+1)),axis:fixedAxisType(i),offset:{x:num(v.offset?.x)??null,y:num(v.offset?.y)??null,z:num(v.offset?.z)??null},min:num(v.min),max:num(v.max),rotationSign:num(v.rotationSign??v.rotationDirection??v.dir)??1,status:v.status||'JSON'}));state.axisPoints=state.joints.map((v,i)=>({name:v.name||('A'+(i+1)),x:num(v.offset?.x),y:num(v.offset?.y),z:num(v.offset?.z),rx:0,ry:0,rz:0,source:'JSON'}));}
   if(j.stlRotation){
     const r=j.stlRotation;
     const set=(id,v)=>{const el=$(id);if(el)el.value=v;};
@@ -943,7 +930,7 @@ function buildJson() {
     joints: state.joints.map((j,i) => ({
       name: j.name,
       axis: fixedAxisType(i),
-      offset: { x: num(j.offset?.z)??0, y: num(j.offset?.y)??0, z: num(j.offset?.x)??0 },
+      offset: { x: num(j.offset?.x)??0, y: num(j.offset?.y)??0, z: num(j.offset?.z)??0 },
       min: num(j.min) ?? -180,
       max: num(j.max) ??  180
     })),
