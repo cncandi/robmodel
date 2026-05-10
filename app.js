@@ -198,15 +198,27 @@ function updateEffTcpMarker() {
     new THREE.MeshStandardMaterial({ color: '#a855f7', emissive: '#7c3aed', emissiveIntensity:.6 })
   ));
 
-  // Grundausrichtung A6: Y+90° (Z zeigt nach vorne), dann User-Offset drauf
-  const euler = new THREE.Euler(
+  // Basis-Rotation A6-Werkzeugrahmen:
+  // Z+ = Stoßrichtung (forward, Spalte 2)
+  // X+ = nach unten  (-Y_world, Spalte 0)
+  // Y+ = nach hinten  (-Z_world, Spalte 1) — rechte-Hand-System
+  const baseMatrix = new THREE.Matrix4().makeBasis(
+    new THREE.Vector3( 0, -1,  0),  // X → down
+    new THREE.Vector3( 0,  0, -1),  // Y → backward
+    new THREE.Vector3( 1,  0,  0)   // Z → forward (Stoßrichtung = +X_world)
+  );
+  const baseQuat = new THREE.Quaternion().setFromRotationMatrix(baseMatrix);
+
+  // User-Offset (im Werkzeugrahmen, additiv)
+  const offsetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(
     (eo.rx||0)*Math.PI/180,
-    (eo.ry||0)*Math.PI/180 + Math.PI/2,
+    (eo.ry||0)*Math.PI/180,
     (eo.rz||0)*Math.PI/180,
     'XYZ'
-  );
+  ));
+
   g.position.set(eo.x||0, eo.y||0, eo.z||0);
-  g.rotation.copy(euler);
+  g.quaternion.copy(baseQuat).multiply(offsetQuat);
   const parent = (toolMountMode === 'a6' && axisPivotGroups[5]) ? axisPivotGroups[5] : toolGroup;
   parent.add(g);
   effTcpHelper = g;
