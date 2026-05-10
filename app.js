@@ -1409,6 +1409,126 @@ async function uploadToRoblib() {
   }
 }
 
+
+// ── Roboter Library Modal ─────────────────────────────────────────
+let _libRobots = [];
+
+function openRobotLibModal() {
+  $('robotLibModal').style.display = 'flex';
+  if (!_libRobots.length) loadRobotLibList();
+}
+
+async function loadRobotLibList() {
+  const status = $('rl-lib-status');
+  const listEl = $('rl-lib-list');
+  const bar    = $('rl-lib-bar');
+  const prog   = $('rl-lib-progress');
+  status.textContent = 'Lade…';
+  prog.style.display = 'block'; bar.style.width = '30%';
+  try {
+    const r = await fetch(ROBLIB_API + '?action=list');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    _libRobots = (data.robots || []).filter(e => (e.type || 'robot') === 'robot');
+    bar.style.width = '100%'; prog.style.display = 'none';
+    status.textContent = _libRobots.length + ' Roboter';
+    renderRobotLibList($('rl-lib-search').value);
+  } catch(e) {
+    prog.style.display = 'none';
+    status.textContent = 'Fehler: ' + e.message;
+  }
+}
+
+function renderRobotLibList(query) {
+  const listEl = $('rl-lib-list');
+  const q = (query || '').toLowerCase();
+  const items = q ? _libRobots.filter(r =>
+    r.name.toLowerCase().includes(q) || (r.marke||'').toLowerCase().includes(q)) : _libRobots;
+  if (!items.length) {
+    listEl.innerHTML = '<div style="padding:16px;font-family:monospace;font-size:11px;color:#4a6a8a">Keine Roboter gefunden.</div>';
+    return;
+  }
+  listEl.innerHTML = items.map((r, i) =>
+    `<div data-lib-ri="${i}" style="padding:8px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:10px">
+      ${r.thumb_url
+        ? `<img src="${r.thumb_url}" style="width:48px;height:48px;object-fit:contain;border-radius:3px;flex-shrink:0;background:#0f2030;border:1px solid rgba(255,255,255,.08)">`
+        : '<span style="width:48px;text-align:center;font-size:28px">🦾</span>'}
+      <div style="flex:1;min-width:0">
+        <div style="font-family:monospace;font-size:13px;color:#d8e8f0;font-weight:700">${esc(r.name)}</div>
+        <div style="font-family:monospace;font-size:11px;color:#6a8fa8">${esc(r.marke||'')} · ${r.achsen||6} Achsen · ${r.reichweite_mm||'?'} mm · ${r.nutzlast_kg||'?'} kg</div>
+      </div>
+      <button data-lib-load="${i}" style="padding:4px 12px;background:rgba(37,99,235,.3);border:1px solid #2563eb;color:#60a5fa;border-radius:3px;font-family:monospace;font-size:11px;cursor:pointer;flex-shrink:0">Laden</button>
+    </div>`
+  ).join('');
+  listEl.querySelectorAll('[data-lib-load]').forEach(btn => {
+    btn.onclick = e => { e.stopPropagation(); loadRobotFromLib(items[parseInt(btn.dataset.libLoad)]); };
+  });
+  listEl.querySelectorAll('[data-lib-ri]').forEach(row => {
+    row.onmouseover = () => row.style.background = 'rgba(255,255,255,.04)';
+    row.onmouseout  = () => row.style.background = '';
+    row.onclick = e => { if (!e.target.closest('button')) loadRobotFromLib(items[parseInt(row.dataset.libRi)]); };
+  });
+}
+
+async function loadRobotFromLib(robot) {
+  const status = $('rl-lib-status');
+  const bar    = $('rl-lib-bar');
+  const prog   = $('rl-lib-progress');
+  status.textContent = 'Lade ' + robot.name + '…';
+  prog.style.display = 'block'; bar.style.width = '10%';
+  try {
+    const res = await fetch(robot.zip_url);
+    if (!res.ok) throw new Error('Download fehlgeschlagen: HTTP ' + res.status);
+    bar.style.width = '40%';
+    const zip = await JSZip.loadAsync(await res.arrayBuffer());
+    bar.style.width = '65%';
+    resetData(); state.mode = 'package';
+
+    // JSON
+    const jsonEntry = Object.keys(zip.files).find(n => !zip.files[n].dir && /\.json$/i.test(n));
+    if (jsonEntry) {
+      try {
+        state.packageJson = JSON.parse(await zip.files[jsonEntry].async('string'));
+        applyJsonToState(state.packageJson);
+      } catch(e) { console.warn('JSON parse error', e); }
+    }
+
+    // STLs
+    for (const name of Object.keys(zip.files)) {
+      if (zip.files[name].dir || !/\.stl$/i.test(name)) continue;
+      const buf = await zip.files[name].async('uint8array');
+      const fname = name.split('/').pop();
+      state.buffers.set(fname, buf);
+      state.files.push({ path: fname, name: fname, size: buf.byteLength, type: 'STL' });
+    }
+    splitFiles();
+
+    // Achsfarben + STL-Zuweisung aus JSON
+    if (state.packageJson?.stlFiles) {
+      Object.entries(state.packageJson.stlFiles).forEach(([ax, info]) => {
+        const stlName = (info.name || '').replace(/\.stl$/i, '') + '.stl';
+        if (state.stls.find(f => f.name === stlName)) state.axisStlMap[ax] = stlName;
+        if (info.color) colors[ax] = info.color;
+      });
+    }
+
+    bar.style.width = '85%';
+    zeroAllTransforms();
+    await loadStls(); enableSave(); renderAll(); setView('iso');
+    bar.style.width = '100%'; prog.style.display = 'none';
+    status.textContent = '✓ ' + robot.name + ' geladen';
+    $('robotLibModal').style.display = 'none';
+  } catch(e) {
+    prog.style.display = 'none';
+    status.textContent = 'Fehler: ' + e.message;
+  }
+}
+
+$('robotLibBtn').onclick   = openRobotLibModal;
+$('robotLibClose').onclick = () => { $('robotLibModal').style.display = 'none'; };
+$('rl-lib-refresh').addEventListener('click', () => { _libRobots = []; loadRobotLibList(); });
+$('rl-lib-search').addEventListener('input', e => renderRobotLibList(e.target.value));
+
 $('demoBtn').onclick    = () => loadDemoKr8().catch(e => alert(e.message));
 // Endeffektor TCP-Offset Inputs
 ['eff-ox','eff-oy','eff-oz','eff-orx','eff-ory','eff-orz'].forEach(id => {
