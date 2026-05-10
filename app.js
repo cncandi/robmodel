@@ -937,7 +937,7 @@ function buildJson() {
   const eo = state.effOffset || {};
   const tcpX = eo.x??num(tcp.x)??0, tcpY = eo.y??num(tcp.y)??0, tcpZ = eo.z??num(tcp.z)??0;
   const tcpA = eo.rz??num(tcp.rz)??0, tcpB = eo.ry??num(tcp.ry)??0, tcpC = eo.rx??num(tcp.rx)??0;
-  return {
+  const result = {
     name: state.robotName || 'Robot',
     stlRotation: {rx:stlRx, ry:stlRy, rz:stlRz},
     joints: state.joints.map((j,i) => ({
@@ -1015,8 +1015,6 @@ function simulateAxis(axisIndex){
 
 // ── Render-Funktionen ──────────────────────────────────────────────
 function renderAll(){renderAxisStlRows();renderRows();updateAxisPointVisuals();renderTcp();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';}
-
-function renderJointAngleRows(){const el=$('jointAngleRows');if(!el)return;el.innerHTML=state.jointAngles.map((v,i)=>`<div class="field"><label>${state.joints[i]?.name||'A'+(i+1)} ${fixedAxisType(i)}</label><input data-joint-angle="${i}" type="number" step="1" value="${v??0}"></div>`).join('');}
 
 
 function renderRows(){$('jointRows').innerHTML=state.joints.map((j,i)=>{
@@ -1135,10 +1133,9 @@ function initAxisStlEvents() {
 
 
 // ── Library-Zugriff für Endeffektor & Umfeld ────────────────────
-const ROBLIB_API_BASE = 'https://cnc-technik.de/robsimul/roblib/api.php';
 
 async function libFetchByType(type) {
-  const r = await fetch(ROBLIB_API_BASE + '?action=list');
+  const r = await fetch(ROBLIB_API + '?action=list');
   if (!r.ok) throw new Error('HTTP ' + r.status);
   const data = await r.json();
   return (data.robots || []).filter(e => (e.type || 'robot') === type);
@@ -1189,20 +1186,7 @@ $('effLibRefreshBtn').addEventListener('click', async () => {
         if (!stls.length) throw new Error('Keine endeffektor.stl in ZIP');
         state.effStl = { path: stls[0].name, name: item.name + '.stl', buf: stls[0].buf };
         // Load offset from JSON if available in ZIP
-        try {
-          const jsonFiles = Object.keys(zip.files).filter(n => n.endsWith('.json'));
-          if (jsonFiles.length) {
-            const jd = JSON.parse(await zip.files[jsonFiles[0]].async('string'));
-            if (jd.endeffektor) {
-              const eo = jd.endeffektor;
-              state.effOffset = { x:eo.px||0, y:eo.py||0, z:eo.pz||0, rx:eo.rx||0, ry:eo.ry||0, rz:eo.rz||0 };
-              ['eff-ox','eff-oy','eff-oz','eff-orx','eff-ory','eff-orz'].forEach(id => {
-                const key = id==='eff-ox'?'x':id==='eff-oy'?'y':id==='eff-oz'?'z':id==='eff-orx'?'rx':id==='eff-ory'?'ry':'rz';
-                const el=$(id); if(el) el.value = state.effOffset[key]||0;
-              });
-            }
-          }
-        } catch(e) {}
+        // JSON offset loading handled via libLoadZipAndExtract result
         renderEffRow();
         updateEffTcpMarker();
         el.textContent = '✓ ' + item.name + ' geladen';
@@ -1463,6 +1447,16 @@ function applyTheme(idx) {
 
 window.selectAxisPoint = selectAxisPoint;
 
+// ── ROBLIB Modal Modus ─────────────────────────────────────────────
+function setRlMode(mode) {
+  const isNew = mode === 'new';
+  const btnNew    = $('rl-mode-new');
+  const btnUpdate = $('rl-mode-update');
+  if (btnNew)    { btnNew.style.background    = isNew  ? 'rgba(37,99,235,.3)' : 'rgba(255,255,255,.05)'; btnNew.style.color    = isNew  ? '#60a5fa' : '#6a8fa8'; }
+  if (btnUpdate) { btnUpdate.style.background = !isNew ? 'rgba(37,99,235,.3)' : 'rgba(255,255,255,.05)'; btnUpdate.style.color = !isNew ? '#60a5fa' : '#6a8fa8'; }
+}
+window.setRlMode = setRlMode;
+
 // ── Event-Listener ─────────────────────────────────────────────────
 $('newBtn').onclick     = () => { resetData(); disableSave(); renderAll(); setView('iso'); };
 $('downloadJson').onclick = downloadJson;
@@ -1509,7 +1503,7 @@ document.addEventListener('input',e=>{
   if(t.dataset.axisPoint!==undefined){const p=state.axisPoints[Number(t.dataset.axisPoint)],f=t.dataset.axisField;p[f]=num(t.value);p.source='manuell';syncJointsFromAxisPoints();rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();renderRows();}
   if(t.dataset.j!==undefined){const idx=Number(t.dataset.j),j=state.joints[idx],f=t.dataset.f;if(['x','y','z'].includes(f)){j.offset[f]=num(t.value);state.axisPoints[idx][f]=num(t.value);state.axisPoints[idx].source='manuell';rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();}else if(['min','max'].includes(f))j[f]=num(t.value);else if(f==='rotationSign'){j[f]=num(t.value);applyJointRotations();}else j[f]=t.value;}
   // Farb-Picker in Parameterzeile
-  if(t.dataset.axisColor){const ax=t.dataset.axisColor;colors[ax]=t.value;updateMeshColor(ax,t.value);renderRows();}
+  if(t.dataset.axisColor){const ax=t.dataset.axisColor;setAxisColor(ax,t.value);renderRows();}
 });
 
 document.addEventListener('click',e=>{
