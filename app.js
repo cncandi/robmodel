@@ -887,7 +887,25 @@ function renderAll(){renderAxisStlRows();renderRows();renderJointAngleRows();upd
 function renderJointAngleRows(){const el=$('jointAngleRows');if(!el)return;el.innerHTML=state.jointAngles.map((v,i)=>`<div class="field"><label>${state.joints[i]?.name||'A'+(i+1)} ${fixedAxisType(i)}</label><input data-joint-angle="${i}" type="number" step="1" value="${v??0}"></div>`).join('');}
 
 
-function renderRows(){$('jointRows').innerHTML=state.joints.map((j,i)=>`<tr data-param-row="${i}" class="${i===state.selectedAxis?'sel':''}" ><td><b>${esc(j.name)}</b></td><td><input class="angleInput" data-joint-angle="${i}" type="number" step="0.1" value="${state.jointAngles?.[i]??0}"></td><td><span class="axisDir">${axisDirectionLabel(i)}</span></td><td><input data-j="${i}" data-f="x" value="${j.offset?.x??''}"></td><td><input data-j="${i}" data-f="y" value="${j.offset?.y??''}"></td><td><input data-j="${i}" data-f="z" value="${j.offset?.z??''}"></td><td><input data-j="${i}" data-f="min" value="${j.min??''}"></td><td><input data-j="${i}" data-f="max" value="${j.max??''}"></td><td><select class="dirSel" data-j="${i}" data-f="rotationSign"><option value="1" ${(num(j.rotationSign)??1)>=0?'selected':''}>+</option><option value="-1" ${(num(j.rotationSign)??1)<0?'selected':''}>−</option></select></td><td><button class="simBtn" data-sim-axis="${i}">▶</button></td></tr>`).join('');}
+function renderRows(){$('jointRows').innerHTML=state.joints.map((j,i)=>{
+  const ax=j.name||'A'+(i+1);
+  const mapped=state.axisStlMap[ax];
+  const fallback=state.stls.find(f=>partKey(f.name)===ax)?.name||null;
+  const src=mapped||fallback; const stlName=src?norm(src):'—'; const col=colors[ax]||'#999999';
+  return `<tr data-param-row="${i}" class="${i===state.selectedAxis?'sel':''}">
+    <td><b>${esc(j.name)}</b></td>
+    <td><input class="angleInput" data-joint-angle="${i}" type="number" step="0.1" value="${state.jointAngles?.[i]??0}"></td>
+    <td><span class="axisDir">${axisDirectionLabel(i)}</span></td>
+    <td><input data-j="${i}" data-f="x" value="${j.offset?.x??''}"></td>
+    <td><input data-j="${i}" data-f="y" value="${j.offset?.y??''}"></td>
+    <td><input data-j="${i}" data-f="z" value="${j.offset?.z??''}"></td>
+    <td><input data-j="${i}" data-f="min" value="${j.min??''}"></td>
+    <td><input data-j="${i}" data-f="max" value="${j.max??''}"></td>
+    <td><select class="dirSel" data-j="${i}" data-f="rotationSign"><option value="1" ${(num(j.rotationSign)??1)>=0?'selected':''}>+</option><option value="-1" ${(num(j.rotationSign)??1)<0?'selected':''}>−</option></select></td>
+    <td><input type="color" data-axis-color="${ax}" value="${col}" style="width:26px;height:22px;border:none;border-radius:3px;cursor:pointer;padding:0" title="Farbe ${ax}"></td>
+    <td style="max-width:70px;overflow:hidden"><span data-axis-stl-label="${ax}" title="${stlName}" style="font-size:10px;color:#6a8fa8;cursor:pointer;white-space:nowrap">${stlName}</span><input type="file" data-axis-stl-input="${ax}" accept=".stl" style="display:none"></td>
+    <td><button class="simBtn" data-sim-axis="${i}">▶</button></td>
+  </tr>`;}).join('');}
 
 function renderTcp(){qsa('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===state.activeTcp));const tcp=state.tcp[state.activeTcp];qsa('[data-tcp]').forEach(i=>i.value=tcp?.[i.dataset.tcp]??'');const x=num(tcp?.x),y=num(tcp?.y),z=num(tcp?.z);tcpMarker.visible=x!==null||y!==null||z!==null;tcpMarker.position.set(x||0,y||0,z||0);}
 
@@ -1284,25 +1302,28 @@ window.selectAxisPoint = selectAxisPoint;
 
 // ── Event-Listener ─────────────────────────────────────────────────
 $('newBtn').onclick     = () => { resetData(); disableSave(); renderAll(); setView('iso'); };
-$('demoBtn').onclick    = () => loadDemoKr8().catch(e=>alert(e.message));
 $('downloadJson').onclick = downloadJson;
 $('downloadZip').onclick  = downloadZip;
 $('resetView').onclick    = () => setView('iso');
 $('toggleGrid').onclick   = () => grid.visible = !grid.visible;
-$('robotGround').onclick  = () => ground(robotGroup,'r');
-$('robotReset').onclick   = () => { state.robotTr=defaultRobotTr(); setInputs('r',state.robotTr); applyTransforms(); fitCamera(); };
-$('toolGround').onclick   = () => ground(toolGroup,'t');
-$('toolReset').onclick    = () => { state.toolTr=defaultToolTr(); setInputs('t',state.toolTr); applyTransforms(); fitCamera(); };
 initAxisStlEvents();
 // Theme laden + Button
 try { const saved = localStorage.getItem('robmodel_theme'); if(saved !== null) applyTheme(parseInt(saved)); } catch(e){}
 $('themeBtn').onclick = () => applyTheme(_themeIdx + 1);
-$('jointReset').onclick   = () => { stopSimulation(); setJointAnglesToReferencePose(); renderJointAngleRows(); renderRows(); applyTransforms(); };
-$('sourceZip').addEventListener('change', e => e.target.files[0] && loadSourceZip(e.target.files[0]).catch(err=>alert(err.message)));
+// Load ZIP: normal = load, Ctrl+Click label = demo
+$('sourceZip').addEventListener('change', e => {
+  if (!e.target.files[0]) return;
+  loadSourceZip(e.target.files[0]).catch(err => alert(err.message));
+});
+// Ctrl+Click on the Load ZIP label triggers demo
+document.querySelector('label[for="sourceZip"]').addEventListener('click', e => {
+  if (e.ctrlKey) { e.preventDefault(); loadDemoKr8().catch(err => alert(err.message)); }
+});
 $('checkZip').addEventListener('change',  e => e.target.files[0] && loadPackageZip(e.target.files[0]).catch(err=>alert(err.message)));
 $('jsonInput').addEventListener('change',  e => e.target.files[0] && loadJsonFile(e.target.files[0]));
 if($('refPose'))$('refPose').addEventListener('input',()=>{setJointAnglesToReferencePose();renderJointAngleRows();applyJointRotations();renderIssues();});
-['rX','rY','rZ','rRx','rRy','rRz','tX','tY','tZ','tRx','tRy','tRz'].forEach(id=>$(id).addEventListener('input',applyTransforms));
+// Hidden inputs for JS compat — still trigger applyTransforms
+['rX','rY','rZ','rRx','rRy','rRz','tX','tY','tZ','tRx','tRy','tRz'].forEach(id=>{const el=$(id);if(el)el.addEventListener('input',applyTransforms);});
 qsa('.tab').forEach(t=>t.onclick=()=>{state.activeTcp=t.dataset.mode;renderTcp();renderIssues();});
 qsa('[data-view]').forEach(b=>{b.addEventListener('click',e=>{if(e.button===0)setView(b.dataset.view);});b.addEventListener('mousedown',e=>{if(e.button!==0)e.preventDefault();});});
 
@@ -1312,13 +1333,40 @@ document.addEventListener('input',e=>{
   if(t.dataset.tcp){state.tcp[state.activeTcp][t.dataset.tcp]=['toolStl','status'].includes(t.dataset.tcp)?t.value:num(t.value);renderTcp();renderIssues();}
   if(t.dataset.axisPoint!==undefined){const p=state.axisPoints[Number(t.dataset.axisPoint)],f=t.dataset.axisField;p[f]=num(t.value);p.source='manuell';syncJointsFromAxisPoints();rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();renderRows();renderIssues();}
   if(t.dataset.j!==undefined){const idx=Number(t.dataset.j),j=state.joints[idx],f=t.dataset.f;if(['x','y','z'].includes(f)){j.offset[f]=num(t.value);state.axisPoints[idx][f]=num(t.value);state.axisPoints[idx].source='manuell';rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();}else if(['min','max'].includes(f))j[f]=num(t.value);else if(f==='rotationSign'){j[f]=num(t.value);applyJointRotations();}else j[f]=t.value;renderIssues();}
+  // Farb-Picker in Parameterzeile
+  if(t.dataset.axisColor){const ax=t.dataset.axisColor;colors[ax]=t.value;updateMeshColor(ax,t.value);renderRows();}
 });
 
 document.addEventListener('click',e=>{
   const t=e.target;
   if(t.dataset.simAxis!==undefined)simulateAxis(Number(t.dataset.simAxis));
+  // STL-Label in Parameterzeile → Datei-Dialog öffnen
+  if(t.dataset.axisStlLabel){
+    const input=t.parentElement.querySelector('[data-axis-stl-input]');
+    if(input)input.click();
+    return;
+  }
   const row=t.closest?.('[data-param-row]');
-  if(row&&!t.matches('input,select,button'))selectAxisPoint(row.dataset.paramRow);
+  if(row&&!t.matches('input,select,button,label,span[data-axis-stl-label]'))selectAxisPoint(row.dataset.paramRow);
+});
+
+// STL-Datei aus Parameterzeile laden (delegiert über document)
+document.addEventListener('change', e => {
+  const t = e.target;
+  const ax = t.dataset.axisStlInput;
+  if (ax && t.files[0]) {
+    const file = t.files[0];
+    file.arrayBuffer().then(buf => {
+      const u8 = new Uint8Array(buf);
+      state.buffers.set(file.name, u8);
+      const existing = state.stls.find(f => partKey(f.name) === ax);
+      if (!existing) state.files.push({ path: file.name, name: file.name, size: buf.byteLength, type: 'STL' });
+      state.axisStlMap[ax] = file.name;
+      splitFiles();
+      loadStls().then(() => { renderRows(); enableSave(); });
+    });
+    t.value = '';
+  }
 });
 
 renderer.domElement.addEventListener('pointerdown', pickAxisPoint);
@@ -1419,7 +1467,6 @@ function openRosModal() {
     list.onmouseout  = e => { const row = e.target.closest('[data-ros-idx]'); if (row) row.style.background=''; };
   }
 }
-$('importRosBtn').onclick = openRosModal;
 
 function rosSelectRobot(idx) {
   const r = ROS_ROBOTS[idx];
