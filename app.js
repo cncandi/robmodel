@@ -218,7 +218,10 @@ function updateEffTcpMarker() {
     'XYZ'
   ));
 
-  g.position.set(eo.x||0, eo.y||0, eo.z||0);
+  // Translation im Werkzeugrahmen: Offset-Vektor mit Basis-Rotation transformieren
+  const localOffset = new THREE.Vector3(eo.x||0, eo.y||0, eo.z||0);
+  localOffset.applyQuaternion(baseQuat);
+  g.position.copy(localOffset);
   g.quaternion.copy(baseQuat).multiply(offsetQuat);
   const parent = (toolMountMode === 'a6' && axisPivotGroups[5]) ? axisPivotGroups[5] : toolGroup;
   parent.add(g);
