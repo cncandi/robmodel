@@ -1274,6 +1274,7 @@ async function uploadToRoblib() {
   }
 }
 
+$('demoBtn').onclick    = () => loadDemoKr8().catch(e => alert(e.message));
 $('roblibBtn').onclick  = openRoblibModal;
 $('toolModeWorld').onclick = () => setToolMode('world');
 $('toolModeA6').onclick    = () => setToolMode('a6');
