@@ -126,9 +126,13 @@
   </main>
 
   <!-- ─── FOOTER / PARAMETER-TABELLE ──────────────────────────── -->
-  <footer class="bottom">
+  <footer class="bottom" id="paramFooter">
     <section class="panel panel-combined">
-      <h2>Parameter · Drehpunkte (Lokal CS)</h2>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <h2 style="margin:0">Parameter · Drehpunkte (Lokal CS)</h2>
+        <button id="toggleParam" title="Panel ein-/ausklappen" style="background:none;border:1px solid rgba(255,255,255,.15);color:var(--txt3);border-radius:3px;padding:1px 8px;font-size:14px;cursor:pointer;line-height:1">▼</button>
+      </div>
+      <div id="paramContent">
       <table>
         <thead>
           <tr>
@@ -139,6 +143,7 @@
         </thead>
         <tbody id="jointRows"></tbody>
       </table>
+      </div>
     </section>
   </footer>
 
