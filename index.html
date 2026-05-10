@@ -73,6 +73,15 @@
     <!-- SEITENLEISTE -->
     <aside class="side">
 
+      <!-- Umgebung aus Library -->
+      <section class="card">
+        <div class="card-head">
+          <h2>🏭 Umgebung (Library)</h2>
+          <button id="umfLibRefreshBtn" title="Aus Library laden" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:3px;padding:2px 8px;font-size:11px;cursor:pointer">↻</button>
+        </div>
+        <div id="umfLibList" style="max-height:130px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace">Klicke ↻ zum Laden…</div>
+      </section>
+
       <!-- STL-Transformation -->
       <section class="card">
         <div class="card-head">
@@ -143,6 +152,13 @@
           <label class="filebtn" id="effAddBtn" for="effStlInput" title="Endeffektor-STL hinzufügen">+ STL</label>
           <input type="file" id="effStlInput" accept=".stl" style="display:none">
           <button id="effClearBtn" title="Endeffektor entfernen">✕</button>
+        </div>
+        <div style="border-top:1px solid rgba(255,255,255,.08);margin-top:6px;padding-top:6px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <span style="font-size:10px;letter-spacing:.06em;color:#6a8fa8;font-family:monospace">LIBRARY</span>
+            <button id="effLibRefreshBtn" title="Endeffektoren aus Library laden" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:3px;padding:2px 8px;font-size:11px;cursor:pointer">↻</button>
+          </div>
+          <div id="effLibList" style="max-height:110px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace">Klicke ↻ zum Laden…</div>
         </div>
       </section>
 
