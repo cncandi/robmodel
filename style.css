@@ -116,7 +116,9 @@ aside.side::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px}
 
 /* ── FOOTER TABELLE ──────────────────────────────── */
 footer.bottom{display:flex;border-top:1px solid var(--bdr);
-  background:var(--bg2);max-height:210px;overflow:hidden;flex-shrink:0}
+  background:var(--bg2);max-height:280px;overflow:hidden;flex-shrink:0;
+  transition:max-height .25s ease}
+footer.bottom.collapsed{max-height:36px}
 .panel{flex:1;overflow:auto;padding:5px 7px;
   scrollbar-width:thin;scrollbar-color:var(--bg4) transparent}
 .panel h2{font-size:14px;font-weight:700;color:var(--txt3);
