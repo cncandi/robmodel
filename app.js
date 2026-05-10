@@ -606,9 +606,9 @@ function updateCSHelper() {
   const H = 30;    // Pfeilkopf
   // Display X-Spalte = Three.Z (oben), Display Z-Spalte = Three.X (horizontal)
   const axes = [
-    { dir: new THREE.Vector3(1,0,0), color: 0xff3333, label: 'X' },  // X → horizontal
+    { dir: new THREE.Vector3(0,0,1), color: 0xff3333, label: 'X' },  // X → oben
     { dir: new THREE.Vector3(0,1,0), color: 0x33dd33, label: 'Y' },
-    { dir: new THREE.Vector3(0,0,1), color: 0x3388ff, label: 'Z' },  // Z → vertikal
+    { dir: new THREE.Vector3(1,0,0), color: 0x3388ff, label: 'Z' },  // Z → horizontal
   ];
   axes.forEach(({ dir, color, label }) => {
     const arrow = new THREE.ArrowHelper(dir, pos, L, color, H, H * 0.6);
