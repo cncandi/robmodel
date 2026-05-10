@@ -28,6 +28,7 @@
       <input id="checkZip" type="file" accept=".zip,application/zip" style="display:none">
       <button id="themeBtn" title="Theme wechseln">◑</button>
       <button id="demoBtn" title="KR8 Beispiel laden (Ctrl+Click)">Example</button>
+      <button id="robotLibBtn" title="Roboter aus Library laden">📚 Library</button>
       <button id="roblibBtn" title="In ROBLIB hochladen" disabled>→ roblib</button>
       <button id="newBtn" title="Alles zurücksetzen">Neu</button>
       <button id="downloadJson" style="display:none" disabled>⬇ JSON</button>
@@ -160,8 +161,12 @@
 <div id="roblibModal" class="rl-overlay" style="display:none">
   <div class="rl-modal">
     <div class="rl-modal-head">
-      <span>→ ROBLIB hochladen</span>
-      <button class="rl-close" id="roblibClose">✕</button>
+      <span id="rl-modal-title">→ ROBLIB hochladen</span>
+      <div style="display:flex;gap:4px">
+        <button id="rl-mode-new" onclick="setRlMode('new')" style="font-family:monospace;font-size:10px;padding:2px 8px;border-radius:3px;cursor:pointer;background:rgba(37,99,235,.3);border:1px solid #2563eb;color:#60a5fa">Neu</button>
+        <button id="rl-mode-update" onclick="setRlMode('update')" style="font-family:monospace;font-size:10px;padding:2px 8px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.2);color:#6a8fa8;display:none">Aktualisieren</button>
+        <button class="rl-close" id="roblibClose">✕</button>
+      </div>
     </div>
     <div class="rl-modal-body">
       <div class="rl-grid">
@@ -233,6 +238,32 @@
         <button id="ros-load" style="width:100%;padding:9px;background:#2563eb;color:#fff;border:none;border-radius:5px;font-family:monospace;font-size:13px;font-weight:600;cursor:pointer">Laden &amp; in RobModel öffnen</button>
       </div>
       <div id="ros-msg" style="display:none;padding:8px 12px;border-radius:4px;font-family:monospace;font-size:12px;margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Roboter Library Modal ─────────────────────────────────── -->
+<div id="robotLibModal" class="rl-overlay" style="display:none">
+  <div class="rl-modal" style="width:min(520px,96vw)">
+    <div class="rl-modal-head">
+      <span>📚 Roboter Library</span>
+      <button class="rl-close" id="robotLibClose">✕</button>
+    </div>
+    <div class="rl-modal-body">
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <input id="rl-lib-search" type="text" placeholder="Suchen…"
+          style="flex:1;background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 10px;color:#d8e8f0;font-family:monospace;font-size:12px;outline:none">
+        <button id="rl-lib-refresh" style="padding:6px 12px;background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:4px;font-family:monospace;font-size:12px;cursor:pointer">↻</button>
+      </div>
+      <div id="rl-lib-status" style="font-family:monospace;font-size:11px;color:#6a8fa8;margin-bottom:6px"></div>
+      <div id="rl-lib-progress" style="display:none;margin-bottom:8px">
+        <div style="background:rgba(255,255,255,.08);border-radius:4px;height:6px;overflow:hidden">
+          <div id="rl-lib-bar" style="height:100%;width:0%;background:#ff6000;border-radius:4px;transition:width .2s"></div>
+        </div>
+      </div>
+      <div id="rl-lib-list" style="max-height:360px;overflow-y:auto;background:#060e14;border-radius:4px;border:1px solid rgba(255,255,255,.08)">
+        <div style="padding:16px;font-family:monospace;font-size:11px;color:#4a6a8a">Klicke ↻ zum Laden…</div>
+      </div>
     </div>
   </div>
 </div>
