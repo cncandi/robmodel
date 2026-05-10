@@ -26,7 +26,6 @@
       <input id="sourceZip" type="file" accept=".zip,application/zip">
       <input id="jsonInput" type="file" accept=".json,application/json" style="display:none">
       <input id="checkZip" type="file" accept=".zip,application/zip" style="display:none">
-      <button id="importRosBtn" title="Von GitHub/ROS importieren">🔗 Import</button>
       <button id="themeBtn" title="Theme wechseln">🌙</button>
       <button id="demoBtn" title="KR8 Beispiel laden">Example</button>
       <button id="roblibBtn" title="In ROBLIB hochladen" disabled>→ roblib</button>
@@ -82,137 +81,46 @@
         <div id="umfLibList" style="max-height:130px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace">Klicke ↻ zum Laden…</div>
       </section>
 
-      <!-- STL-Transformation -->
+      <!-- Endeffektor -->
       <section class="card">
         <div class="card-head">
-          <h2>STL-Transformation</h2>
-          <span class="badge warn">live</span>
-        </div>
-        <div class="grid6">
-          <div class="field"><label>X</label><input id="rX" type="number" step="0.1" value="0"></div>
-          <div class="field"><label>Y</label><input id="rY" type="number" step="0.1" value="0"></div>
-          <div class="field"><label>Z</label><input id="rZ" type="number" step="0.1" value="0"></div>
-          <div class="field"><label>Rx</label><input id="rRx" type="number" step="0.1" value="0"></div>
-          <div class="field"><label>Ry</label><input id="rRy" type="number" step="0.1" value="0"></div>
-          <div class="field"><label>Rz</label><input id="rRz" type="number" step="0.1" value="0"></div>
-        </div>
-        <div class="btn-row">
-          <button id="robotGround">Auf XY-Ebene</button>
-          <button id="robotReset">Reset</button>
-        </div>
-      </section>
-
-      <!-- Achsen / FK -->
-      <section class="card">
-        <div class="card-head">
-          <h2>Achsen drehen</h2>
-          <span class="badge info">FK</span>
-        </div>
-        <div class="grid6" id="jointAngleRows"></div>
-        <div class="btn-row">
-          <button id="jointReset">Referenzpose</button>
-        </div>
-      </section>
-
-      <!-- Achsen-STL -->
-      <section class="card">
-        <h2>Achsen-STL</h2>
-        <div id="axisStlRows"></div>
-        <input id="axisStlInput" type="file" accept=".stl" style="display:none">
-      </section>
-
-      <!-- Tool-STL -->
-      <section class="card">
-        <div class="card-head">
-          <h2>Tool-STL</h2>
-          <span class="badge info" id="toolBadge">—</span>
-        </div>
-        <div class="grid6">
-          <div class="field"><label>X</label><input id="tX" type="number" step="0.1" value="0"></div>
-          <div class="field"><label>Y</label><input id="tY" type="number" step="0.1" value="0"></div>
-          <div class="field"><label>Z</label><input id="tZ" type="number" step="0.1" value="0"></div>
-          <div class="field"><label>Rx</label><input id="tRx" type="number" step="0.1" value="0"></div>
-          <div class="field"><label>Ry</label><input id="tRy" type="number" step="0.1" value="0"></div>
-          <div class="field"><label>Rz</label><input id="tRz" type="number" step="0.1" value="0"></div>
-        </div>
-        <div class="btn-row">
-          <button id="toolGround">Auf XY-Ebene</button>
-          <button id="toolReset">Reset</button>
-        </div>
-      </section>
-
-      <!-- Endeffektor-STL -->
-      <section class="card">
-        <div class="card-head">
-          <h2>🔧 Endeffektor-STL</h2>
+          <h2>🔧 Endeffektor</h2>
           <span class="badge info" id="effBadge">—</span>
         </div>
+        <!-- Montage-Modus -->
+        <div style="display:flex;gap:4px;margin-bottom:8px">
+          <button id="toolModeWorld" class="tool-mode-btn active" title="Werkzeug fix im Weltkoordinatensystem">🌍 Frei</button>
+          <button id="toolModeA6"    class="tool-mode-btn"        title="Werkzeug an A6">🔩 An A6</button>
+        </div>
+        <!-- Lokale STL -->
         <div id="effStlRows"></div>
         <div class="btn-row">
-          <label class="filebtn" id="effAddBtn" for="effStlInput" title="Endeffektor-STL hinzufügen">+ STL</label>
+          <label class="filebtn" for="effStlInput">+ STL</label>
           <input type="file" id="effStlInput" accept=".stl" style="display:none">
-          <button id="effClearBtn" title="Endeffektor entfernen">✕</button>
+          <button id="effClearBtn">✕ Entfernen</button>
         </div>
-        <div style="border-top:1px solid rgba(255,255,255,.08);margin-top:6px;padding-top:6px">
+        <!-- Library -->
+        <div style="border-top:1px solid rgba(255,255,255,.08);margin-top:8px;padding-top:6px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
             <span style="font-size:10px;letter-spacing:.06em;color:#6a8fa8;font-family:monospace">LIBRARY</span>
-            <button id="effLibRefreshBtn" title="Endeffektoren aus Library laden" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:3px;padding:2px 8px;font-size:11px;cursor:pointer">↻</button>
+            <button id="effLibRefreshBtn" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:3px;padding:2px 8px;font-size:11px;cursor:pointer">↻</button>
           </div>
           <div id="effLibList" style="max-height:110px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace">Klicke ↻ zum Laden…</div>
         </div>
       </section>
 
-      <!-- Umfeld-STL -->
-      <section class="card">
-        <div class="card-head">
-          <h2>🏭 Umfeld-STL</h2>
-          <span class="badge" id="umfBadge">0</span>
-        </div>
-        <div id="umfStlRows" style="max-height:150px;overflow-y:auto"></div>
-        <div class="btn-row">
-          <label class="filebtn" for="umfStlInput" title="Umfeld-STL hinzufügen">+ STL</label>
-          <input type="file" id="umfStlInput" accept=".stl" style="display:none">
-        </div>
-      </section>
-
-      <!-- Referenzpose -->
-      <section class="card">
-        <h2>Referenzpose</h2>
-        <div class="field">
-          <label>A1, A2, A3, A4, A5, A6 (Grad)</label>
-          <input id="refPose" type="text" value="0,-90,90,0,0,0">
-        </div>
-        <div class="hint">Wird als <b>stlRefAngles</b> in die JSON geschrieben.</div>
-      </section>
-
-      <!-- TCP -->
-      <section class="card">
-        <h2>TCP / ToolData</h2>
-        <div class="tabs">
-          <div class="tab active" data-mode="auftragen">Auftragen</div>
-          <div class="tab" data-mode="abtragen">Abtragen</div>
-        </div>
-        <div class="grid6">
-          <div class="field"><label>X</label><input data-tcp="x" type="number" step="0.0001"></div>
-          <div class="field"><label>Y</label><input data-tcp="y" type="number" step="0.0001"></div>
-          <div class="field"><label>Z</label><input data-tcp="z" type="number" step="0.0001"></div>
-          <div class="field"><label>Rz/A</label><input data-tcp="rz" type="number" step="0.0001"></div>
-          <div class="field"><label>Ry/B</label><input data-tcp="ry" type="number" step="0.0001"></div>
-          <div class="field"><label>Rx/C</label><input data-tcp="rx" type="number" step="0.0001"></div>
-        </div>
-        <div class="grid2">
-          <div class="field"><label>Tool-Länge</label><input data-tcp="toolLength" type="number"></div>
-          <div class="field"><label>Tool-STL</label><input data-tcp="toolStl" type="text"></div>
-        </div>
-      </section>
-
-      <!-- Prüfliste -->
-      <section class="card">
-        <h2>Prüfliste</h2>
-        <div class="checklist" id="issues">
-          <div class="issue warn">Noch keine Daten geladen.</div>
-        </div>
-      </section>
+      <!-- Hidden inputs (brauchen wir für JS-Kompatibilität) -->
+      <input id="axisStlInput" type="file" accept=".stl" style="display:none">
+      <input id="umfStlInput"  type="file" accept=".stl" style="display:none">
+      <input id="jsonInput"    type="file" accept=".json" style="display:none">
+      <input id="checkZip"     type="file" accept=".zip" style="display:none">
+      <!-- Hidden fields für Achsen (JS compat) -->
+      <input id="rX" type="hidden" value="0"><input id="rY" type="hidden" value="0">
+      <input id="rZ" type="hidden" value="0"><input id="rRx" type="hidden" value="0">
+      <input id="rRy" type="hidden" value="0"><input id="rRz" type="hidden" value="0">
+      <input id="tX" type="hidden" value="0"><input id="tY" type="hidden" value="0">
+      <input id="tZ" type="hidden" value="0"><input id="tRx" type="hidden" value="0">
+      <input id="tRy" type="hidden" value="0"><input id="tRz" type="hidden" value="0">
 
     </aside>
   </main>
@@ -226,7 +134,7 @@
           <tr>
             <th>Achse</th><th>Winkel °</th><th>Dreht</th>
             <th>X</th><th>Y</th><th>Z</th>
-            <th>Min</th><th>Max</th><th>±</th><th>Sim</th>
+            <th>Min</th><th>Max</th><th>±</th><th>🎨</th><th>STL</th><th>Sim</th>
           </tr>
         </thead>
         <tbody id="jointRows"></tbody>
