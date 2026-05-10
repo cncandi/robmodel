@@ -165,19 +165,39 @@ function updateEffTcpMarker() {
     if (effTcpHelper.parent) effTcpHelper.parent.remove(effTcpHelper);
     effTcpHelper = null;
   }
-  // Marker zeigen wenn An A6 aktiv ODER Endeffektor geladen
   const showMarker = toolMountMode === 'a6' || !!state.effStl;
   if (!showMarker || !scene) return;
   if (toolMountMode === 'a6' && (!axisPivotGroups || !axisPivotGroups[5])) return;
 
   const eo = state.effOffset || {};
   const g = new THREE.Group();
-  const axes = new THREE.AxesHelper(80);
-  g.add(axes);
+
+  // Dicke Achsen als Zylinder (r=4, l=80)
+  const axDef = [
+    { color: '#ff3333', axis: new THREE.Vector3(1,0,0) },
+    { color: '#33ff33', axis: new THREE.Vector3(0,1,0) },
+    { color: '#3388ff', axis: new THREE.Vector3(0,0,1) },
+  ];
+  axDef.forEach(({ color, axis }) => {
+    const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity:.4 });
+    // Schaft
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 80, 8), mat);
+    shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), axis);
+    shaft.position.copy(axis).multiplyScalar(40);
+    g.add(shaft);
+    // Pfeilspitze
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(7, 18, 8), mat);
+    tip.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), axis);
+    tip.position.copy(axis).multiplyScalar(89);
+    g.add(tip);
+  });
+
+  // Ursprungskugel
   g.add(new THREE.Mesh(
-    new THREE.SphereGeometry(10, 12, 8),
-    new THREE.MeshStandardMaterial({ color: '#a855f7', emissive: '#7c3aed', emissiveIntensity:.6, depthTest: false })
+    new THREE.SphereGeometry(8, 12, 8),
+    new THREE.MeshStandardMaterial({ color: '#a855f7', emissive: '#7c3aed', emissiveIntensity:.6 })
   ));
+
   g.position.set(eo.x||0, eo.y||0, eo.z||0);
   g.rotation.set(
     (eo.rx||0)*Math.PI/180,
