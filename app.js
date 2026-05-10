@@ -1328,11 +1328,8 @@ async function uploadToRoblib() {
   const fields = {
     name:  $('rl-name').value.trim(),
     type,
-    user:  $('rl-user').value.trim(),
-    pass:  $('rl-pass').value,
   };
   if (!fields.name) { show('Name fehlt.', false); return; }
-  if (!fields.user || !fields.pass) { show('Zugangsdaten fehlen.', false); return; }
   // Robot-specific fields
   if (type === 'robot') {
     Object.assign(fields, {
