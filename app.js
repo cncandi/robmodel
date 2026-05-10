@@ -983,6 +983,87 @@ function initAxisStlEvents() {
 }
 
 
+// ── Library-Zugriff für Endeffektor & Umfeld ────────────────────
+const ROBLIB_API_BASE = 'https://cnc-technik.de/robsimul/roblib/api.php';
+
+async function libFetchByType(type) {
+  const r = await fetch(ROBLIB_API_BASE + '?action=list');
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const data = await r.json();
+  return (data.robots || []).filter(e => (e.type || 'robot') === type);
+}
+
+async function libLoadZipAndExtract(zipUrl, stlPattern) {
+  const r = await fetch(zipUrl);
+  if (!r.ok) throw new Error('Download fehlgeschlagen');
+  const zip = await JSZip.loadAsync(await r.arrayBuffer());
+  const results = [];
+  for (const name of Object.keys(zip.files)) {
+    if (!zip.files[name].dir && stlPattern.test(name)) {
+      const buf = await zip.files[name].async('uint8array');
+      results.push({ name: name.split('/').pop(), buf });
+    }
+  }
+  return results;
+}
+
+function libRenderList(container, items, onSelect) {
+  if (!items.length) {
+    container.innerHTML = '<span style="color:#4a6a8a">Keine Einträge gefunden.</span>';
+    return;
+  }
+  container.innerHTML = items.map((item, i) =>
+    `<div data-lib-idx="${i}" style="padding:4px 6px;cursor:pointer;border-radius:3px;display:flex;align-items:center;gap:6px;margin-bottom:2px">
+      ${item.thumb_url ? `<img src="${item.thumb_url}" style="width:28px;height:28px;object-fit:cover;border-radius:2px;flex-shrink:0">` : '<span style="width:28px;text-align:center;font-size:16px">📦</span>'}
+      <span style="color:#d8e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</span>
+    </div>`
+  ).join('');
+  container.querySelectorAll('[data-lib-idx]').forEach(row => {
+    row.onmouseover = () => row.style.background = 'rgba(255,255,255,.06)';
+    row.onmouseout  = () => row.style.background = '';
+    row.onclick = () => onSelect(items[parseInt(row.dataset.libIdx)]);
+  });
+}
+
+// Endeffektor Library
+$('effLibRefreshBtn').addEventListener('click', async () => {
+  const el = $('effLibList');
+  el.textContent = 'Lade…';
+  try {
+    const items = await libFetchByType('endeffektor');
+    libRenderList(el, items, async item => {
+      el.textContent = 'Lade ' + item.name + '…';
+      try {
+        const stls = await libLoadZipAndExtract(item.zip_url, /endeffektor.*\.stl$/i);
+        if (!stls.length) throw new Error('Keine endeffektor.stl in ZIP');
+        state.effStl = { path: stls[0].name, name: item.name + '.stl', buf: stls[0].buf };
+        renderEffRow();
+        el.textContent = '✓ ' + item.name + ' geladen';
+      } catch(e) { el.textContent = 'Fehler: ' + e.message; }
+    });
+  } catch(e) { el.textContent = 'Fehler: ' + e.message; }
+});
+
+// Umfeld Library
+$('umfLibRefreshBtn').addEventListener('click', async () => {
+  const el = $('umfLibList');
+  el.textContent = 'Lade…';
+  try {
+    const items = await libFetchByType('umfeld');
+    libRenderList(el, items, async item => {
+      el.textContent = 'Lade ' + item.name + '…';
+      try {
+        const stls = await libLoadZipAndExtract(item.zip_url, /umfeld.*\.stl$/i);
+        if (!stls.length) throw new Error('Keine umfeld*.stl in ZIP');
+        if (!state.umfStls) state.umfStls = [];
+        stls.forEach(s => state.umfStls.push({ path: s.name, name: item.name + ' · ' + s.name, buf: s.buf }));
+        renderUmfRows();
+        el.textContent = '✓ ' + item.name + ' (' + stls.length + ' STL) geladen';
+      } catch(e) { el.textContent = 'Fehler: ' + e.message; }
+    });
+  } catch(e) { el.textContent = 'Fehler: ' + e.message; }
+});
+
 // ── Endeffektor & Umfeld STL ────────────────────────────────────
 // state.effStl  = { path, name, buf }  (ein Endeffektor)
 // state.umfStls = [{ path, name, buf }]  (mehrere Umfeld-Teile)
