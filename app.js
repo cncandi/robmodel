@@ -64,7 +64,7 @@ const state = {
 };
 
 // ── Three.js Variablen ────────────────────────────────────────────
-let scene, camera, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot;
+let scene, camera, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot, worldRoot;
 let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup;
 const meshes = new Map();
 const axisMeshes = [];
@@ -129,10 +129,12 @@ function init3d() {
   robotGroup = new THREE.Group();
   toolGroup = new THREE.Group();
   kinematicsRoot = new THREE.Group(); // keine STL-Transformation!
-  scene.add(robotGroup, toolGroup, kinematicsRoot);;
+  worldRoot = new THREE.Group();
+  worldRoot.add(robotGroup, toolGroup, kinematicsRoot);
+  scene.add(worldRoot);
 
   axisPointGroup = new THREE.Group();
-  scene.add(axisPointGroup);
+  worldRoot.add(axisPointGroup);
   csHelperGroup = new THREE.Group();
   scene.add(csHelperGroup);
 
@@ -294,14 +296,14 @@ function applyTransforms() {
   state.robotTr = readInputs('r');
   state.toolTr  = readInputs('t');
   const _rx = deg(state.robotTr.rx), _ry = deg(state.robotTr.ry), _rz = deg(state.robotTr.rz);
-  // Alle Gruppen gleichmäßig drehen (STL-Korrektur)
+  // Gesamte Szene drehen über worldRoot
+  worldRoot.rotation.set(_rx, _ry, _rz);
   robotGroup.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
-  robotGroup.rotation.set(_rx, _ry, _rz);
+  robotGroup.rotation.set(0, 0, 0);
   kinematicsRoot.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
-  kinematicsRoot.rotation.set(_rx, _ry, _rz);
+  kinematicsRoot.rotation.set(0, 0, 0);
   toolGroup.position.set(state.toolTr.x, state.toolTr.y, state.toolTr.z);
-  toolGroup.rotation.set(_rx, _ry, _rz);
-  axisPointGroup.rotation.set(_rx, _ry, _rz);
+  toolGroup.rotation.set(0, 0, 0);
   for (const [, mesh] of meshes) mesh.rotation.set(0, 0, 0);
   if (axisPointGroup) { axisPointGroup.position.set(0,0,0); axisPointGroup.rotation.set(0,0,0); axisPointGroup.scale.set(1,1,1); }
   applyJointRotations();
@@ -656,9 +658,7 @@ function clearGroup(g) { while (g.children.length) g.remove(g.children[0]); }
 // Rotation auf ALLE Gruppen anwenden (robotGroup, kinematicsRoot, toolGroup)
 function applyStlRotation(rx, ry, rz) {
   const r = Math.PI / 180;
-  [robotGroup, kinematicsRoot, toolGroup].forEach(g => {
-    if (g) g.rotation.set(rx * r, ry * r, rz * r);
-  });
+  if (worldRoot) worldRoot.rotation.set(rx * r, ry * r, rz * r);
   state.robotTr.rx = rx; state.robotTr.ry = ry; state.robotTr.rz = rz;
   const set = (id, v) => { const el = $(id); if (el) el.value = v; };
   set('rRx', rx); set('rRy', ry); set('rRz', rz);
