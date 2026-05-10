@@ -157,6 +157,33 @@ function init3d() {
   setTimeout(() => setView('iso'), 0);
 }
 
+// ── Endeffektor TCP-Marker ──────────────────────────────────────
+let effTcpHelper = null;
+
+function updateEffTcpMarker() {
+  if (effTcpHelper) { scene.remove(effTcpHelper); effTcpHelper = null; }
+  if (!state.effStl || !scene) return;
+  const eo = state.effOffset || {};
+  const g = new THREE.Group();
+  const axes = new THREE.AxesHelper(60);
+  g.add(axes);
+  // Kleine Kugel als Ursprungsmarker
+  g.add(new THREE.Mesh(
+    new THREE.SphereGeometry(8, 10, 8),
+    new THREE.MeshStandardMaterial({ color: '#a855f7', emissive: '#7c3aed', emissiveIntensity:.5 })
+  ));
+  g.position.set(eo.x||0, eo.y||0, eo.z||0);
+  g.rotation.set(
+    (eo.rx||0)*Math.PI/180,
+    (eo.ry||0)*Math.PI/180,
+    (eo.rz||0)*Math.PI/180
+  );
+  // An A6 hängen wenn vorhanden, sonst in toolGroup
+  const parent = (toolMountMode==='a6' && axisPivotGroups[5]) ? axisPivotGroups[5] : toolGroup;
+  parent.add(g);
+  effTcpHelper = g;
+}
+
 function resize() {
   const r = $('viewer').parentElement.getBoundingClientRect();
   const w = r.width || window.innerWidth;
@@ -625,8 +652,12 @@ function resetData() {
   state.joints=['A1','A2','A3','A4','A5','A6'].map((n,i)=>({name:n,axis:fixedAxisType(i),offset:defOffset(i),min:null,max:null,rotationSign:1,status:'KR8 Zielwert'}));
   state.tcp.auftragen={x:null,y:null,z:null,rz:null,ry:null,rx:null,toolLength:0,toolStl:'',status:'manuell'};
   state.tcp.abtragen={...state.tcp.auftragen};
-  state.effStl  = null;
-  state.umfStls = [];
+  state.effStl   = null;
+  state.umfStls  = [];
+  state.effOffset = {x:0,y:0,z:0,rx:0,ry:0,rz:0};
+  // Reset offset inputs
+  ['eff-ox','eff-oy','eff-oz','eff-orx','eff-ory','eff-orz'].forEach(id=>{const el=$(id);if(el)el.value='0';});
+  updateEffTcpMarker();
   renderEffRow?.(); renderUmfRows?.();
 }
 
@@ -830,7 +861,14 @@ function buildJson() {
       tool:     { px:0, py:0, pz:0, rx:0, ry:0, rz:0, name: toolName }
     }
   };
-  if (state.effStl)        result.endeffektor = { name: norm(state.effStl.name), stl: 'endeffektor.stl', px:0, py:0, pz:0, rx:0, ry:0, rz:0 };
+  if (state.effStl) {
+    const eo = state.effOffset || {};
+    result.endeffektor = {
+      name: norm(state.effStl.name), stl: 'endeffektor.stl',
+      px: eo.x||0, py: eo.y||0, pz: eo.z||0,
+      rx: eo.rx||0, ry: eo.ry||0, rz: eo.rz||0
+    };
+  }
   if (state.umfStls?.length) result.umfeld = state.umfStls.map((u,i) => ({ name: norm(u.name), stl: 'umfeld_'+(i+1)+'.stl', px:0, py:0, pz:0, rx:0, ry:0, rz:0 }));
   return result;
 }
@@ -1056,7 +1094,23 @@ $('effLibRefreshBtn').addEventListener('click', async () => {
         const stls = await libLoadZipAndExtract(item.zip_url, /endeffektor.*\.stl$/i);
         if (!stls.length) throw new Error('Keine endeffektor.stl in ZIP');
         state.effStl = { path: stls[0].name, name: item.name + '.stl', buf: stls[0].buf };
+        // Load offset from JSON if available in ZIP
+        try {
+          const jsonFiles = Object.keys(zip.files).filter(n => n.endsWith('.json'));
+          if (jsonFiles.length) {
+            const jd = JSON.parse(await zip.files[jsonFiles[0]].async('string'));
+            if (jd.endeffektor) {
+              const eo = jd.endeffektor;
+              state.effOffset = { x:eo.px||0, y:eo.py||0, z:eo.pz||0, rx:eo.rx||0, ry:eo.ry||0, rz:eo.rz||0 };
+              ['eff-ox','eff-oy','eff-oz','eff-orx','eff-ory','eff-orz'].forEach(id => {
+                const key = id==='eff-ox'?'x':id==='eff-oy'?'y':id==='eff-oz'?'z':id==='eff-orx'?'rx':id==='eff-ory'?'ry':'rz';
+                const el=$(id); if(el) el.value = state.effOffset[key]||0;
+              });
+            }
+          }
+        } catch(e) {}
         renderEffRow();
+        updateEffTcpMarker();
         el.textContent = '✓ ' + item.name + ' geladen';
       } catch(e) { el.textContent = 'Fehler: ' + e.message; }
     });
@@ -1096,7 +1150,7 @@ function renderEffRow() {
       <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${norm(state.effStl.name)}</span>
       <button id="effClearBtn" style="background:rgba(204,51,51,.2);border:1px solid rgba(204,51,51,.4);color:#f87171;border-radius:3px;padding:2px 6px;font-size:12px;cursor:pointer">✕</button>
     </div>`;
-    $('effClearBtn').onclick = () => { state.effStl = null; renderEffRow(); };
+    $('effClearBtn').onclick = () => { state.effStl = null; state.effOffset = {x:0,y:0,z:0,rx:0,ry:0,rz:0}; ['eff-ox','eff-oy','eff-oz','eff-orx','eff-ory','eff-orz'].forEach(id=>{const el=$(id);if(el)el.value='0';}); renderEffRow(); updateEffTcpMarker(); };
     if (badge) badge.textContent = norm(state.effStl.name);
   } else {
     el.innerHTML = '';
@@ -1278,6 +1332,18 @@ async function uploadToRoblib() {
 }
 
 $('demoBtn').onclick    = () => loadDemoKr8().catch(e => alert(e.message));
+// Endeffektor TCP-Offset Inputs
+['eff-ox','eff-oy','eff-oz','eff-orx','eff-ory','eff-orz'].forEach(id => {
+  const el = $(id); if (!el) return;
+  const field = id.replace('eff-o','').replace('eff-o','');
+  el.addEventListener('input', () => {
+    if (!state.effOffset) state.effOffset = {};
+    const key = id === 'eff-ox' ? 'x' : id === 'eff-oy' ? 'y' : id === 'eff-oz' ? 'z' :
+                id === 'eff-orx' ? 'rx' : id === 'eff-ory' ? 'ry' : 'rz';
+    state.effOffset[key] = parseFloat(el.value) || 0;
+    updateEffTcpMarker();
+  });
+});
 $('roblibBtn').onclick  = openRoblibModal;
 $('toolModeWorld').onclick = () => setToolMode('world');
 $('toolModeA6').onclick    = () => setToolMode('a6');
