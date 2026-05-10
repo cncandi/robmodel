@@ -64,7 +64,7 @@ const state = {
 };
 
 // ── Three.js Variablen ────────────────────────────────────────────
-let scene, camera, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot, worldRoot;
+let scene, camera, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot;
 let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup;
 const meshes = new Map();
 const axisMeshes = [];
@@ -129,12 +129,10 @@ function init3d() {
   robotGroup = new THREE.Group();
   toolGroup = new THREE.Group();
   kinematicsRoot = new THREE.Group(); // keine STL-Transformation!
-  worldRoot = new THREE.Group();
-  worldRoot.add(robotGroup, toolGroup, kinematicsRoot);
-  scene.add(worldRoot);
+  scene.add(robotGroup, toolGroup, kinematicsRoot);
 
   axisPointGroup = new THREE.Group();
-  worldRoot.add(axisPointGroup);
+  scene.add(axisPointGroup);
   csHelperGroup = new THREE.Group();
   scene.add(csHelperGroup);
 
@@ -295,21 +293,21 @@ function detachToolFromA6() {
 function applyTransforms() {
   state.robotTr = readInputs('r');
   state.toolTr  = readInputs('t');
+  // Gruppen: nur Position, keine Rotation (Rotation liegt auf den Meshes)
   const _rx = deg(state.robotTr.rx), _ry = deg(state.robotTr.ry), _rz = deg(state.robotTr.rz);
-  // Gesamte Szene drehen über worldRoot
-  worldRoot.rotation.set(_rx, _ry, _rz);
   robotGroup.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
   robotGroup.rotation.set(0, 0, 0);
   kinematicsRoot.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
-  kinematicsRoot.rotation.set(0, 0, 0);
   toolGroup.position.set(state.toolTr.x, state.toolTr.y, state.toolTr.z);
   toolGroup.rotation.set(0, 0, 0);
-  for (const [, mesh] of meshes) mesh.rotation.set(0, 0, 0);
+  // STL-Korrektur auf ALLE Meshes gleichmäßig anwenden (Roboter, Podest, Tool)
+  for (const [, mesh] of meshes) mesh.rotation.set(_rx, _ry, _rz);
   if (axisPointGroup) { axisPointGroup.position.set(0,0,0); axisPointGroup.rotation.set(0,0,0); axisPointGroup.scale.set(1,1,1); }
   applyJointRotations();
   scene.updateMatrixWorld(true);
   if (toolMountMode === 'a6') attachToolToA6(); else detachToolFromA6();
   updateEffTcpMarker();
+  
 }
 
 function fitCamera() {
@@ -655,16 +653,6 @@ function isTool(f) { const n = norm(f.name||f); const tool = norm(state.tcp.auft
 function findStl(stem) { const s = norm(stem); return state.stls.find(f=>norm(f.name)===s)?.name || state.stls.find(f=>norm(f.name).includes(s)||s.includes(norm(f.name)))?.name || null; }
 function clearGroup(g) { while (g.children.length) g.remove(g.children[0]); }
 
-// Rotation auf ALLE Gruppen anwenden (robotGroup, kinematicsRoot, toolGroup)
-function applyStlRotation(rx, ry, rz) {
-  const r = Math.PI / 180;
-  if (worldRoot) worldRoot.rotation.set(rx * r, ry * r, rz * r);
-  state.robotTr.rx = rx; state.robotTr.ry = ry; state.robotTr.rz = rz;
-  const set = (id, v) => { const el = $(id); if (el) el.value = v; };
-  set('rRx', rx); set('rRy', ry); set('rRz', rz);
-  scene.updateMatrixWorld(true);
-}
-
 async function loadStls() {
   for (const f of state.stls) {
     try {
@@ -709,7 +697,6 @@ function resetData() {
   state.joints=['A1','A2','A3','A4','A5','A6'].map((n,i)=>({name:n,axis:fixedAxisType(i),offset:defOffset(i),min:null,max:null,rotationSign:1,status:'KR8 Zielwert'}));
   state.tcp.auftragen={x:null,y:null,z:null,rz:null,ry:null,rx:null,toolLength:0,toolStl:'',status:'manuell'};
   state.tcp.abtragen={...state.tcp.auftragen};
-  state.sourceRobotId = null; state.sourceRobotName = null; // ID wenn aus Library geladen
   state.effStl   = null;
   state.umfStls  = [];
   state.effOffset = {x:0,y:0,z:0,rx:0,ry:0,rz:0};
@@ -820,10 +807,6 @@ async function loadDemoKr8() {
     state.tcp.auftragen = { x:364.5, y:0, z:46.5, rx:0, ry:90, rz:0, toolLength:0, toolStl:'tool1_tcp', status:'KR8 Demo' };
     state.tcp.abtragen  = { ...state.tcp.auftragen };
     setEffOffsetFromTcp(state.tcp.auftragen);
-    // KR8 braucht keine STL-Rotation
-    state.robotTr={...state.robotTr, rx:0, ry:0, rz:0};
-    const setSR=(id,v)=>{const el=$(id);if(el)el.value=v;};
-    setSR('rRx',0); setSR('rRy',0); setSR('rRz',0);
     await loadStls(); enableSave(); renderAll(); setView('iso');
   } catch(e) {
     alert('Demo-Load fehlgeschlagen: ' + e.message);
@@ -918,24 +901,13 @@ function applyJsonToState(j) {
   if(Array.isArray(j.stlRefAngles)&&j.stlRefAngles.length===6){state.referencePose=j.stlRefAngles.map(v=>Number(v)||0);if($('refPose'))$('refPose').value=state.referencePose.join(',');}
   if(Array.isArray(j.jointAngles)&&j.jointAngles.length===6)state.jointAngles=j.jointAngles.map(v=>Number(v)||0);
   if(Array.isArray(j.joints)){state.joints=j.joints.map((v,i)=>({name:v.name||('A'+(i+1)),axis:fixedAxisType(i),offset:v.offset||{x:null,y:null,z:null},min:num(v.min),max:num(v.max),rotationSign:num(v.rotationSign??v.rotationDirection??v.dir)??1,status:v.status||'JSON'}));state.axisPoints=state.joints.map((v,i)=>({name:v.name||('A'+(i+1)),x:num(v.offset?.x),y:num(v.offset?.y),z:num(v.offset?.z),rx:0,ry:0,rz:0,source:'JSON'}));}
-  if(j.stlRotation){
-    const r=j.stlRotation;
-    state.robotTr={...state.robotTr, rx:r.rx||0, ry:r.ry||0, rz:r.rz||0};
-    const set=(id,v)=>{const el=$(id);if(el)el.value=v;};
-    set('rRx',r.rx||0); set('rRy',r.ry||0); set('rRz',r.rz||0);
-  } else if(j.joints) {
-    // Kein stlRotation in JSON → Standard Z90+X90 für ROS-Roboter
-    state.robotTr={...state.robotTr, rx:90, ry:0, rz:90};
-    const set=(id,v)=>{const el=$(id);if(el)el.value=v;};
-    set('rRx',90); set('rRy',0); set('rRz',90);
-  }
   if(j.tcp){state.tcp.auftragen=cleanTcpOrientation({...(j.tcp.auftragen||j.tcp),toolLength:j.tcp.auftragen?.toolLength??0,status:'JSON'});state.tcp.abtragen=cleanTcpOrientation({...(j.tcp.abtragen||j.tcp.auftragen||j.tcp),toolLength:j.tcp.abtragen?.toolLength??0,status:'JSON'});setEffOffsetFromTcp(state.tcp.auftragen);}
   const toolName=j.sceneModels?.tool?.name||j.tcp?.auftragen?.toolStl||j.tcp?.auftragen?.stlName;
   if(toolName)state.toolName=String(toolName).endsWith('.stl')?toolName:toolName+'.stl';
   normalizeKnownOffsets();
 }
 
-function buildJson(overrideRx, overrideRy, overrideRz) {
+function buildJson() {
   const axNames = ['A1','A2','A3','A4','A5','A6'];
   const stlFiles = Object.fromEntries(axNames.map((ax, i) => {
     const src = state.axisStlMap[ax] || state.stls.find(f => partKey(f.name) === ax)?.name || '';
@@ -947,15 +919,8 @@ function buildJson(overrideRx, overrideRy, overrideRz) {
   const eo = state.effOffset || {};
   const tcpX = eo.x??num(tcp.x)??0, tcpY = eo.y??num(tcp.y)??0, tcpZ = eo.z??num(tcp.z)??0;
   const tcpA = eo.rz??num(tcp.rz)??0, tcpB = eo.ry??num(tcp.ry)??0, tcpC = eo.rx??num(tcp.rx)??0;
-  // STL-Orientierung speichern
-  const rTr = state.robotTr || {};
-  // STL-Orientierung speichern (Override wenn aus Upload-Kontext)
-  const rxVal = overrideRx !== undefined ? overrideRx : (rTr.rx||0);
-  const ryVal = overrideRy !== undefined ? overrideRy : (rTr.ry||0);
-  const rzVal = overrideRz !== undefined ? overrideRz : (rTr.rz||0);
   return {
     name: state.robotName || 'Robot',
-    stlRotation: { rx: rxVal, ry: ryVal, rz: rzVal },
     joints: state.joints.map((j,i) => ({
       name: j.name,
       axis: fixedAxisType(i),
@@ -1347,7 +1312,6 @@ function rlTypeChanged() {
 $('rl-type')?.addEventListener('change', rlTypeChanged);
 
 async function uploadToRoblib() {
-  const isUpdate = _rlMode === 'update' && state.sourceRobotId;
   const btn  = $('rl-submit');
   const msg  = $('rl-msg');
   const wrap = $('rl-progress-wrap');
@@ -1398,34 +1362,18 @@ async function uploadToRoblib() {
     setProgress('Erstelle ZIP…', 5);
     const prevMode = toolMountMode;
     if (prevMode !== 'world') { detachToolFromA6(); scene.updateMatrixWorld(true); }
-    // STL-Rotation für Export entfernen (RobSimul braucht Original-Orientierung)
-    // stlRotation bleibt nur im JSON für RobModel-Darstellung
-    const savedRx = state.robotTr.rx||0, savedRy = state.robotTr.ry||0, savedRz = state.robotTr.rz||0;
-    const hasRot = savedRx || savedRy || savedRz;
-    if (hasRot) {
-      state.robotTr.rx = 0; state.robotTr.ry = 0; state.robotTr.rz = 0;
-      for (const [, mesh] of meshes) mesh.rotation.set(0, 0, 0);
-      scene.updateMatrixWorld(true);
-    }
     const zip  = new JSZip();
     const base = zipName(state.robotName || 'robot');
-    zip.file(base + '.json', JSON.stringify(buildJson(savedRx, savedRy, savedRz), null, 2));
+    zip.file(base + '.json', JSON.stringify(buildJson(), null, 2));
     for (const [, mesh] of meshes) zip.file(mesh.name, exportBinaryStl(mesh));
     if (state.effStl?.buf) zip.file('endeffektor.stl', state.effStl.buf);
     if (state.umfStls?.length) state.umfStls.forEach((u, i) => zip.file('umfeld_' + (i+1) + '.stl', u.buf));
-    // Rotation wiederherstellen
-    if (hasRot) {
-      state.robotTr.rx = savedRx; state.robotTr.ry = savedRy; state.robotTr.rz = savedRz;
-      for (const [, mesh] of meshes) mesh.rotation.set(deg(savedRx), deg(savedRy), deg(savedRz));
-      scene.updateMatrixWorld(true);
-    }
     const zipBlob = await zip.generateAsync({ type: 'blob' }, m => setProgress('Komprimiere…', 5 + m.percent * 0.4));
     if (prevMode !== 'world') attachToolToA6();
     setProgress('Lade hoch…', 45);
 
     const fd = new FormData();
     for (const [k, v] of Object.entries(fields)) fd.append(k, v);
-    if (isUpdate) fd.append('id', state.sourceRobotId);
     fd.append('zip', zipBlob, base + '.zip');
     const thumb = $('rl-thumb').files[0];
     if (thumb) fd.append('thumb', thumb, thumb.name);
@@ -1433,7 +1381,7 @@ async function uploadToRoblib() {
     // 2. XHR mit Upload-Progress
     const data = await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', ROBLIB_API + '?action=' + (isUpdate ? 'update' : 'upload'));
+      xhr.open('POST', ROBLIB_API + '?action=upload');
       xhr.upload.onprogress = e => {
         if (e.lengthComputable) setProgress('Lade hoch…', 45 + (e.loaded / e.total) * 50);
       };
@@ -1447,8 +1395,7 @@ async function uploadToRoblib() {
 
     if (data.ok) {
       setProgress('Fertig!', 100);
-      state.sourceRobotId = data.robot?.id || state.sourceRobotId;
-      setTimeout(() => show((isUpdate?'↻ Aktualisiert: ':'✓ Hochgeladen: ') + data.robot.name, true), 600);
+      setTimeout(() => show('✓ Hochgeladen: ' + data.robot.name, true), 600);
     } else {
       show('Fehler: ' + data.error, false);
     }
@@ -1601,125 +1548,6 @@ function stlFromGeometry(geo) {
   }
   g.dispose(); return buf;
 }
-
-// ── Roboter Library (roblib) ────────────────────────────────────
-let _rlMode = 'new'; // 'new' | 'update'
-let _allRobots = [];
-
-function openRobotLibModal() {
-  $('robotLibModal').style.display = 'flex';
-  $('rl-lib-status').textContent = '';
-}
-
-function setRlMode(mode) {
-  _rlMode = mode;
-  $('rl-mode-new').style.background    = mode==='new'    ? 'rgba(37,99,235,.3)' : 'rgba(255,255,255,.05)';
-  $('rl-mode-new').style.color         = mode==='new'    ? '#60a5fa' : '#6a8fa8';
-  $('rl-mode-new').style.borderColor   = mode==='new'    ? '#2563eb' : 'rgba(255,255,255,.2)';
-  $('rl-mode-update').style.background = mode==='update' ? 'rgba(255,96,0,.2)'   : 'rgba(255,255,255,.05)';
-  $('rl-mode-update').style.color      = mode==='update' ? '#ff6000' : '#6a8fa8';
-  $('rl-mode-update').style.borderColor= mode==='update' ? '#ff6000' : 'rgba(255,255,255,.2)';
-  $('rl-modal-title').textContent = mode==='update'
-    ? '↻ ROBLIB aktualisieren: ' + (state.sourceRobotName||'')
-    : '→ ROBLIB hochladen';
-  $('rl-submit').textContent = mode==='update' ? 'Aktualisieren' : 'Hochladen';
-}
-
-async function rlLoadRobotList() {
-  const status = $('rl-lib-status');
-  const list   = $('rl-lib-list');
-  status.textContent = 'Lade…';
-  try {
-    const r = await fetch(ROBLIB_API + '?action=list');
-    const d = await r.json();
-    _allRobots = (d.robots || []).filter(r => (r.type||'robot') === 'robot');
-    rlRenderRobotList(_allRobots);
-    status.textContent = _allRobots.length + ' Roboter verfügbar';
-  } catch(e) {
-    status.textContent = 'Fehler: ' + e.message;
-  }
-}
-
-function rlRenderRobotList(robots) {
-  const list = $('rl-lib-list');
-  if (!robots.length) {
-    list.innerHTML = '<div style="padding:16px;font-family:monospace;font-size:11px;color:#4a6a8a">Keine Roboter gefunden.</div>';
-    return;
-  }
-  list.innerHTML = robots.map((r, i) =>
-    `<div data-robot-idx="${i}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:10px">
-      ${r.thumb_url ? `<img src="${r.thumb_url}" style="width:40px;height:40px;object-fit:cover;border-radius:3px;flex-shrink:0">` : '<span style="width:40px;text-align:center;font-size:22px">🦾</span>'}
-      <div style="flex:1;min-width:0">
-        <div style="font-family:monospace;font-size:12px;color:#d8e8f0;font-weight:700">${r.name}</div>
-        <div style="font-family:monospace;font-size:10px;color:#6a8fa8">${r.marke||''} ${r.modell||''} · ${r.achsen||0} Achsen · ${r.reichweite_mm||0}mm</div>
-      </div>
-    </div>`
-  ).join('');
-
-  list.querySelectorAll('[data-robot-idx]').forEach(row => {
-    row.onmouseover = () => row.style.background = 'rgba(255,255,255,.04)';
-    row.onmouseout  = () => row.style.background = '';
-    row.onclick = () => rlLoadRobotFromLib(robots[parseInt(row.dataset.robotIdx)]);
-  });
-}
-
-async function rlLoadRobotFromLib(robot) {
-  const status = $('rl-lib-status');
-  const bar    = $('rl-lib-bar');
-  const prog   = $('rl-lib-progress');
-  prog.style.display = 'block'; bar.style.width = '10%';
-  status.textContent = 'Lade ' + robot.name + '…';
-
-  try {
-    const buf = await new Promise((res, rej) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('GET', ROBLIB_API + '?action=download&id=' + robot.id);
-      xhr.responseType = 'arraybuffer';
-      xhr.onprogress = e => { if (e.lengthComputable) bar.style.width = (10 + e.loaded/e.total*80) + '%'; };
-      xhr.onload = () => res(xhr.response);
-      xhr.onerror = () => rej(new Error('Download fehlgeschlagen'));
-      xhr.send();
-    });
-
-    bar.style.width = '95%';
-    status.textContent = 'Verarbeite…';
-
-    const file = new File([buf], robot.name + '.zip', { type: 'application/zip' });
-    await loadSourceZip(file);
-
-    // Merke Quelle für Update-Funktion
-    state.sourceRobotId   = robot.id;
-    state.sourceRobotName = robot.name;
-
-    bar.style.width = '100%'; bar.style.background = '#22c55e';
-    status.textContent = '✓ ' + robot.name + ' geladen';
-
-    // Upload-Modal vorbereiten
-    $('rl-name').value  = robot.name;
-    $('rl-marke').value = robot.marke  || '';
-    $('rl-modell').value= robot.modell || '';
-    $('rl-achsen').value= robot.achsen || 6;
-    $('rl-reichweite').value = robot.reichweite_mm || '';
-    $('rl-nutzlast').value   = robot.nutzlast_kg   || '';
-    $('rl-gewicht').value    = robot.gewicht_kg     || '';
-    $('rl-wdh').value        = robot.wiederholgenauigkeit_mm || '';
-    $('rl-mode-update').style.display = '';
-    setRlMode('update');
-
-    setTimeout(() => { $('robotLibModal').style.display = 'none'; prog.style.display = 'none'; bar.style.background = '#ff6000'; }, 800);
-  } catch(e) {
-    status.textContent = 'Fehler: ' + e.message;
-    prog.style.display = 'none';
-  }
-}
-
-$('robotLibBtn').onclick   = openRobotLibModal;
-$('robotLibClose').onclick = () => { $('robotLibModal').style.display = 'none'; };
-$('rl-lib-refresh').addEventListener('click', rlLoadRobotList);
-$('rl-lib-search').addEventListener('input', () => {
-  const q = $('rl-lib-search').value.toLowerCase();
-  rlRenderRobotList(q ? _allRobots.filter(r => (r.name+r.marke+r.modell).toLowerCase().includes(q)) : _allRobots);
-});
 
 // ── ROS / GitHub Import ──────────────────────────────────────────
 let _rosData = null;
