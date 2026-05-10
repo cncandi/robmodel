@@ -884,7 +884,7 @@ function simulateAxis(axisIndex){
 // ── Render-Funktionen ──────────────────────────────────────────────
 function renderAll(){renderAxisStlRows();renderRows();updateAxisPointVisuals();renderTcp();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';}
 
-function {const el=$('jointAngleRows');if(!el)return;el.innerHTML=state.jointAngles.map((v,i)=>`<div class="field"><label>${state.joints[i]?.name||'A'+(i+1)} ${fixedAxisType(i)}</label><input data-joint-angle="${i}" type="number" step="1" value="${v??0}"></div>`).join('');}
+function renderJointAngleRows(){const el=$('jointAngleRows');if(!el)return;el.innerHTML=state.jointAngles.map((v,i)=>`<div class="field"><label>${state.joints[i]?.name||'A'+(i+1)} ${fixedAxisType(i)}</label><input data-joint-angle="${i}" type="number" step="1" value="${v??0}"></div>`).join('');}
 
 
 function renderRows(){$('jointRows').innerHTML=state.joints.map((j,i)=>{
