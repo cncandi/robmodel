@@ -301,6 +301,7 @@ function applyTransforms() {
   kinematicsRoot.rotation.set(_rx, _ry, _rz);
   toolGroup.position.set(state.toolTr.x, state.toolTr.y, state.toolTr.z);
   toolGroup.rotation.set(_rx, _ry, _rz);
+  axisPointGroup.rotation.set(_rx, _ry, _rz);
   for (const [, mesh] of meshes) mesh.rotation.set(0, 0, 0);
   if (axisPointGroup) { axisPointGroup.position.set(0,0,0); axisPointGroup.rotation.set(0,0,0); axisPointGroup.scale.set(1,1,1); }
   applyJointRotations();
@@ -652,6 +653,18 @@ function isTool(f) { const n = norm(f.name||f); const tool = norm(state.tcp.auft
 function findStl(stem) { const s = norm(stem); return state.stls.find(f=>norm(f.name)===s)?.name || state.stls.find(f=>norm(f.name).includes(s)||s.includes(norm(f.name)))?.name || null; }
 function clearGroup(g) { while (g.children.length) g.remove(g.children[0]); }
 
+// Rotation auf ALLE Gruppen anwenden (robotGroup, kinematicsRoot, toolGroup)
+function applyStlRotation(rx, ry, rz) {
+  const r = Math.PI / 180;
+  [robotGroup, kinematicsRoot, toolGroup].forEach(g => {
+    if (g) g.rotation.set(rx * r, ry * r, rz * r);
+  });
+  state.robotTr.rx = rx; state.robotTr.ry = ry; state.robotTr.rz = rz;
+  const set = (id, v) => { const el = $(id); if (el) el.value = v; };
+  set('rRx', rx); set('rRy', ry); set('rRz', rz);
+  scene.updateMatrixWorld(true);
+}
+
 async function loadStls() {
   for (const f of state.stls) {
     try {
@@ -807,6 +820,10 @@ async function loadDemoKr8() {
     state.tcp.auftragen = { x:364.5, y:0, z:46.5, rx:0, ry:90, rz:0, toolLength:0, toolStl:'tool1_tcp', status:'KR8 Demo' };
     state.tcp.abtragen  = { ...state.tcp.auftragen };
     setEffOffsetFromTcp(state.tcp.auftragen);
+    // KR8 braucht keine STL-Rotation
+    state.robotTr={...state.robotTr, rx:0, ry:0, rz:0};
+    const setSR=(id,v)=>{const el=$(id);if(el)el.value=v;};
+    setSR('rRx',0); setSR('rRy',0); setSR('rRz',0);
     await loadStls(); enableSave(); renderAll(); setView('iso');
   } catch(e) {
     alert('Demo-Load fehlgeschlagen: ' + e.message);
@@ -906,6 +923,11 @@ function applyJsonToState(j) {
     state.robotTr={...state.robotTr, rx:r.rx||0, ry:r.ry||0, rz:r.rz||0};
     const set=(id,v)=>{const el=$(id);if(el)el.value=v;};
     set('rRx',r.rx||0); set('rRy',r.ry||0); set('rRz',r.rz||0);
+  } else if(j.joints) {
+    // Kein stlRotation in JSON → Standard Z90+X90 für ROS-Roboter
+    state.robotTr={...state.robotTr, rx:90, ry:0, rz:90};
+    const set=(id,v)=>{const el=$(id);if(el)el.value=v;};
+    set('rRx',90); set('rRy',0); set('rRz',90);
   }
   if(j.tcp){state.tcp.auftragen=cleanTcpOrientation({...(j.tcp.auftragen||j.tcp),toolLength:j.tcp.auftragen?.toolLength??0,status:'JSON'});state.tcp.abtragen=cleanTcpOrientation({...(j.tcp.abtragen||j.tcp.auftragen||j.tcp),toolLength:j.tcp.abtragen?.toolLength??0,status:'JSON'});setEffOffsetFromTcp(state.tcp.auftragen);}
   const toolName=j.sceneModels?.tool?.name||j.tcp?.auftragen?.toolStl||j.tcp?.auftragen?.stlName;
