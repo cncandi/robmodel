@@ -199,15 +199,16 @@ function updateEffTcpMarker() {
   ));
 
   // Basis-Rotation A6-Werkzeugrahmen:
-  // Z+ = Stoßrichtung (forward, Spalte 2)
-  // X+ = nach unten  (-Y_world, Spalte 0)
-  // Y+ = nach hinten  (-Z_world, Spalte 1) — rechte-Hand-System
+  // Z+ = Stoßrichtung, X+ = nach unten, Y+ = nach hinten
   const baseMatrix = new THREE.Matrix4().makeBasis(
     new THREE.Vector3( 0, -1,  0),  // X → down
     new THREE.Vector3( 0,  0, -1),  // Y → backward
-    new THREE.Vector3( 1,  0,  0)   // Z → forward (Stoßrichtung = +X_world)
+    new THREE.Vector3( 1,  0,  0)   // Z → forward (Stoßrichtung)
   );
   const baseQuat = new THREE.Quaternion().setFromRotationMatrix(baseMatrix);
+  // +90° um lokale Z-Achse (Kalibrierung)
+  const zRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1), Math.PI/2);
+  baseQuat.multiply(zRot);
 
   // User-Offset (im Werkzeugrahmen, additiv)
   const offsetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(
