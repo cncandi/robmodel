@@ -914,7 +914,7 @@ function applyJsonToState(j) {
   normalizeKnownOffsets();
 }
 
-function buildJson() {
+function buildJson(overrideRx, overrideRy, overrideRz) {
   const axNames = ['A1','A2','A3','A4','A5','A6'];
   const stlFiles = Object.fromEntries(axNames.map((ax, i) => {
     const src = state.axisStlMap[ax] || state.stls.find(f => partKey(f.name) === ax)?.name || '';
@@ -928,9 +928,13 @@ function buildJson() {
   const tcpA = eo.rz??num(tcp.rz)??0, tcpB = eo.ry??num(tcp.ry)??0, tcpC = eo.rx??num(tcp.rx)??0;
   // STL-Orientierung speichern
   const rTr = state.robotTr || {};
+  // STL-Orientierung speichern (Override wenn aus Upload-Kontext)
+  const rxVal = overrideRx !== undefined ? overrideRx : (rTr.rx||0);
+  const ryVal = overrideRy !== undefined ? overrideRy : (rTr.ry||0);
+  const rzVal = overrideRz !== undefined ? overrideRz : (rTr.rz||0);
   return {
     name: state.robotName || 'Robot',
-    stlRotation: { rx: rTr.rx||0, ry: rTr.ry||0, rz: rTr.rz||0 },
+    stlRotation: { rx: rxVal, ry: ryVal, rz: rzVal },
     joints: state.joints.map((j,i) => ({
       name: j.name,
       axis: fixedAxisType(i),
@@ -1373,12 +1377,27 @@ async function uploadToRoblib() {
     setProgress('Erstelle ZIP…', 5);
     const prevMode = toolMountMode;
     if (prevMode !== 'world') { detachToolFromA6(); scene.updateMatrixWorld(true); }
+    // STL-Rotation für Export entfernen (RobSimul braucht Original-Orientierung)
+    // stlRotation bleibt nur im JSON für RobModel-Darstellung
+    const savedRx = state.robotTr.rx||0, savedRy = state.robotTr.ry||0, savedRz = state.robotTr.rz||0;
+    const hasRot = savedRx || savedRy || savedRz;
+    if (hasRot) {
+      state.robotTr.rx = 0; state.robotTr.ry = 0; state.robotTr.rz = 0;
+      for (const [, mesh] of meshes) mesh.rotation.set(0, 0, 0);
+      scene.updateMatrixWorld(true);
+    }
     const zip  = new JSZip();
     const base = zipName(state.robotName || 'robot');
-    zip.file(base + '.json', JSON.stringify(buildJson(), null, 2));
+    zip.file(base + '.json', JSON.stringify(buildJson(savedRx, savedRy, savedRz), null, 2));
     for (const [, mesh] of meshes) zip.file(mesh.name, exportBinaryStl(mesh));
     if (state.effStl?.buf) zip.file('endeffektor.stl', state.effStl.buf);
     if (state.umfStls?.length) state.umfStls.forEach((u, i) => zip.file('umfeld_' + (i+1) + '.stl', u.buf));
+    // Rotation wiederherstellen
+    if (hasRot) {
+      state.robotTr.rx = savedRx; state.robotTr.ry = savedRy; state.robotTr.rz = savedRz;
+      for (const [, mesh] of meshes) mesh.rotation.set(deg(savedRx), deg(savedRy), deg(savedRz));
+      scene.updateMatrixWorld(true);
+    }
     const zipBlob = await zip.generateAsync({ type: 'blob' }, m => setProgress('Komprimiere…', 5 + m.percent * 0.4));
     if (prevMode !== 'world') attachToolToA6();
     setProgress('Lade hoch…', 45);
