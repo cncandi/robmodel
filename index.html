@@ -27,6 +27,7 @@
       <input id="jsonInput" type="file" accept=".json,application/json" style="display:none">
       <input id="checkZip" type="file" accept=".zip,application/zip" style="display:none">
       <button id="themeBtn" title="Theme wechseln">🌙</button>
+      <button id="demoBtn" title="KR8 Beispiel laden (Ctrl+Click)">Example</button>
       <button id="demoBtn" title="KR8 Beispiel laden">Example</button>
       <button id="roblibBtn" title="In ROBLIB hochladen" disabled>→ roblib</button>
       <span style="width:1px;background:rgba(255,255,255,.15);margin:0 4px;align-self:stretch"></span>
@@ -87,11 +88,6 @@
           <h2>🔧 Endeffektor</h2>
           <span class="badge info" id="effBadge">—</span>
         </div>
-        <!-- Montage-Modus -->
-        <div style="display:flex;gap:4px;margin-bottom:8px">
-          <button id="toolModeWorld" class="tool-mode-btn active" title="Werkzeug fix im Weltkoordinatensystem">🌍 Frei</button>
-          <button id="toolModeA6"    class="tool-mode-btn"        title="Werkzeug an A6">🔩 An A6</button>
-        </div>
         <!-- Lokale STL -->
         <div id="effStlRows"></div>
         <div class="btn-row">
@@ -106,6 +102,14 @@
             <button id="effLibRefreshBtn" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:3px;padding:2px 8px;font-size:11px;cursor:pointer">↻</button>
           </div>
           <div id="effLibList" style="max-height:110px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace">Klicke ↻ zum Laden…</div>
+        </div>
+      </section>
+
+      <!-- Montage-Modus -->
+      <section class="card" style="padding:8px 10px">
+        <div style="display:flex;gap:4px">
+          <button id="toolModeWorld" class="tool-mode-btn active" style="flex:1" title="Werkzeug fix im Weltkoordinatensystem">🌍 Frei</button>
+          <button id="toolModeA6"    class="tool-mode-btn"        style="flex:1" title="Werkzeug an A6">🔩 An A6</button>
         </div>
       </section>
 
