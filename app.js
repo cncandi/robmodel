@@ -1306,6 +1306,12 @@ window.selectAxisPoint = selectAxisPoint;
 $('newBtn').onclick     = () => { resetData(); disableSave(); renderAll(); setView('iso'); };
 $('downloadJson').onclick = downloadJson;
 $('downloadZip').onclick  = downloadZip;
+$('toggleParam').onclick = () => {
+  const footer = $('paramFooter');
+  const btn    = $('toggleParam');
+  const collapsed = footer.classList.toggle('collapsed');
+  btn.textContent = collapsed ? '▲' : '▼';
+};
 $('resetView').onclick    = () => setView('iso');
 $('toggleGrid').onclick   = () => grid.visible = !grid.visible;
 initAxisStlEvents();
