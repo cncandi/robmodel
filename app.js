@@ -129,7 +129,8 @@ function init3d() {
   robotGroup = new THREE.Group();
   toolGroup = new THREE.Group();
   kinematicsRoot = new THREE.Group(); // keine STL-Transformation!
-  scene.add(robotGroup, toolGroup, kinematicsRoot);
+  robotGroup.add(kinematicsRoot);
+  scene.add(robotGroup, toolGroup);
 
   axisPointGroup = new THREE.Group();
   scene.add(axisPointGroup);
@@ -294,13 +295,13 @@ function applyTransforms() {
   state.robotTr = readInputs('r');
   state.toolTr  = readInputs('t');
   const _rx = deg(state.robotTr.rx), _ry = deg(state.robotTr.ry), _rz = deg(state.robotTr.rz);
-  // STL-Korrektur auf gesamte robotGroup (korrekte Rotation aller Achsen + Meshes)
+  // Gesamte robotGroup (inkl. kinematicsRoot als Kind) + toolGroup drehen
   robotGroup.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
   robotGroup.rotation.set(_rx, _ry, _rz);
   kinematicsRoot.position.set(0, 0, 0);
   kinematicsRoot.rotation.set(0, 0, 0);
   toolGroup.position.set(state.toolTr.x, state.toolTr.y, state.toolTr.z);
-  toolGroup.rotation.set(0, 0, 0);
+  toolGroup.rotation.set(_rx, _ry, _rz);
   for (const [, mesh] of meshes) mesh.rotation.set(0, 0, 0);
   if (axisPointGroup) { axisPointGroup.position.set(0,0,0); axisPointGroup.rotation.set(0,0,0); axisPointGroup.scale.set(1,1,1); }
   applyJointRotations();
