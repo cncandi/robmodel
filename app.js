@@ -654,10 +654,20 @@ function findStl(stem) { const s = norm(stem); return state.stls.find(f=>norm(f.
 function clearGroup(g) { while (g.children.length) g.remove(g.children[0]); }
 
 async function loadStls() {
+  // STL-Rotation aus Inputs lesen und in Geometrie einbrennen
+  const stlRx = parseFloat($('rRx')?.value || 0) || 0;
+  const stlRy = parseFloat($('rRy')?.value || 0) || 0;
+  const stlRz = parseFloat($('rRz')?.value || 0) || 0;
+  const hasRot = stlRx || stlRy || stlRz;
+  const rotMatrix = hasRot ? new THREE.Matrix4().makeRotationFromEuler(
+    new THREE.Euler(stlRx*Math.PI/180, stlRy*Math.PI/180, stlRz*Math.PI/180)
+  ) : null;
+
   for (const f of state.stls) {
     try {
       const u8 = state.buffers.get(f.path);
       const g = loader.parse(u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength));
+      if (rotMatrix) g.applyMatrix4(rotMatrix); // Rotation direkt in Geometrie einbrennen
       g.computeVertexNormals();
       const mat = new THREE.MeshStandardMaterial({ color: colors[partKey(f.name)], roughness: .62, metalness: .08 });
       const mesh = new THREE.Mesh(g, mat); mesh.name = f.name;
@@ -901,6 +911,11 @@ function applyJsonToState(j) {
   if(Array.isArray(j.stlRefAngles)&&j.stlRefAngles.length===6){state.referencePose=j.stlRefAngles.map(v=>Number(v)||0);if($('refPose'))$('refPose').value=state.referencePose.join(',');}
   if(Array.isArray(j.jointAngles)&&j.jointAngles.length===6)state.jointAngles=j.jointAngles.map(v=>Number(v)||0);
   if(Array.isArray(j.joints)){state.joints=j.joints.map((v,i)=>({name:v.name||('A'+(i+1)),axis:fixedAxisType(i),offset:v.offset||{x:null,y:null,z:null},min:num(v.min),max:num(v.max),rotationSign:num(v.rotationSign??v.rotationDirection??v.dir)??1,status:v.status||'JSON'}));state.axisPoints=state.joints.map((v,i)=>({name:v.name||('A'+(i+1)),x:num(v.offset?.x),y:num(v.offset?.y),z:num(v.offset?.z),rx:0,ry:0,rz:0,source:'JSON'}));}
+  if(j.stlRotation){
+    const r=j.stlRotation;
+    const set=(id,v)=>{const el=$(id);if(el)el.value=v;};
+    set('rRx',r.rx||0); set('rRy',r.ry||0); set('rRz',r.rz||0);
+  }
   if(j.tcp){state.tcp.auftragen=cleanTcpOrientation({...(j.tcp.auftragen||j.tcp),toolLength:j.tcp.auftragen?.toolLength??0,status:'JSON'});state.tcp.abtragen=cleanTcpOrientation({...(j.tcp.abtragen||j.tcp.auftragen||j.tcp),toolLength:j.tcp.abtragen?.toolLength??0,status:'JSON'});setEffOffsetFromTcp(state.tcp.auftragen);}
   const toolName=j.sceneModels?.tool?.name||j.tcp?.auftragen?.toolStl||j.tcp?.auftragen?.stlName;
   if(toolName)state.toolName=String(toolName).endsWith('.stl')?toolName:toolName+'.stl';
@@ -908,6 +923,9 @@ function applyJsonToState(j) {
 }
 
 function buildJson() {
+  const stlRx = parseFloat($('rRx')?.value||0)||0;
+  const stlRy = parseFloat($('rRy')?.value||0)||0;
+  const stlRz = parseFloat($('rRz')?.value||0)||0;
   const axNames = ['A1','A2','A3','A4','A5','A6'];
   const stlFiles = Object.fromEntries(axNames.map((ax, i) => {
     const src = state.axisStlMap[ax] || state.stls.find(f => partKey(f.name) === ax)?.name || '';
@@ -921,6 +939,7 @@ function buildJson() {
   const tcpA = eo.rz??num(tcp.rz)??0, tcpB = eo.ry??num(tcp.ry)??0, tcpC = eo.rx??num(tcp.rx)??0;
   return {
     name: state.robotName || 'Robot',
+    stlRotation: {rx:stlRx, ry:stlRy, rz:stlRz},
     joints: state.joints.map((j,i) => ({
       name: j.name,
       axis: fixedAxisType(i),
@@ -1455,6 +1474,12 @@ $('toggleParam').onclick = () => {
   btn.textContent = collapsed ? '▲' : '▼';
 };
 $('resetView').onclick    = () => setView('iso');
+$('applyStlRotBtn').onclick = () => {
+  // Geometry neu laden mit aktuellen Rotationswerten
+  for (const m of meshes.values()) { m.parent?.remove(m); m.geometry?.dispose?.(); }
+  meshes.clear();
+  loadStls().then(() => { renderRows(); });
+};
 $('toggleGrid').onclick   = () => grid.visible = !grid.visible;
 initAxisStlEvents();
 // Theme laden + Button
