@@ -740,6 +740,34 @@ async function loadJsonFile(file) {
   } catch (e) { alert('JSON konnte nicht gelesen werden: '+e.message); renderAll(); }
 }
 
+
+// ── TCP ↔ Endeffektor TCP-Offset Sync ──────────────────────────
+function setEffOffsetFromTcp(tcp) {
+  // tcp.a=Rz, tcp.b=Ry, tcp.c=Rx (RobSimul XYZABC convention)
+  // eff-o fields: x,y,z,rx(=c),ry(=b),rz(=a)
+  state.effOffset = {
+    x:  tcp.x  ?? 0,
+    y:  tcp.y  ?? 0,
+    z:  tcp.z  ?? 0,
+    rx: tcp.c  ?? tcp.rx ?? 0,
+    ry: tcp.b  ?? tcp.ry ?? 0,
+    rz: tcp.a  ?? tcp.rz ?? 0
+  };
+  const map = {'eff-ox':'x','eff-oy':'y','eff-oz':'z','eff-orx':'rx','eff-ory':'ry','eff-orz':'rz'};
+  Object.entries(map).forEach(([id,k]) => { const el=$(id); if(el) el.value = state.effOffset[k]||0; });
+}
+
+function syncTcpFromEffOffset() {
+  const eo = state.effOffset || {};
+  // Keep existing tcp state, only update position values
+  state.tcp.auftragen = { ...state.tcp.auftragen,
+    x: eo.x||0, y: eo.y||0, z: eo.z||0,
+    rx: eo.rx||0, ry: eo.ry||0, rz: eo.rz||0,
+    a: eo.rz||0, b: eo.ry||0, c: eo.rx||0
+  };
+  state.tcp.abtragen = { ...state.tcp.auftragen };
+}
+
 async function loadDemoKr8() {
   const BASE  = '../stl/';
   const FILES = ['podest.stl','a1.stl','a2.stl','a3.stl','a4.stl','a5.stl','a6.stl','tool1_tcp.stl'];
@@ -778,6 +806,7 @@ async function loadDemoKr8() {
     // KR8 TCP (tool1_tcp): x=364.5mm, z=46.5mm, ry=90°
     state.tcp.auftragen = { x:364.5, y:0, z:46.5, rx:0, ry:90, rz:0, toolLength:0, toolStl:'tool1_tcp', status:'KR8 Demo' };
     state.tcp.abtragen  = { ...state.tcp.auftragen };
+    setEffOffsetFromTcp(state.tcp.auftragen);
     await loadStls(); enableSave(); renderAll(); setView('iso');
   } catch(e) {
     alert('Demo-Load fehlgeschlagen: ' + e.message);
@@ -872,7 +901,7 @@ function applyJsonToState(j) {
   if(Array.isArray(j.stlRefAngles)&&j.stlRefAngles.length===6){state.referencePose=j.stlRefAngles.map(v=>Number(v)||0);if($('refPose'))$('refPose').value=state.referencePose.join(',');}
   if(Array.isArray(j.jointAngles)&&j.jointAngles.length===6)state.jointAngles=j.jointAngles.map(v=>Number(v)||0);
   if(Array.isArray(j.joints)){state.joints=j.joints.map((v,i)=>({name:v.name||('A'+(i+1)),axis:fixedAxisType(i),offset:v.offset||{x:null,y:null,z:null},min:num(v.min),max:num(v.max),rotationSign:num(v.rotationSign??v.rotationDirection??v.dir)??1,status:v.status||'JSON'}));state.axisPoints=state.joints.map((v,i)=>({name:v.name||('A'+(i+1)),x:num(v.offset?.x),y:num(v.offset?.y),z:num(v.offset?.z),rx:0,ry:0,rz:0,source:'JSON'}));}
-  if(j.tcp){state.tcp.auftragen=cleanTcpOrientation({...(j.tcp.auftragen||j.tcp),toolLength:j.tcp.auftragen?.toolLength??0,status:'JSON'});state.tcp.abtragen=cleanTcpOrientation({...(j.tcp.abtragen||j.tcp.auftragen||j.tcp),toolLength:j.tcp.abtragen?.toolLength??0,status:'JSON'});}
+  if(j.tcp){state.tcp.auftragen=cleanTcpOrientation({...(j.tcp.auftragen||j.tcp),toolLength:j.tcp.auftragen?.toolLength??0,status:'JSON'});state.tcp.abtragen=cleanTcpOrientation({...(j.tcp.abtragen||j.tcp.auftragen||j.tcp),toolLength:j.tcp.abtragen?.toolLength??0,status:'JSON'});setEffOffsetFromTcp(state.tcp.auftragen);}
   const toolName=j.sceneModels?.tool?.name||j.tcp?.auftragen?.toolStl||j.tcp?.auftragen?.stlName;
   if(toolName)state.toolName=String(toolName).endsWith('.stl')?toolName:toolName+'.stl';
   normalizeKnownOffsets();
@@ -887,8 +916,9 @@ function buildJson() {
   }));
   const tcp = state.tcp.auftragen;
   const toolName = norm(state.toolName || tcp.toolStl || '') || 'tool1_tcp';
-  const tcpX = num(tcp.x), tcpY = num(tcp.y), tcpZ = num(tcp.z);
-  const tcpA = num(tcp.rz), tcpB = num(tcp.ry), tcpC = num(tcp.rx);
+  const eo = state.effOffset || {};
+  const tcpX = eo.x??num(tcp.x)??0, tcpY = eo.y??num(tcp.y)??0, tcpZ = eo.z??num(tcp.z)??0;
+  const tcpA = eo.rz??num(tcp.rz)??0, tcpB = eo.ry??num(tcp.ry)??0, tcpC = eo.rx??num(tcp.rx)??0;
   return {
     name: state.robotName || 'Robot',
     joints: state.joints.map((j,i) => ({
@@ -1195,7 +1225,7 @@ function renderEffRow() {
       <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${norm(state.effStl.name)}</span>
       <button id="effClearBtn" style="background:rgba(204,51,51,.2);border:1px solid rgba(204,51,51,.4);color:#f87171;border-radius:3px;padding:2px 6px;font-size:12px;cursor:pointer">✕</button>
     </div>`;
-    $('effClearBtn').onclick = () => { state.effStl = null; state.effOffset = {x:0,y:0,z:0,rx:0,ry:0,rz:0}; ['eff-ox','eff-oy','eff-oz','eff-orx','eff-ory','eff-orz'].forEach(id=>{const el=$(id);if(el)el.value='0';}); renderEffRow(); updateEffTcpMarker(); };
+    $('effClearBtn').onclick = () => { state.effStl = null; state.effOffset = {x:0,y:0,z:0,rx:0,ry:0,rz:0}; ['eff-ox','eff-oy','eff-oz','eff-orx','eff-ory','eff-orz'].forEach(id=>{const el=$(id);if(el)el.value='0';}); syncTcpFromEffOffset(); renderEffRow(); updateEffTcpMarker(); };
     if (badge) badge.textContent = norm(state.effStl.name);
   } else {
     el.innerHTML = '';
@@ -1386,6 +1416,7 @@ $('demoBtn').onclick    = () => loadDemoKr8().catch(e => alert(e.message));
     const key = id === 'eff-ox' ? 'x' : id === 'eff-oy' ? 'y' : id === 'eff-oz' ? 'z' :
                 id === 'eff-orx' ? 'rx' : id === 'eff-ory' ? 'ry' : 'rz';
     state.effOffset[key] = parseFloat(el.value) || 0;
+    syncTcpFromEffOffset();
     updateEffTcpMarker();
   });
 });
