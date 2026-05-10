@@ -897,7 +897,7 @@ function applyJsonToState(j) {
   state.robotName=j.name||state.robotName;
   if(Array.isArray(j.stlRefAngles)&&j.stlRefAngles.length===6){state.referencePose=j.stlRefAngles.map(v=>Number(v)||0);if($('refPose'))$('refPose').value=state.referencePose.join(',');}
   if(Array.isArray(j.jointAngles)&&j.jointAngles.length===6)state.jointAngles=j.jointAngles.map(v=>Number(v)||0);
-  if(Array.isArray(j.joints)){state.joints=j.joints.map((v,i)=>({name:v.name||('A'+(i+1)),axis:fixedAxisType(i),offset:{x:num(v.offset?.x)??null,y:num(v.offset?.y)??null,z:num(v.offset?.z)??null},min:num(v.min),max:num(v.max),rotationSign:num(v.rotationSign??v.rotationDirection??v.dir)??1,status:v.status||'JSON'}));state.axisPoints=state.joints.map((v,i)=>({name:v.name||('A'+(i+1)),x:num(v.offset?.x),y:num(v.offset?.y),z:num(v.offset?.z),rx:0,ry:0,rz:0,source:'JSON'}));}
+  if(Array.isArray(j.joints)){state.joints=j.joints.map((v,i)=>({name:v.name||('A'+(i+1)),axis:fixedAxisType(i),offset:{x:i===1?num(v.offset?.z)??null:num(v.offset?.x)??null,y:num(v.offset?.y)??null,z:i===1?num(v.offset?.x)??null:num(v.offset?.z)??null},min:num(v.min),max:num(v.max),rotationSign:num(v.rotationSign??v.rotationDirection??v.dir)??1,status:v.status||'JSON'}));state.axisPoints=state.joints.map((v,i)=>({name:v.name||('A'+(i+1)),x:i===1?num(v.offset?.z):num(v.offset?.x),y:num(v.offset?.y),z:i===1?num(v.offset?.x):num(v.offset?.z),rx:0,ry:0,rz:0,source:'JSON'}));}
   if(j.stlRotation){
     const r=j.stlRotation;
     const set=(id,v)=>{const el=$(id);if(el)el.value=v;};
@@ -930,7 +930,7 @@ function buildJson() {
     joints: state.joints.map((j,i) => ({
       name: j.name,
       axis: fixedAxisType(i),
-      offset: { x: num(j.offset?.x)??0, y: num(j.offset?.y)??0, z: num(j.offset?.z)??0 },
+      offset: { x: i===1?num(j.offset?.z)??0:num(j.offset?.x)??0, y: num(j.offset?.y)??0, z: i===1?num(j.offset?.x)??0:num(j.offset?.z)??0 },
       min: num(j.min) ?? -180,
       max: num(j.max) ??  180
     })),
