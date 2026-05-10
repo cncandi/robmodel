@@ -902,6 +902,12 @@ function applyJsonToState(j) {
   if(Array.isArray(j.stlRefAngles)&&j.stlRefAngles.length===6){state.referencePose=j.stlRefAngles.map(v=>Number(v)||0);if($('refPose'))$('refPose').value=state.referencePose.join(',');}
   if(Array.isArray(j.jointAngles)&&j.jointAngles.length===6)state.jointAngles=j.jointAngles.map(v=>Number(v)||0);
   if(Array.isArray(j.joints)){state.joints=j.joints.map((v,i)=>({name:v.name||('A'+(i+1)),axis:fixedAxisType(i),offset:v.offset||{x:null,y:null,z:null},min:num(v.min),max:num(v.max),rotationSign:num(v.rotationSign??v.rotationDirection??v.dir)??1,status:v.status||'JSON'}));state.axisPoints=state.joints.map((v,i)=>({name:v.name||('A'+(i+1)),x:num(v.offset?.x),y:num(v.offset?.y),z:num(v.offset?.z),rx:0,ry:0,rz:0,source:'JSON'}));}
+  if(j.stlRotation){
+    const r=j.stlRotation;
+    state.robotTr={...state.robotTr, rx:r.rx||0, ry:r.ry||0, rz:r.rz||0};
+    const set=(id,v)=>{const el=$(id);if(el)el.value=v;};
+    set('rRx',r.rx||0); set('rRy',r.ry||0); set('rRz',r.rz||0);
+  }
   if(j.tcp){state.tcp.auftragen=cleanTcpOrientation({...(j.tcp.auftragen||j.tcp),toolLength:j.tcp.auftragen?.toolLength??0,status:'JSON'});state.tcp.abtragen=cleanTcpOrientation({...(j.tcp.abtragen||j.tcp.auftragen||j.tcp),toolLength:j.tcp.abtragen?.toolLength??0,status:'JSON'});setEffOffsetFromTcp(state.tcp.auftragen);}
   const toolName=j.sceneModels?.tool?.name||j.tcp?.auftragen?.toolStl||j.tcp?.auftragen?.stlName;
   if(toolName)state.toolName=String(toolName).endsWith('.stl')?toolName:toolName+'.stl';
@@ -920,8 +926,11 @@ function buildJson() {
   const eo = state.effOffset || {};
   const tcpX = eo.x??num(tcp.x)??0, tcpY = eo.y??num(tcp.y)??0, tcpZ = eo.z??num(tcp.z)??0;
   const tcpA = eo.rz??num(tcp.rz)??0, tcpB = eo.ry??num(tcp.ry)??0, tcpC = eo.rx??num(tcp.rx)??0;
+  // STL-Orientierung speichern
+  const rTr = state.robotTr || {};
   return {
     name: state.robotName || 'Robot',
+    stlRotation: { rx: rTr.rx||0, ry: rTr.ry||0, rz: rTr.rz||0 },
     joints: state.joints.map((j,i) => ({
       name: j.name,
       axis: fixedAxisType(i),
