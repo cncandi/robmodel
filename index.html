@@ -22,15 +22,14 @@
       <div class="subtitle">Roboter-Kinematik Editor · v38</div>
     </div>
     <div class="toolbar">
-      <label class="filebtn primary" for="sourceZip" title="STL-ZIP oder Package-ZIP laden">📦 Load ZIP</label>
+      <button id="newBtn" title="Alles zurücksetzen" style="background:rgba(255,96,0,.35);border-color:rgba(255,96,0,.7);color:#ff8030;font-weight:bold">Neu</button>
+      <button id="robotLibBtn" title="Roboter aus Library laden">📚 Library</button>
+      <label class="filebtn" for="sourceZip" title="STL-ZIP oder Package-ZIP laden">📦 Load ZIP</label>
       <input id="sourceZip" type="file" accept=".zip,application/zip">
       <input id="jsonInput" type="file" accept=".json,application/json" style="display:none">
       <input id="checkZip" type="file" accept=".zip,application/zip" style="display:none">
       <button id="themeBtn" title="Theme wechseln">◑</button>
-      <button id="demoBtn" title="KR8 Beispiel laden (Ctrl+Click)">Example</button>
-      <button id="robotLibBtn" title="Roboter aus Library laden">📚 Library</button>
-      <button id="roblibBtn" title="In ROBLIB hochladen" disabled>→ roblib</button>
-      <button id="newBtn" title="Alles zurücksetzen">Neu</button>
+      <button id="roblibBtn" title="In ROBLIB speichern" disabled>save roblib</button>
       <button id="downloadJson" style="display:none" disabled>⬇ JSON</button>
       <button id="downloadZip" style="display:none" disabled>💾 Save ZIP</button>
     </div>
