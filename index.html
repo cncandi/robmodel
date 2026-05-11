@@ -69,13 +69,22 @@
     <!-- SEITENLEISTE -->
     <aside class="side">
 
-      <!-- Umgebung aus Library -->
+      <!-- Umgebung -->
       <section class="card">
         <div class="card-head">
-          <h2>🏭 Umgebung (Library)</h2>
+          <h2>🏭 Umgebung</h2>
+          <div style="display:flex;gap:4px;align-items:center">
+            <span class="badge info" id="umfBadge">0</span>
+            <button id="umfAddBtn" title="Umgebungselement hinzufügen" style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 6px;font-size:13px;cursor:pointer">+</button>
+          </div>
+        </div>
+        <div id="umfStlRows"></div>
+        <!-- Library -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;margin-top:4px">
+          <span style="font-size:10px;letter-spacing:.06em;color:#6a8fa8;font-family:monospace">LIBRARY</span>
           <button id="umfLibRefreshBtn" title="Aus Library laden" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:4px;padding:6px 16px;font-size:16px;cursor:pointer">↻</button>
         </div>
-        <div id="umfLibList" style="max-height:130px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace">Klicke ↻ zum Laden…</div>
+        <div id="umfLibList" style="max-height:100px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace">Klicke ↻ zum Laden…</div>
       </section>
 
       <!-- Endeffektoren -->
