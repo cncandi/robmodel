@@ -899,12 +899,12 @@ function applyJsonToState(j) {
     state.effektoren = j.endeffektoren.map(e => ({
       stlFile: null,
       offset: { x:e.px||0, y:e.py||0, z:e.pz||0, rx:e.rx||0, ry:e.ry||0, rz:e.rz||0 },
-      stlName: e.stl || null, name: e.name || null
+      stlName: e.stl || null, name: e.name || null, typ: e.typ || 'auftragend'
     }));
     state.activeEff = 0;
   } else if (j.endeffektor) {
     const e = j.endeffektor;
-    state.effektoren = [{ stlFile: null, offset: { x:e.px||0, y:e.py||0, z:e.pz||0, rx:e.rx||0, ry:e.ry||0, rz:e.rz||0 }, stlName: e.stl||null, name: e.name||null }];
+    state.effektoren = [{ stlFile: null, offset: { x:e.px||0, y:e.py||0, z:e.pz||0, rx:e.rx||0, ry:e.ry||0, rz:e.rz||0 }, stlName: e.stl||null, name: e.name||null, typ: e.typ||'auftragend' }];
     state.activeEff = 0;
   }
   if(j.stlRotation){
@@ -954,7 +954,7 @@ function buildJson() {
   if (state.effektoren.length > 0) {
     result.endeffektoren = state.effektoren.map((eff, i) => {
       const eo = eff.offset || {};
-      return { name: norm(eff.stlFile?.name || ('Effektor '+(i+1))), stl: 'endeffektor_'+(i+1)+'.stl', px: eo.x||0, py: eo.y||0, pz: eo.z||0, rx: eo.rx||0, ry: eo.ry||0, rz: eo.rz||0 };
+      return { name: norm(eff.stlFile?.name || ('Effektor '+(i+1))), stl: 'endeffektor_'+(i+1)+'.stl', typ: eff.typ||'auftragend', px: eo.x||0, py: eo.y||0, pz: eo.z||0, rx: eo.rx||0, ry: eo.ry||0, rz: eo.rz||0 };
     });
   }
   if (state.umfStls?.length) result.umfeld = state.umfStls.map((u,i) => ({ name: norm(u.name), stl: 'umfeld_'+(i+1)+'.stl', px:0, py:0, pz:0, rx:0, ry:0, rz:0 }));
@@ -1178,7 +1178,7 @@ $('effLibRefreshBtn').addEventListener('click', async () => {
       try {
         const stls = await libLoadZipAndExtract(item.zip_url, /endeffektor.*\.stl$/i);
         if (!stls.length) throw new Error('Keine endeffektor.stl in ZIP');
-        state.effektoren.push({ stlFile: { path: stls[0].name, name: item.name + '.stl', buf: stls[0].buf }, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0} });
+        state.effektoren.push({ stlFile: { path: stls[0].name, name: item.name + '.stl', buf: stls[0].buf }, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0}, typ: 'auftragend' });
         state.activeEff = state.effektoren.length - 1;
         renderEffRow();
         updateEffTcpMarker();
@@ -1238,6 +1238,9 @@ function renderEffRow() {
       ${nav('last','⏭',idx===effs.length-1)}
       <button data-enav="del" style="min-width:32px;height:32px;font-size:14px;cursor:pointer;background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:4px;padding:0 6px">✕</button>
     </div>
+    <div style="display:flex;gap:4px;margin-bottom:8px">
+      ${['auftragend','abtragend','färbend'].map(t=>`<button data-etyp="${t}" style="flex:1;padding:4px 0;font-size:11px;font-family:monospace;cursor:pointer;border-radius:4px;border:1px solid ${(eff.typ||'auftragend')===t?'rgba(37,99,235,.6)':'rgba(255,255,255,.1)'};background:${(eff.typ||'auftragend')===t?'rgba(37,99,235,.25)':'rgba(255,255,255,.04)'};color:${(eff.typ||'auftragend')===t?'#60a5fa':'#6a8fa8'}">${t}</button>`).join('')}
+    </div>
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
       <span style="flex:1;font-size:11px;color:#d8e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${lbl}</span>
       <button data-enav="stl" style="height:28px;padding:0 10px;font-size:11px;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#9ab;border-radius:4px;white-space:nowrap">STL laden</button>
@@ -1254,6 +1257,12 @@ function renderEffRow() {
     del:   () => { effs.splice(idx,1); state.activeEff=Math.min(idx,Math.max(0,effs.length-1)); },
     stl:   () => { $('effStlInput').dataset.effIdx=idx; $('effStlInput').click(); },
   };
+  el.querySelectorAll('[data-etyp]').forEach(b => {
+    b.onclick = () => {
+      state.effektoren[idx].typ = b.dataset.etyp;
+      renderEffRow();
+    };
+  });
   el.querySelectorAll('[data-enav]').forEach(b => {
     if (b.disabled) return;
     b.onclick = () => { nav_click[b.dataset.enav]?.(); syncTcpFromActiveEff?.(); renderEffRow(); updateEffTcpMarker(); };
@@ -1285,7 +1294,7 @@ function renderUmfRows() {
 
 // File inputs
 $('effAddBtn').addEventListener('click', () => {
-  state.effektoren.push({ stlFile: null, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0} });
+  state.effektoren.push({ stlFile: null, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0}, typ: 'auftragend' });
   state.activeEff = state.effektoren.length - 1;
   renderEffRow(); updateEffTcpMarker();
 });
@@ -1297,7 +1306,7 @@ $('effStlInput').addEventListener('change', async e => {
   if (effIdx >= 0 && effIdx < state.effektoren.length) {
     state.effektoren[effIdx].stlFile = { path: file.name, name: file.name, buf };
   } else {
-    state.effektoren.push({ stlFile: { path: file.name, name: file.name, buf }, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0} });
+    state.effektoren.push({ stlFile: { path: file.name, name: file.name, buf }, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0}, typ: 'auftragend' });
     state.activeEff = state.effektoren.length - 1;
   }
   renderEffRow();
