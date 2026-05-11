@@ -36,6 +36,7 @@
   </header>
 
   <!-- ─── MAIN ─────────────────────────────────────────────────── -->
+  <div class="left-col">
   <main class="main">
 
     <!-- 3D VIEWER -->
@@ -66,6 +67,38 @@
       <canvas id="viewer"></canvas>
     </section>
 
+  </main>
+
+  <!-- ─── FOOTER / PARAMETER-TABELLE ──────────────────────────── -->
+  <div style="background:var(--bg3);border-top:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;padding:2px 8px;flex-shrink:0">
+    <span style="font-size:11px;font-weight:700;color:var(--txt3);letter-spacing:.5px;text-transform:uppercase">Parameter · Drehpunkte (Lokal CS)</span>
+    <button id="toggleParam" title="Panel ein-/ausklappen" style="background:none;border:1px solid rgba(255,255,255,.15);color:var(--txt3);border-radius:3px;padding:0 8px;font-size:13px;cursor:pointer;line-height:1.6">▼</button>
+  </div>
+  <div style="background:var(--bg3);border-top:1px solid var(--bdr);display:flex;align-items:center;gap:6px;padding:3px 8px;flex-shrink:0;font-family:monospace;font-size:11px">
+    <span style="color:var(--txt3);white-space:nowrap">STL Rx</span>
+    <input id="rRx" type="number" step="1" value="0" style="width:52px;padding:1px 4px;font-size:11px;font-family:monospace;background:var(--bg2);border:1px solid var(--bdr);border-radius:3px;color:var(--txt)" title="Rotation X einbrennen — dann Neu laden">
+    <span style="color:var(--txt3)">Ry</span>
+    <input id="rRy" type="number" step="1" value="0" style="width:52px;padding:1px 4px;font-size:11px;font-family:monospace;background:var(--bg2);border:1px solid var(--bdr);border-radius:3px;color:var(--txt)">
+    <span style="color:var(--txt3)">Rz</span>
+    <input id="rRz" type="number" step="1" value="0" style="width:52px;padding:1px 4px;font-size:11px;font-family:monospace;background:var(--bg2);border:1px solid var(--bdr);border-radius:3px;color:var(--txt)">
+    <button id="applyStlRotBtn" style="padding:5px 16px;background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:4px;font-family:monospace;font-size:13px;cursor:pointer;white-space:nowrap">↺ Anwenden</button>
+  </div>
+  <footer class="bottom" id="paramFooter">
+    <section class="panel panel-combined">
+      <table>
+        <thead>
+          <tr>
+            <th>Achse</th><th>Winkel °</th><th>Dreht</th>
+            <th>X</th><th>Y</th><th>Z</th>
+            <th>Min</th><th>Max</th><th>±</th><th>🎨</th><th>STL</th><th>Sim</th>
+          </tr>
+        </thead>
+        <tbody id="jointRows"></tbody>
+      </table>
+    </section>
+  </footer>
+
+  </div><!-- .left-col -->
     <!-- SEITENLEISTE -->
     <aside class="side">
 
@@ -116,37 +149,6 @@
       <input id="tRy" type="hidden" value="0"><input id="tRz" type="hidden" value="0">
 
     </aside>
-  </main>
-
-  <!-- ─── FOOTER / PARAMETER-TABELLE ──────────────────────────── -->
-  <div style="background:var(--bg3);border-top:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;padding:2px 8px;flex-shrink:0">
-    <span style="font-size:11px;font-weight:700;color:var(--txt3);letter-spacing:.5px;text-transform:uppercase">Parameter · Drehpunkte (Lokal CS)</span>
-    <button id="toggleParam" title="Panel ein-/ausklappen" style="background:none;border:1px solid rgba(255,255,255,.15);color:var(--txt3);border-radius:3px;padding:0 8px;font-size:13px;cursor:pointer;line-height:1.6">▼</button>
-  </div>
-  <div style="background:var(--bg3);border-top:1px solid var(--bdr);display:flex;align-items:center;gap:6px;padding:3px 8px;flex-shrink:0;font-family:monospace;font-size:11px">
-    <span style="color:var(--txt3);white-space:nowrap">STL Rx</span>
-    <input id="rRx" type="number" step="1" value="0" style="width:52px;padding:1px 4px;font-size:11px;font-family:monospace;background:var(--bg2);border:1px solid var(--bdr);border-radius:3px;color:var(--txt)" title="Rotation X einbrennen — dann Neu laden">
-    <span style="color:var(--txt3)">Ry</span>
-    <input id="rRy" type="number" step="1" value="0" style="width:52px;padding:1px 4px;font-size:11px;font-family:monospace;background:var(--bg2);border:1px solid var(--bdr);border-radius:3px;color:var(--txt)">
-    <span style="color:var(--txt3)">Rz</span>
-    <input id="rRz" type="number" step="1" value="0" style="width:52px;padding:1px 4px;font-size:11px;font-family:monospace;background:var(--bg2);border:1px solid var(--bdr);border-radius:3px;color:var(--txt)">
-    <button id="applyStlRotBtn" style="padding:5px 16px;background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:4px;font-family:monospace;font-size:13px;cursor:pointer;white-space:nowrap">↺ Anwenden</button>
-  </div>
-  <footer class="bottom" id="paramFooter">
-    <section class="panel panel-combined">
-      <table>
-        <thead>
-          <tr>
-            <th>Achse</th><th>Winkel °</th><th>Dreht</th>
-            <th>X</th><th>Y</th><th>Z</th>
-            <th>Min</th><th>Max</th><th>±</th><th>🎨</th><th>STL</th><th>Sim</th>
-          </tr>
-        </thead>
-        <tbody id="jointRows"></tbody>
-      </table>
-    </section>
-  </footer>
-
 </div><!-- .wrap -->
 
 <script type="module" src="app.js"></script>
