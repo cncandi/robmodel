@@ -60,7 +60,9 @@ const state = {
   tcp: {
     auftragen: { x: null, y: null, z: null, rz: null, ry: null, rx: null, toolLength: 0, toolStl: '', status: 'manuell' },
     abtragen:  { x: null, y: null, z: null, rz: null, ry: null, rx: null, toolLength: 0, toolStl: '', status: 'manuell' },
-  }
+  },
+  effektoren: [],
+  activeEff: 0,
 };
 
 // ── Three.js Variablen ────────────────────────────────────────────
@@ -1214,17 +1216,48 @@ function renderEffRow() {
   const el = $('effStlRows');
   const badge = $('effBadge');
   if (!el) return;
-  if (state.effStl) {
-    el.innerHTML = `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px;color:#d8e8f0">
-      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${norm(state.effStl.name)}</span>
-      <button id="effClearBtn" style="background:rgba(204,51,51,.2);border:1px solid rgba(204,51,51,.4);color:#f87171;border-radius:3px;padding:2px 6px;font-size:12px;cursor:pointer">✕</button>
-    </div>`;
-    // effClearBtn handled dynamically in renderEffRow()
-    if (badge) badge.textContent = norm(state.effStl.name);
-  } else {
-    el.innerHTML = '';
-    if (badge) badge.textContent = '—';
+  const effs = state.effektoren || [];
+  if (!effs.length) {
+    el.innerHTML = '<div style="font-size:11px;color:#4a6a8a;padding:2px 0 4px">Keine Endeffektoren</div>';
+    if (badge) badge.textContent = '0';
+    return;
   }
+  const fs = 'background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:2px;padding:1px 4px;font-family:inherit;font-size:11px;color:#d8e8f0;width:100%;text-align:right;outline:none';
+  el.innerHTML = effs.map((eff, i) => {
+    const active = i === (state.activeEff||0);
+    const lbl = eff.stlFile ? norm(eff.stlFile.name) : (eff.stlName || '—');
+    const o = eff.offset || {};
+    return `<div style="border:1px solid ${active?'rgba(37,99,235,.5)':'rgba(255,255,255,.08)'};border-radius:4px;padding:6px 8px;margin-bottom:5px">
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:5px">
+        <span style="font-size:10px;color:#6a8fa8;font-family:monospace;flex-shrink:0">EFF ${i+1}</span>
+        <span style="flex:1;font-size:11px;color:#d8e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lbl}</span>
+        <button data-es="${i}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#9ab;border-radius:3px;padding:1px 5px;font-size:10px;cursor:pointer">STL</button>
+        ${!active?`<button data-ea="${i}" style="background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.3);color:#60a5fa;border-radius:3px;padding:1px 5px;font-size:10px;cursor:pointer">●</button>`:'<span style="font-size:10px;color:#60a5fa;padding:0 4px">●</span>'}
+        <button data-ed="${i}" style="background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:3px;padding:1px 5px;font-size:10px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px">
+        ${['x','y','z','rx','ry','rz'].map(k=>`<div><label style="font-size:9px;color:#6a8fa8;display:block">${k.toUpperCase()}</label><input data-eo="${i}" data-k="${k}" type="number" step="0.1" value="${o[k]||0}" style="${fs}"></div>`).join('')}
+      </div></div>`;
+  }).join('');
+  if (badge) badge.textContent = effs.length;
+  el.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{
+    state.effektoren.splice(+b.dataset.ed,1);
+    state.activeEff=Math.min(state.activeEff||0,Math.max(0,state.effektoren.length-1));
+    syncTcpFromActiveEff?.();renderEffRow();updateEffTcpMarker();
+  });
+  el.querySelectorAll('[data-ea]').forEach(b=>b.onclick=()=>{
+    state.activeEff=+b.dataset.ea;syncTcpFromActiveEff?.();renderEffRow();updateEffTcpMarker();
+  });
+  el.querySelectorAll('[data-es]').forEach(b=>b.onclick=()=>{
+    $('effStlInput').dataset.effIdx=b.dataset.es;$('effStlInput').click();
+  });
+  el.querySelectorAll('[data-eo]').forEach(inp=>inp.addEventListener('input',()=>{
+    const i=+inp.dataset.eo,k=inp.dataset.k;
+    if(!state.effektoren[i])return;
+    if(!state.effektoren[i].offset)state.effektoren[i].offset={};
+    state.effektoren[i].offset[k]=parseFloat(inp.value)||0;
+    if(i===(state.activeEff||0)){syncTcpFromActiveEff?.();updateEffTcpMarker();}
+  }));
 }
 
 function renderUmfRows() {
