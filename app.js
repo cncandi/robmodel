@@ -63,6 +63,8 @@ const state = {
   },
   effektoren: [],
   activeEff: 0,
+  umfElemente: [],
+  activeUmf: 0,
 };
 
 // ── Three.js Variablen ────────────────────────────────────────────
@@ -701,7 +703,9 @@ function resetData() {
   state.tcp.abtragen={...state.tcp.auftragen};
   state.effektoren = [];
   state.activeEff  = 0;
-  state.umfStls  = [];
+  state.umfStls   = [];
+  state.umfElemente = [];
+  state.activeUmf   = 0;
   updateEffTcpMarker();
   renderEffRow?.(); renderUmfRows?.();
 }
@@ -907,6 +911,14 @@ function applyJsonToState(j) {
     state.effektoren = [{ stlFile: null, offset: { x:e.px||0, y:e.py||0, z:e.pz||0, rx:e.rx||0, ry:e.ry||0, rz:e.rz||0 }, stlName: e.stl||null, name: e.name||null, typ: e.typ||'auftragend' }];
     state.activeEff = 0;
   }
+  if (Array.isArray(j.umfeld) && j.umfeld.length) {
+    state.umfElemente = j.umfeld.map(e => ({
+      stlFile: null,
+      offset: { x:e.px||0, y:e.py||0, z:e.pz||0, rx:e.rx||0, ry:e.ry||0, rz:e.rz||0 },
+      stlName: e.stl||null, name: e.name||null
+    }));
+    state.activeUmf = 0;
+  }
   if(j.stlRotation){
     const r=j.stlRotation;
     const set=(id,v)=>{const el=$(id);if(el)el.value=v;};
@@ -957,7 +969,10 @@ function buildJson() {
       return { name: norm(eff.stlFile?.name || ('Effektor '+(i+1))), stl: 'endeffektor_'+(i+1)+'.stl', typ: eff.typ||'auftragend', px: eo.x||0, py: eo.y||0, pz: eo.z||0, rx: eo.rx||0, ry: eo.ry||0, rz: eo.rz||0 };
     });
   }
-  if (state.umfStls?.length) result.umfeld = state.umfStls.map((u,i) => ({ name: norm(u.name), stl: 'umfeld_'+(i+1)+'.stl', px:0, py:0, pz:0, rx:0, ry:0, rz:0 }));
+  const allUmf = [...(state.umfElemente||[]), ...(state.umfStls||[]).map(u=>({stlFile:u,offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}}))];
+  if (allUmf.length) result.umfeld = allUmf.map((u,i) => {
+    const o = u.offset||{}; return { name: norm(u.stlFile?.name||u.name||('Umfeld '+(i+1))), stl: 'umfeld_'+(i+1)+'.stl', px:o.x||0, py:o.y||0, pz:o.z||0, rx:o.rx||0, ry:o.ry||0, rz:o.rz||0 };
+  });
   return result;
 }
 
@@ -1199,8 +1214,10 @@ $('umfLibRefreshBtn').addEventListener('click', async () => {
       try {
         const stls = await libLoadZipAndExtract(item.zip_url, /umfeld.*\.stl$/i);
         if (!stls.length) throw new Error('Keine umfeld*.stl in ZIP');
-        if (!state.umfStls) state.umfStls = [];
-        stls.forEach(s => state.umfStls.push({ path: s.name, name: item.name + ' · ' + s.name, buf: s.buf }));
+        if (!state.umfElemente) state.umfElemente = [];
+  if (!state.umfStls) state.umfStls = [];
+        stls.forEach(s => state.umfElemente.push({ stlFile:{ path:s.name, name:item.name+' · '+s.name, buf:s.buf }, offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0} }));
+        state.activeUmf = state.umfElemente.length-1;
         renderUmfRows();
         el.textContent = '✓ ' + item.name + ' (' + stls.length + ' STL) geladen';
       } catch(e) { el.textContent = 'Fehler: ' + e.message; }
@@ -1280,16 +1297,52 @@ function renderUmfRows() {
   const el = $('umfStlRows');
   const badge = $('umfBadge');
   if (!el) return;
-  el.innerHTML = (state.umfStls || []).map((u, i) =>
-    `<div style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px;color:#d8e8f0">
-      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${norm(u.name)}</span>
-      <button data-umf-idx="${i}" style="background:rgba(204,51,51,.2);border:1px solid rgba(204,51,51,.4);color:#f87171;border-radius:3px;padding:1px 5px;font-size:11px;cursor:pointer">✕</button>
-    </div>`
-  ).join('');
-  el.querySelectorAll('[data-umf-idx]').forEach(btn => {
-    btn.onclick = () => { state.umfStls.splice(parseInt(btn.dataset.umfIdx), 1); renderUmfRows(); };
+  const elms = state.umfElemente || [];
+  if (badge) badge.textContent = elms.length || '0';
+  if (!elms.length) {
+    el.innerHTML = '<div style="font-size:11px;color:#4a6a8a;padding:4px 0">Keine Umgebungselemente</div>';
+    return;
+  }
+  const idx = Math.min(state.activeUmf||0, elms.length-1);
+  const elm = elms[idx];
+  const o = elm.offset || {};
+  const lbl = elm.stlFile ? norm(elm.stlFile.name) : (elm.stlName || '—');
+  const fs = 'background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:2px 5px;font-family:inherit;font-size:12px;color:#d8e8f0;width:100%;text-align:right;outline:none';
+  const nav = (id,label,dis) => `<button data-unav="${id}" ${dis?'disabled':''} style="min-width:34px;height:32px;font-size:15px;cursor:${dis?'default':'pointer'};background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,${dis?'.05':'.15'});color:${dis?'#3a5a7a':'#9ab'};border-radius:4px;padding:0 6px">${label}</button>`;
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:5px;margin-bottom:8px">
+      ${nav('first','⏮',idx===0)}
+      ${nav('prev','◀',idx===0)}
+      <span style="flex:1;text-align:center;font-family:monospace;font-size:12px;color:#d8e8f0">${idx+1} / ${elms.length}</span>
+      ${nav('next','▶',idx===elms.length-1)}
+      ${nav('last','⏭',idx===elms.length-1)}
+      <button data-unav="del" style="min-width:32px;height:32px;font-size:14px;cursor:pointer;background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:4px;padding:0 6px">✕</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+      <span style="flex:1;font-size:11px;color:#d8e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${lbl}</span>
+      <button data-unav="stl" style="height:28px;padding:0 10px;font-size:11px;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#9ab;border-radius:4px;white-space:nowrap">STL laden</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px">
+      ${['x','y','z','rx','ry','rz'].map(k=>`<div><label style="font-size:10px;color:#6a8fa8;display:block;margin-bottom:2px">${k.toUpperCase()}</label><input data-uo="${idx}" data-k="${k}" type="number" step="0.1" value="${o[k]||0}" style="${fs}"></div>`).join('')}
+    </div>`;
+  const nc = {
+    first:()=>{state.activeUmf=0;},
+    prev: ()=>{state.activeUmf=Math.max(0,idx-1);},
+    next: ()=>{state.activeUmf=Math.min(elms.length-1,idx+1);},
+    last: ()=>{state.activeUmf=elms.length-1;},
+    del:  ()=>{elms.splice(idx,1);state.activeUmf=Math.min(idx,Math.max(0,elms.length-1));},
+    stl:  ()=>{$('umfStlInput').dataset.umfIdx=idx;$('umfStlInput').click();},
+  };
+  el.querySelectorAll('[data-unav]').forEach(b=>{
+    if(b.disabled)return;
+    b.onclick=()=>{nc[b.dataset.unav]?.();renderUmfRows();};
   });
-  if (badge) badge.textContent = (state.umfStls || []).length;
+  el.querySelectorAll('[data-uo]').forEach(inp=>inp.addEventListener('input',()=>{
+    const i=+inp.dataset.uo,k=inp.dataset.k;
+    if(!state.umfElemente[i])return;
+    if(!state.umfElemente[i].offset)state.umfElemente[i].offset={};
+    state.umfElemente[i].offset[k]=parseFloat(inp.value)||0;
+  }));
 }
 
 // File inputs
@@ -1313,12 +1366,26 @@ $('effStlInput').addEventListener('change', async e => {
   e.target.value = '';
 });
 
+$('umfAddBtn')?.addEventListener('click', () => {
+  if (!state.umfElemente) state.umfElemente = [];
+  state.umfElemente.push({ stlFile: null, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0} });
+  state.activeUmf = state.umfElemente.length - 1;
+  renderUmfRows();
+});
+
 $('umfStlInput').addEventListener('change', async e => {
   const files = Array.from(e.target.files);
+  if (!state.umfElemente) state.umfElemente = [];
   if (!state.umfStls) state.umfStls = [];
   for (const file of files) {
     const buf = new Uint8Array(await file.arrayBuffer());
-    state.umfStls.push({ path: file.name, name: file.name, buf });
+    const umfIdx = parseInt($('umfStlInput').dataset.umfIdx ?? '-1');
+    if (umfIdx >= 0 && umfIdx < state.umfElemente.length) {
+      state.umfElemente[umfIdx].stlFile = { path: file.name, name: file.name, buf };
+    } else {
+      state.umfElemente.push({ stlFile:{path:file.name,name:file.name,buf}, offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0} });
+      state.activeUmf = state.umfElemente.length-1;
+    }
   }
   renderUmfRows();
   e.target.value = '';
@@ -1419,7 +1486,8 @@ async function uploadToRoblib() {
     zip.file(base + '.json', JSON.stringify(buildJson(), null, 2));
     for (const [, mesh] of meshes) zip.file(mesh.name, exportBinaryStl(mesh));
     state.effektoren.forEach((eff, i) => { if (eff.stlFile?.buf) zip.file('endeffektor_'+(i+1)+'.stl', eff.stlFile.buf); });
-    if (state.umfStls?.length) state.umfStls.forEach((u, i) => zip.file('umfeld_' + (i+1) + '.stl', u.buf));
+    const allUmfZip = [...(state.umfElemente||[]), ...(state.umfStls||[]).map(u=>({stlFile:u}))];
+    allUmfZip.forEach((u, i) => { const buf = u.stlFile?.buf; if(buf) zip.file('umfeld_'+(i+1)+'.stl', buf); });
     const zipBlob = await zip.generateAsync({ type: 'blob' }, m => setProgress('Komprimiere…', 5 + m.percent * 0.4));
     if (prevMode !== 'world') attachToolToA6();
     setProgress('Lade hoch…', 45);
