@@ -28,7 +28,8 @@ header.top button.orange{background:rgba(240,85,0,.2);color:#ff8a00;border-color
 header.top .sep{width:1px;height:16px;background:var(--bdr);margin:0 3px}
 
 /* ── LAYOUT ──────────────────────────────────────── */
-.wrap{display:flex;flex-direction:column;flex:1;overflow:hidden;height:100vh}
+.wrap{display:flex;flex-direction:row;flex:1;overflow:hidden;min-height:0}
+.left-col{display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0}
 main.main{display:flex;flex:1;overflow:hidden;min-height:0}
 
 /* ── 3D VIEWER ───────────────────────────────────── */
