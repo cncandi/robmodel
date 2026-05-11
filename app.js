@@ -1217,46 +1217,53 @@ function renderEffRow() {
   const badge = $('effBadge');
   if (!el) return;
   const effs = state.effektoren || [];
+  if (badge) badge.textContent = effs.length || '0';
   if (!effs.length) {
-    el.innerHTML = '<div style="font-size:11px;color:#4a6a8a;padding:2px 0 4px">Keine Endeffektoren</div>';
-    if (badge) badge.textContent = '0';
+    el.innerHTML = '<div style="font-size:11px;color:#4a6a8a;padding:4px 0">Keine Endeffektoren</div>';
     return;
   }
-  const fs = 'background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:2px;padding:1px 4px;font-family:inherit;font-size:11px;color:#d8e8f0;width:100%;text-align:right;outline:none';
-  el.innerHTML = effs.map((eff, i) => {
-    const active = i === (state.activeEff||0);
-    const lbl = eff.stlFile ? norm(eff.stlFile.name) : (eff.stlName || '—');
-    const o = eff.offset || {};
-    return `<div style="border:1px solid ${active?'rgba(37,99,235,.5)':'rgba(255,255,255,.08)'};border-radius:4px;padding:6px 8px;margin-bottom:5px">
-      <div style="display:flex;align-items:center;gap:4px;margin-bottom:5px">
-        <span style="font-size:10px;color:#6a8fa8;font-family:monospace;flex-shrink:0">EFF ${i+1}</span>
-        <span style="flex:1;font-size:11px;color:#d8e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lbl}</span>
-        <button data-es="${i}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#9ab;border-radius:3px;padding:1px 5px;font-size:10px;cursor:pointer">STL</button>
-        ${!active?`<button data-ea="${i}" style="background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.3);color:#60a5fa;border-radius:3px;padding:1px 5px;font-size:10px;cursor:pointer">●</button>`:'<span style="font-size:10px;color:#60a5fa;padding:0 4px">●</span>'}
-        <button data-ed="${i}" style="background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:3px;padding:1px 5px;font-size:10px;cursor:pointer">✕</button>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px">
-        ${['x','y','z','rx','ry','rz'].map(k=>`<div><label style="font-size:9px;color:#6a8fa8;display:block">${k.toUpperCase()}</label><input data-eo="${i}" data-k="${k}" type="number" step="0.1" value="${o[k]||0}" style="${fs}"></div>`).join('')}
-      </div></div>`;
-  }).join('');
-  if (badge) badge.textContent = effs.length;
-  el.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{
-    state.effektoren.splice(+b.dataset.ed,1);
-    state.activeEff=Math.min(state.activeEff||0,Math.max(0,state.effektoren.length-1));
-    syncTcpFromActiveEff?.();renderEffRow();updateEffTcpMarker();
+  const idx = Math.min(state.activeEff||0, effs.length-1);
+  const eff = effs[idx];
+  const o = eff.offset || {};
+  const lbl = eff.stlFile ? norm(eff.stlFile.name) : (eff.stlName || '—');
+  const fs = 'background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:2px 5px;font-family:inherit;font-size:12px;color:#d8e8f0;width:100%;text-align:right;outline:none';
+  const nav = (id,label,disabled) => `<button data-enav="${id}" ${disabled?'disabled':''} style="min-width:34px;height:32px;font-size:15px;cursor:${disabled?'default':'pointer'};background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,${disabled?'.05':'.15'});color:${disabled?'#3a5a7a':'#9ab'};border-radius:4px;padding:0 6px">${label}</button>`;
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:5px;margin-bottom:8px">
+      ${nav('first','⏮',idx===0)}
+      ${nav('prev','◀',idx===0)}
+      <span style="flex:1;text-align:center;font-family:monospace;font-size:12px;color:#d8e8f0">${idx+1} / ${effs.length}</span>
+      ${nav('next','▶',idx===effs.length-1)}
+      ${nav('last','⏭',idx===effs.length-1)}
+      <button data-enav="del" style="min-width:32px;height:32px;font-size:14px;cursor:pointer;background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:4px;padding:0 6px">✕</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+      <span style="flex:1;font-size:11px;color:#d8e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${lbl}</span>
+      <button data-enav="stl" style="height:28px;padding:0 10px;font-size:11px;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#9ab;border-radius:4px;white-space:nowrap">STL laden</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px">
+      ${['x','y','z','rx','ry','rz'].map(k=>`<div><label style="font-size:10px;color:#6a8fa8;display:block;margin-bottom:2px">${k.toUpperCase()}</label><input data-eo="${idx}" data-k="${k}" type="number" step="0.1" value="${o[k]||0}" style="${fs}"></div>`).join('')}
+    </div>`;
+
+  const nav_click = {
+    first: () => { state.activeEff=0; },
+    prev:  () => { state.activeEff=Math.max(0,idx-1); },
+    next:  () => { state.activeEff=Math.min(effs.length-1,idx+1); },
+    last:  () => { state.activeEff=effs.length-1; },
+    del:   () => { effs.splice(idx,1); state.activeEff=Math.min(idx,Math.max(0,effs.length-1)); },
+    stl:   () => { $('effStlInput').dataset.effIdx=idx; $('effStlInput').click(); },
+  };
+  el.querySelectorAll('[data-enav]').forEach(b => {
+    if (b.disabled) return;
+    b.onclick = () => { nav_click[b.dataset.enav]?.(); syncTcpFromActiveEff?.(); renderEffRow(); updateEffTcpMarker(); };
   });
-  el.querySelectorAll('[data-ea]').forEach(b=>b.onclick=()=>{
-    state.activeEff=+b.dataset.ea;syncTcpFromActiveEff?.();renderEffRow();updateEffTcpMarker();
-  });
-  el.querySelectorAll('[data-es]').forEach(b=>b.onclick=()=>{
-    $('effStlInput').dataset.effIdx=b.dataset.es;$('effStlInput').click();
-  });
-  el.querySelectorAll('[data-eo]').forEach(inp=>inp.addEventListener('input',()=>{
-    const i=+inp.dataset.eo,k=inp.dataset.k;
-    if(!state.effektoren[i])return;
-    if(!state.effektoren[i].offset)state.effektoren[i].offset={};
+  el.querySelectorAll('[data-eo]').forEach(inp => inp.addEventListener('input', () => {
+    const i=+inp.dataset.eo, k=inp.dataset.k;
+    if (!state.effektoren[i]) return;
+    if (!state.effektoren[i].offset) state.effektoren[i].offset={};
     state.effektoren[i].offset[k]=parseFloat(inp.value)||0;
-    if(i===(state.activeEff||0)){syncTcpFromActiveEff?.();updateEffTcpMarker();}
+    if (i===(state.activeEff||0)) { syncTcpFromActiveEff?.(); updateEffTcpMarker(); }
   }));
 }
 
