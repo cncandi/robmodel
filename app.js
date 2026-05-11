@@ -1244,6 +1244,12 @@ function renderUmfRows() {
 }
 
 // File inputs
+$('effAddBtn').addEventListener('click', () => {
+  state.effektoren.push({ stlFile: null, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0} });
+  state.activeEff = state.effektoren.length - 1;
+  renderEffRow(); updateEffTcpMarker();
+});
+
 $('effStlInput').addEventListener('change', async e => {
   const file = e.target.files[0]; if (!file) return;
   const buf = new Uint8Array(await file.arrayBuffer());
