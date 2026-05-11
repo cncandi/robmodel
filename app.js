@@ -1532,7 +1532,7 @@ $('robotLibClose').onclick = () => { $('robotLibModal').style.display = 'none'; 
 $('rl-lib-refresh').addEventListener('click', () => { _libRobots = []; loadRobotLibList(); });
 $('rl-lib-search').addEventListener('input', e => renderRobotLibList(e.target.value));
 
-$('demoBtn').onclick    = () => loadDemoKr8().catch(e => alert(e.message));
+// demoBtn removed
 // Endeffektor TCP-Offset Inputs
 ['eff-ox','eff-oy','eff-oz','eff-orx','eff-ory','eff-orz'].forEach(id => {
   const el = $(id); if (!el) return;
