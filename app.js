@@ -165,11 +165,11 @@ function updateEffTcpMarker() {
     if (effTcpHelper.parent) effTcpHelper.parent.remove(effTcpHelper);
     effTcpHelper = null;
   }
-  const showMarker = toolMountMode === 'a6' || !!state.effStl;
+  const showMarker = toolMountMode === 'a6' || state.effektoren.length > 0;
   if (!showMarker || !scene) return;
   if (toolMountMode === 'a6' && (!axisPivotGroups || !axisPivotGroups[5])) return;
 
-  const eo = state.effOffset || {};
+  const eo = state.effektoren[state.activeEff]?.offset || {};
   const g = new THREE.Group();
 
   // Dicke Achsen als Zylinder (r=4, l=80)
@@ -697,11 +697,9 @@ function resetData() {
   state.joints=['A1','A2','A3','A4','A5','A6'].map((n,i)=>({name:n,axis:fixedAxisType(i),offset:defOffset(i),min:null,max:null,rotationSign:1,status:'KR8 Zielwert'}));
   state.tcp.auftragen={x:null,y:null,z:null,rz:null,ry:null,rx:null,toolLength:0,toolStl:'',status:'manuell'};
   state.tcp.abtragen={...state.tcp.auftragen};
-  state.effStl   = null;
+  state.effektoren = [];
+  state.activeEff  = 0;
   state.umfStls  = [];
-  state.effOffset = {x:0,y:0,z:0,rx:0,ry:0,rz:0};
-  // Reset offset inputs
-  ['eff-ox','eff-oy','eff-oz','eff-orx','eff-ory','eff-orz'].forEach(id=>{const el=$(id);if(el)el.value='0';});
   updateEffTcpMarker();
   renderEffRow?.(); renderUmfRows?.();
 }
@@ -745,21 +743,13 @@ async function loadJsonFile(file) {
 function setEffOffsetFromTcp(tcp) {
   // tcp.a=Rz, tcp.b=Ry, tcp.c=Rx (RobSimul XYZABC convention)
   // eff-o fields: x,y,z,rx(=c),ry(=b),rz(=a)
-  state.effOffset = {
-    x:  tcp.x  ?? 0,
-    y:  tcp.y  ?? 0,
-    z:  tcp.z  ?? 0,
-    rx: tcp.c  ?? tcp.rx ?? 0,
-    ry: tcp.b  ?? tcp.ry ?? 0,
-    rz: tcp.a  ?? tcp.rz ?? 0
-  };
-  const map = {'eff-ox':'x','eff-oy':'y','eff-oz':'z','eff-orx':'rx','eff-ory':'ry','eff-orz':'rz'};
-  Object.entries(map).forEach(([id,k]) => { const el=$(id); if(el) el.value = state.effOffset[k]||0; });
+  const offset = { x: tcp.x??0, y: tcp.y??0, z: tcp.z??0, rx: tcp.c??tcp.rx??0, ry: tcp.b??tcp.ry??0, rz: tcp.a??tcp.rz??0 };
+  if (state.effektoren[state.activeEff]) state.effektoren[state.activeEff].offset = offset;
+  else { state.effektoren.push({ stlFile: null, offset }); state.activeEff = 0; }
 }
 
-function syncTcpFromEffOffset() {
-  const eo = state.effOffset || {};
-  // Keep existing tcp state, only update position values
+function syncTcpFromActiveEff() {
+  const eo = state.effektoren[state.activeEff]?.offset || {};
   state.tcp.auftragen = { ...state.tcp.auftragen,
     x: eo.x||0, y: eo.y||0, z: eo.z||0,
     rx: eo.rx||0, ry: eo.ry||0, rz: eo.rz||0,
@@ -767,6 +757,7 @@ function syncTcpFromEffOffset() {
   };
   state.tcp.abtragen = { ...state.tcp.auftragen };
 }
+function syncTcpFromEffOffset() { syncTcpFromActiveEff(); }
 
 async function loadDemoKr8() {
   const BASE  = '../stl/';
@@ -901,6 +892,19 @@ function applyJsonToState(j) {
   if(Array.isArray(j.stlRefAngles)&&j.stlRefAngles.length===6){state.referencePose=j.stlRefAngles.map(v=>Number(v)||0);if($('refPose'))$('refPose').value=state.referencePose.join(',');}
   if(Array.isArray(j.jointAngles)&&j.jointAngles.length===6)state.jointAngles=j.jointAngles.map(v=>Number(v)||0);
   if(Array.isArray(j.joints)){state.joints=j.joints.map((v,i)=>({name:v.name||('A'+(i+1)),axis:fixedAxisType(i),offset:{x:num(v.offset?.x)??null,y:num(v.offset?.y)??null,z:num(v.offset?.z)??null},min:num(v.min),max:num(v.max),rotationSign:num(v.rotationSign??v.rotationDirection??v.dir)??1,status:v.status||'JSON'}));state.axisPoints=state.joints.map((v,i)=>({name:v.name||('A'+(i+1)),x:num(v.offset?.x),y:num(v.offset?.y),z:num(v.offset?.z),rx:0,ry:0,rz:0,source:'JSON'}));}
+  // Endeffektoren: neues Format (Array) + backward compat (Singular)
+  if (Array.isArray(j.endeffektoren) && j.endeffektoren.length > 0) {
+    state.effektoren = j.endeffektoren.map(e => ({
+      stlFile: null,
+      offset: { x:e.px||0, y:e.py||0, z:e.pz||0, rx:e.rx||0, ry:e.ry||0, rz:e.rz||0 },
+      stlName: e.stl || null, name: e.name || null
+    }));
+    state.activeEff = 0;
+  } else if (j.endeffektor) {
+    const e = j.endeffektor;
+    state.effektoren = [{ stlFile: null, offset: { x:e.px||0, y:e.py||0, z:e.pz||0, rx:e.rx||0, ry:e.ry||0, rz:e.rz||0 }, stlName: e.stl||null, name: e.name||null }];
+    state.activeEff = 0;
+  }
   if(j.stlRotation){
     const r=j.stlRotation;
     const set=(id,v)=>{const el=$(id);if(el)el.value=v;};
@@ -924,7 +928,7 @@ function buildJson() {
   }));
   const tcp = state.tcp.auftragen;
   const toolName = norm(state.toolName || tcp.toolStl || '') || 'tool1_tcp';
-  const eo = state.effOffset || {};
+  const eo = state.effektoren[state.activeEff]?.offset || {};
   const tcpX = eo.x??num(tcp.x)??0, tcpY = eo.y??num(tcp.y)??0, tcpZ = eo.z??num(tcp.z)??0;
   const tcpA = eo.rz??num(tcp.rz)??0, tcpB = eo.ry??num(tcp.ry)??0, tcpC = eo.rx??num(tcp.rx)??0;
   const result = {
@@ -945,13 +949,11 @@ function buildJson() {
       tool:     { px:0, py:0, pz:0, rx:0, ry:0, rz:0, name: toolName }
     }
   };
-  if (state.effStl) {
-    const eo = state.effOffset || {};
-    result.endeffektor = {
-      name: norm(state.effStl.name), stl: 'endeffektor.stl',
-      px: eo.x||0, py: eo.y||0, pz: eo.z||0,
-      rx: eo.rx||0, ry: eo.ry||0, rz: eo.rz||0
-    };
+  if (state.effektoren.length > 0) {
+    result.endeffektoren = state.effektoren.map((eff, i) => {
+      const eo = eff.offset || {};
+      return { name: norm(eff.stlFile?.name || ('Effektor '+(i+1))), stl: 'endeffektor_'+(i+1)+'.stl', px: eo.x||0, py: eo.y||0, pz: eo.z||0, rx: eo.rx||0, ry: eo.ry||0, rz: eo.rz||0 };
+    });
   }
   if (state.umfStls?.length) result.umfeld = state.umfStls.map((u,i) => ({ name: norm(u.name), stl: 'umfeld_'+(i+1)+'.stl', px:0, py:0, pz:0, rx:0, ry:0, rz:0 }));
   return result;
@@ -1174,9 +1176,8 @@ $('effLibRefreshBtn').addEventListener('click', async () => {
       try {
         const stls = await libLoadZipAndExtract(item.zip_url, /endeffektor.*\.stl$/i);
         if (!stls.length) throw new Error('Keine endeffektor.stl in ZIP');
-        state.effStl = { path: stls[0].name, name: item.name + '.stl', buf: stls[0].buf };
-        // Load offset from JSON if available in ZIP
-        // JSON offset loading handled via libLoadZipAndExtract result
+        state.effektoren.push({ stlFile: { path: stls[0].name, name: item.name + '.stl', buf: stls[0].buf }, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0} });
+        state.activeEff = state.effektoren.length - 1;
         renderEffRow();
         updateEffTcpMarker();
         el.textContent = '✓ ' + item.name + ' geladen';
@@ -1218,7 +1219,7 @@ function renderEffRow() {
       <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${norm(state.effStl.name)}</span>
       <button id="effClearBtn" style="background:rgba(204,51,51,.2);border:1px solid rgba(204,51,51,.4);color:#f87171;border-radius:3px;padding:2px 6px;font-size:12px;cursor:pointer">✕</button>
     </div>`;
-    $('effClearBtn').onclick = () => { state.effStl = null; state.effOffset = {x:0,y:0,z:0,rx:0,ry:0,rz:0}; ['eff-ox','eff-oy','eff-oz','eff-orx','eff-ory','eff-orz'].forEach(id=>{const el=$(id);if(el)el.value='0';}); syncTcpFromEffOffset(); renderEffRow(); updateEffTcpMarker(); };
+    // effClearBtn handled dynamically in renderEffRow()
     if (badge) badge.textContent = norm(state.effStl.name);
   } else {
     el.innerHTML = '';
@@ -1246,7 +1247,13 @@ function renderUmfRows() {
 $('effStlInput').addEventListener('change', async e => {
   const file = e.target.files[0]; if (!file) return;
   const buf = new Uint8Array(await file.arrayBuffer());
-  state.effStl = { path: file.name, name: file.name, buf };
+  const effIdx = parseInt($('effStlInput').dataset.effIdx ?? '-1');
+  if (effIdx >= 0 && effIdx < state.effektoren.length) {
+    state.effektoren[effIdx].stlFile = { path: file.name, name: file.name, buf };
+  } else {
+    state.effektoren.push({ stlFile: { path: file.name, name: file.name, buf }, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0} });
+    state.activeEff = state.effektoren.length - 1;
+  }
   renderEffRow();
   e.target.value = '';
 });
@@ -1356,7 +1363,7 @@ async function uploadToRoblib() {
     const base = zipName(state.robotName || 'robot');
     zip.file(base + '.json', JSON.stringify(buildJson(), null, 2));
     for (const [, mesh] of meshes) zip.file(mesh.name, exportBinaryStl(mesh));
-    if (state.effStl?.buf) zip.file('endeffektor.stl', state.effStl.buf);
+    state.effektoren.forEach((eff, i) => { if (eff.stlFile?.buf) zip.file('endeffektor_'+(i+1)+'.stl', eff.stlFile.buf); });
     if (state.umfStls?.length) state.umfStls.forEach((u, i) => zip.file('umfeld_' + (i+1) + '.stl', u.buf));
     const zipBlob = await zip.generateAsync({ type: 'blob' }, m => setProgress('Komprimiere…', 5 + m.percent * 0.4));
     if (prevMode !== 'world') attachToolToA6();
@@ -1489,6 +1496,15 @@ async function loadRobotFromLib(robot) {
       state.files.push({ path: fname, name: fname, size: buf.byteLength, type: 'STL' });
     }
     splitFiles();
+
+    // Effektoren-STLs: stlName → buffer aus ZIP
+    state.effektoren.forEach((eff) => {
+      if (!eff.stlFile && eff.stlName) {
+        const fname = eff.stlName.split('/').pop();
+        const buf = state.buffers.get(fname);
+        if (buf) eff.stlFile = { path: fname, name: eff.name || fname, buf };
+      }
+    });
 
     // Achsfarben + STL-Zuweisung aus JSON
     if (state.packageJson?.stlFiles) {
