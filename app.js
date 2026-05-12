@@ -1098,7 +1098,7 @@ function renderRows(){$('jointRows').innerHTML=state.joints.map((j,i)=>{
     <td><input data-j="${i}" data-f="min" value="${j.min??''}"></td>
     <td><input data-j="${i}" data-f="max" value="${j.max??''}"></td>
     <td><select class="dirSel" data-j="${i}" data-f="rotationSign"><option value="1" ${(num(j.rotationSign)??1)>=0?'selected':''}>+</option><option value="-1" ${(num(j.rotationSign)??1)<0?'selected':''}>−</option></select></td>
-    <td><div style="display:flex;align-items:center;gap:3px"><div style="width:16px;height:16px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.2);flex-shrink:0"></div><input type="text" maxlength="7" value="${col}" data-axis-color="${ax}" placeholder="#e8a020" style="width:64px;background:var(--bg1);border:1px solid var(--bdr);border-radius:3px;padding:1px 4px;font-family:monospace;font-size:11px;color:var(--txt);outline:none"></div></td>
+    <td><label style="display:inline-block;width:26px;height:22px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden" title="Farbe ${ax}"><input type="color" data-axis-color="${ax}" value="${col}" style="opacity:0;width:1px;height:1px;position:absolute"></label></td>
     <td style="max-width:80px">
       <button data-axis-stl-label="${ax}" style="font-size:10px;padding:2px 5px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:#6a8fa8;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;width:100%" title="${stlName} — klicken zum Laden">${stlName}</button>
       <input type="file" data-axis-stl-input="${ax}" accept=".stl,.stp,.step,.zip" style="display:none">
@@ -1139,7 +1139,7 @@ function renderAxisStlRows() {
     const col = colors[ax] || '#999999';
     return `<div class="axis-stl-row">
       <span class="axis-stl-label">${ax}</span>
-      <div style="display:flex;align-items:center;gap:3px;flex-shrink:0"><div class="axis-clr-preview" data-ax="${ax}" style="width:16px;height:16px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.2);cursor:pointer;flex-shrink:0"></div><input type="text" maxlength="7" class="axis-color-pick" data-ax="${ax}" value="${col}" placeholder="#e8a020" style="width:64px;background:var(--bg1);border:1px solid var(--bdr);border-radius:3px;padding:1px 4px;font-family:monospace;font-size:11px;color:var(--txt);outline:none"></div>
+      <label style="display:inline-block;width:22px;height:22px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden;flex-shrink:0" title="Farbe ${ax}"><input type="color" class="axis-color-pick" data-ax="${ax}" value="${col}" style="opacity:0;width:1px;height:1px;position:absolute"></label>
       <span class="axis-stl-name${hasFile ? ' has-file' : ''}" title="${name}">${name}</span>
       <button class="axis-stl-btn" data-ax="${ax}">+ STL</button>
       ${hasFile ? `<button class="axis-stl-clear" data-ax="${ax}">✕</button>` : ''}
@@ -1158,35 +1158,16 @@ function setAxisColor(ax, hex) {
 }
 
 function initAxisStlEvents() {
-  function applyColorInput(el) {
-    let hex = el.value.trim();
-    if (!hex.startsWith('#')) hex = '#' + hex;
-    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
-    if (el.classList.contains('axis-color-pick')) {
-      setAxisColor(el.dataset.ax, hex);
-      // Update preview
-      const row = el.closest('.axis-stl-row');
-      if (row) { const prev = row.querySelector('.axis-clr-preview'); if (prev) prev.style.background = hex; }
-      el.value = hex;
-    }
-    if (el.dataset.axisColor) {
-      setAxisColor(el.dataset.axisColor, hex);
-      // Update preview swatch
-      const swatch = el.previousElementSibling;
-      if (swatch) swatch.style.background = hex;
-      el.value = hex;
-    }
-  }
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && (e.target.classList.contains('axis-color-pick') || e.target.dataset.axisColor)) {
-      applyColorInput(e.target); e.preventDefault();
-    }
+  document.addEventListener('change', e => {
+    const cp = e.target.closest('.axis-color-pick, [data-axis-color]');
+    if (!cp) return;
+    const ax = cp.dataset.ax || cp.dataset.axisColor;
+    const hex = cp.value;
+    setAxisColor(ax, hex);
+    // Update label background
+    const lbl = cp.closest('label');
+    if (lbl) lbl.style.background = hex;
   });
-  document.addEventListener('blur', e => {
-    if (e.target.classList.contains('axis-color-pick') || e.target.dataset.axisColor) {
-      applyColorInput(e.target);
-    }
-  }, true);
   document.addEventListener('click', e => {
     const btn = e.target.closest('.axis-stl-btn');
     const clr = e.target.closest('.axis-stl-clear');
