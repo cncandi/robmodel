@@ -1158,11 +1158,13 @@ function setAxisColor(ax, hex) {
 }
 
 function initAxisStlEvents() {
-  document.addEventListener('input', e => {
-    const cp = e.target.closest('.axis-color-pick');
-    if (cp) setAxisColor(cp.dataset.ax, cp.value);
-    const ac = e.target.closest('[data-axis-color]');
-    if (ac) setAxisColor(ac.dataset.axisColor, ac.value);
+  ['input','change'].forEach(evt => {
+    document.addEventListener(evt, e => {
+      const cp = e.target.closest('.axis-color-pick');
+      if (cp) { setAxisColor(cp.dataset.ax, cp.value); renderAxisStlRows(); }
+      const ac = e.target.closest('[data-axis-color]');
+      if (ac) { setAxisColor(ac.dataset.axisColor, ac.value); renderRows(); }
+    });
   });
   document.addEventListener('click', e => {
     const btn = e.target.closest('.axis-stl-btn');
@@ -1840,6 +1842,12 @@ document.addEventListener('input',e=>{
   if(t.dataset.j!==undefined){const idx=Number(t.dataset.j),j=state.joints[idx],f=t.dataset.f;if(['x','y','z'].includes(f)){j.offset[f]=num(t.value);state.axisPoints[idx][f]=num(t.value);state.axisPoints[idx].source='manuell';rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();}else if(['min','max'].includes(f))j[f]=num(t.value);else if(f==='rotationSign'){j[f]=num(t.value);applyJointRotations();}else j[f]=t.value;}
   // Farb-Picker in Parameterzeile
   if(t.dataset.axisColor){const ax=t.dataset.axisColor;setAxisColor(ax,t.value);renderRows();}
+});
+
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.dataset.axisColor){const ax=t.dataset.axisColor;setAxisColor(ax,t.value);renderRows();}
+  if(t.classList.contains('axis-color-pick')){setAxisColor(t.dataset.ax,t.value);renderAxisStlRows();}
 });
 
 document.addEventListener('click',e=>{
