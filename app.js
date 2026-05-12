@@ -1554,7 +1554,58 @@ $('rl-type')?.addEventListener('change', rlTypeChanged);
 
 async function updateRoblib() {
   if (!_lastLibRobot) { alert('Kein Library-Eintrag geladen.'); return; }
-  await uploadToRoblib();
+  const btn  = $('rl-submit');
+  const msg  = $('rl-msg');
+  const wrap = $('rl-progress-wrap');
+  const bar  = $('rl-progress-bar');
+  const lbl  = $('rl-progress-label');
+  const pct  = $('rl-progress-pct');
+  const show = (text, ok) => { msg.textContent=text; msg.className='rl-msg '+(ok?'rl-ok':'rl-err'); msg.style.display=''; wrap.style.display='none'; };
+  const setProgress = (label, percent) => { wrap.style.display=''; msg.style.display='none'; lbl.textContent=label; pct.textContent=Math.round(percent)+'%'; bar.style.width=percent+'%'; bar.style.background=percent===100?'#22c55e':'#2563eb'; };
+  const type = $('rl-type')?.value||'robot';
+  const fields = { id: _lastLibRobot.id, name: $('rl-name').value.trim(), type };
+  if (type === 'robot') {
+    Object.assign(fields, {
+      marke: $('rl-marke').value.trim(), modell: $('rl-modell').value.trim(),
+      achsen: $('rl-achsen').value.trim(), reichweite_mm: $('rl-reichweite').value.trim(),
+      nutzlast_kg: $('rl-nutzlast').value.trim(), gewicht_kg: $('rl-gewicht').value.trim(),
+      wiederholgenauigkeit_mm: $('rl-wdh').value.trim(),
+    });
+  }
+  if (!fields.id) { show('Keine ID vorhanden.', false); return; }
+  btn.disabled = true; btn.textContent = 'Aktualisiere…';
+  try {
+    setProgress('Erstelle ZIP…', 5);
+    const prevMode = toolMountMode;
+    if (prevMode !== 'world') { detachToolFromA6(); scene.updateMatrixWorld(true); }
+    const zip = new JSZip();
+    const base = zipName(state.robotName || 'robot');
+    zip.file(base + '.json', JSON.stringify(buildJson(), null, 2));
+    for (const [, mesh] of meshes) zip.file(mesh.name, exportBinaryStl(mesh));
+    state.effektoren.forEach((eff, i) => { if (eff.stlFile?.buf) zip.file('endeffektor_'+(i+1)+'.stl', eff.stlFile.buf); });
+    const allUmfZip = [...(state.umfElemente||[]), ...(state.umfStls||[]).map(u=>({stlFile:u}))];
+    allUmfZip.forEach((u, i) => { const buf = u.stlFile?.buf; if(buf) zip.file('umfeld_'+(i+1)+'.stl', buf); });
+    const zipBlob = await zip.generateAsync({type:'blob'}, m => setProgress('Komprimiere…', 5+m.percent*0.4));
+    if (prevMode !== 'world') attachToolToA6();
+    setProgress('Lade hoch…', 45);
+    const fd = new FormData();
+    for (const [k,v] of Object.entries(fields)) fd.append(k, v);
+    fd.append('zip', zipBlob, base+'.zip');
+    const thumb = $('rl-thumb').files[0];
+    if (thumb) fd.append('thumb', thumb, thumb.name);
+    const data = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', ROBLIB_API + '?action=update');
+      xhr.upload.onprogress = e => { if(e.lengthComputable) setProgress('Lade hoch…', 45+(e.loaded/e.total)*50); };
+      xhr.onload = () => { try { resolve(JSON.parse(xhr.responseText)); } catch(e) { reject(new Error('Ungültige Serverantwort')); } };
+      xhr.onerror = () => reject(new Error('Verbindungsfehler'));
+      xhr.send(fd);
+    });
+    if (data.ok) {
+      setProgress('Fertig!', 100);
+      setTimeout(() => { show('✓ ' + fields.name + ' aktualisiert', true); btn.disabled=false; btn.textContent='Aktualisieren'; }, 600);
+    } else { show(data.error || 'Fehler beim Aktualisieren.', false); btn.disabled=false; btn.textContent='Aktualisieren'; }
+  } catch(e) { show('Fehler: '+e.message, false); btn.disabled=false; btn.textContent='Aktualisieren'; }
 }
 
 async function uploadToRoblib() {
@@ -1800,7 +1851,7 @@ $('roblibBtn').onclick  = openRoblibModal;
 $('toolModeWorld').onclick = () => setToolMode('world');
 $('toolModeA6').onclick    = () => setToolMode('a6');
 $('roblibClose').onclick = () => { $('roblibModal').style.display = 'none'; };
-$('rl-submit').onclick  = () => { const isUpd = $('rl-mode-update')?.style.background?.includes('34,197') || $('rl-submit').textContent==='Aktualisieren'; isUpd ? updateRoblib() : uploadToRoblib(); };
+$('rl-submit').onclick  = () => { $('rl-submit').textContent.includes('Aktualis') ? updateRoblib() : uploadToRoblib(); };
 const THEMES      = ['dark','bg-pro','bg-white','bg-minimal','bg-win11','bg-deep','bg-vivid','bg-matrix'];
 const THEME_NAMES = ['Dark','Pro','White','Minimal','Win11','Deep','Vivid','Matrix'];
 const THEME_BG    = [0x070d1a,0x1e1e1e,0xf0f0eb,0xf4f4f4,0xf3f6fc,0x000408,0x1a0a2e,0x000800];
