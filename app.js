@@ -1531,6 +1531,25 @@ function rlTypeChanged() {
 }
 $('rl-type')?.addEventListener('change', rlTypeChanged);
 
+async function updateRoblib() {
+  if (!_lastLibRobot) { alert('Kein Library-Eintrag geladen.'); return; }
+  const r = _lastLibRobot;
+  // Formularfelder vorausfüllen
+  const set = (id, val) => { const el=$(id); if(el) el.value = val||''; };
+  set('rl-name',       r.name);
+  set('rl-type',       r.type || 'robot');
+  if (typeof rlTypeChanged === 'function') rlTypeChanged();
+  set('rl-marke',      r.marke);
+  set('rl-modell',     r.modell);
+  set('rl-achsen',     r.achsen);
+  set('rl-reichweite', r.reichweite_mm);
+  set('rl-nutzlast',   r.nutzlast_kg);
+  set('rl-gewicht',    r.gewicht_kg);
+  set('rl-wdh',        r.wiederholgenauigkeit_mm);
+  // Direkt hochladen
+  await uploadToRoblib();
+}
+
 async function uploadToRoblib() {
   const btn  = $('rl-submit');
   const msg  = $('rl-msg');
@@ -1685,7 +1704,11 @@ function renderRobotLibList(query) {
   });
 }
 
+let _lastLibRobot = null; // zuletzt geladener Library-Eintrag
+
 async function loadRobotFromLib(robot) {
+  _lastLibRobot = robot; // merken für Aktualisieren
+  const updateBtn = $('libUpdateBtn'); if(updateBtn) updateBtn.disabled = false;
   const status = $('rl-lib-status');
   const bar    = $('rl-lib-bar');
   const prog   = $('rl-lib-progress');
