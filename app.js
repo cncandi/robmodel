@@ -388,6 +388,7 @@ function rebuildRobotKinematics() {
       if (stlName && norm(stlName) === norm(file.name)) { assignedAxis = ax; break; }
     }
     const key = assignedAxis || partKey(file.name);
+    mesh.userData.axisKey = key; // Store for color updates
     const m = key.match(/^A([1-6])$/);
     if (m) {
       const idx = Number(m[1]) - 1;
@@ -1148,17 +1149,12 @@ function renderAxisStlRows() {
 
 function setAxisColor(ax, hex) {
   colors[ax] = hex;
-  let changed = false;
-  for (const [path, mesh] of meshes) {
-    const file = state.stls.find(f => f.path === path) || { name: mesh.name };
-    const key = (state.axisStlMap[ax] && norm(state.axisStlMap[ax]) === norm(file.name)) ? ax : partKey(file.name);
-    if (key === ax) {
+  for (const [, mesh] of meshes) {
+    if (mesh.userData.axisKey === ax) {
       mesh.material.color.set(hex);
       mesh.material.needsUpdate = true;
-      changed = true;
     }
   }
-  if (changed && typeof renderer !== 'undefined') renderer.render(scene, camera);
 }
 
 function initAxisStlEvents() {
