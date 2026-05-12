@@ -1153,7 +1153,7 @@ function setAxisColor(ax, hex) {
   if (!m) return;
   const grp = axisPivotGroups[parseInt(m[1]) - 1];
   if (!grp) return;
-  grp.traverse(child => {
+  grp.children.forEach(child => {
     if (child.isMesh && child.material) {
       child.material.color.set(hex);
       child.material.needsUpdate = true;
