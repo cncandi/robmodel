@@ -1159,6 +1159,8 @@ function initAxisStlEvents() {
   document.addEventListener('input', e => {
     const cp = e.target.closest('.axis-color-pick');
     if (cp) setAxisColor(cp.dataset.ax, cp.value);
+    const ac = e.target.closest('[data-axis-color]');
+    if (ac) setAxisColor(ac.dataset.axisColor, ac.value);
   });
   document.addEventListener('click', e => {
     const btn = e.target.closest('.axis-stl-btn');
