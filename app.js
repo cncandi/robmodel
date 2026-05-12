@@ -1148,11 +1148,17 @@ function renderAxisStlRows() {
 
 function setAxisColor(ax, hex) {
   colors[ax] = hex;
+  let changed = false;
   for (const [path, mesh] of meshes) {
     const file = state.stls.find(f => f.path === path) || { name: mesh.name };
     const key = (state.axisStlMap[ax] && norm(state.axisStlMap[ax]) === norm(file.name)) ? ax : partKey(file.name);
-    if (key === ax) mesh.material.color.set(hex);
+    if (key === ax) {
+      mesh.material.color.set(hex);
+      mesh.material.needsUpdate = true;
+      changed = true;
+    }
   }
+  if (changed && typeof renderer !== 'undefined') renderer.render(scene, camera);
 }
 
 function initAxisStlEvents() {
