@@ -635,6 +635,62 @@ function selectAxisPoint(i) {
   updateCSHelper();
 }
 
+// ── STEP / OCCT Import ─────────────────────────────────────────────
+let _occtModule = null, _occtLoading = null;
+function getOCCT() {
+  if (_occtModule) return Promise.resolve(_occtModule);
+  if (_occtLoading) return _occtLoading;
+  const initOcct = () => occtimportjs({
+    locateFile: p => 'https://cdn.jsdelivr.net/npm/occt-import-js@0.0.23/dist/' + p
+  }).then(m => { _occtModule = m; _occtLoading = null; return m; });
+  if (typeof occtimportjs !== 'undefined') {
+    return (_occtLoading = initOcct());
+  }
+  return (_occtLoading = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/occt-import-js@0.0.23/dist/occt-import-js.js';
+    s.onload = () => initOcct().then(res).catch(rej);
+    s.onerror = () => rej(new Error('occt-import-js laden fehlgeschlagen'));
+    document.head.appendChild(s);
+  }));
+}
+function stepToGeometry(arrayBuffer) {
+  return getOCCT().then(occt => {
+    occt.FS.writeFile('/input.stp', new Uint8Array(arrayBuffer));
+    const result = occt.ReadStepFile('/input.stp', null);
+    if (!result.success || !result.meshes?.length) throw new Error('STEP lesen fehlgeschlagen');
+    const positions = [], normals = [], indices = [];
+    let offset = 0;
+    for (const mesh of result.meshes) {
+      const pos = mesh.attributes.position.array;
+      const nor = mesh.attributes.normal?.array;
+      const idx = mesh.index?.array;
+      for (const v of pos) positions.push(v);
+      if (nor) for (const v of nor) normals.push(v);
+      if (idx) for (const v of idx) indices.push(v + offset);
+      offset += pos.length / 3;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    if (normals.length) geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    if (indices.length) geo.setIndex(indices);
+    geo.computeVertexNormals();
+    return geo;
+  });
+}
+async function parseGeometry(arrayBuffer, fileName) {
+  const ext = (fileName || '').split('.').pop().toLowerCase();
+  if (ext === 'stp' || ext === 'step') return stepToGeometry(arrayBuffer);
+  return loader.parse(arrayBuffer);
+}
+async function extractFromZip(file) {
+  const zip = await JSZip.loadAsync(file);
+  const entries = Object.values(zip.files).filter(f => !f.dir && /\.(stp|step|stl)$/i.test(f.name));
+  if (!entries.length) throw new Error('Keine STL/STEP-Datei im ZIP gefunden');
+  const first = entries[0];
+  return { buf: await first.async('arraybuffer'), name: first.name.split('/').pop() };
+}
+
 // ── STL laden ──────────────────────────────────────────────────────
 function partKey(n) {
   const s = norm(n);
@@ -660,7 +716,7 @@ async function loadStls() {
   for (const f of state.stls) {
     try {
       const u8 = state.buffers.get(f.path);
-      const g = loader.parse(u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength));
+      const g = await parseGeometry(u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength), f.name);
       if (rotMatrix) g.applyMatrix4(rotMatrix); // Rotation direkt in Geometrie einbrennen
       g.computeVertexNormals();
       const mat = new THREE.MeshStandardMaterial({ color: colors[partKey(f.name)], roughness: .62, metalness: .08 });
@@ -1044,7 +1100,7 @@ function renderRows(){$('jointRows').innerHTML=state.joints.map((j,i)=>{
     <td><input type="color" data-axis-color="${ax}" value="${col}" style="width:26px;height:22px;border:none;border-radius:3px;cursor:pointer;padding:0" title="Farbe ${ax}"></td>
     <td style="max-width:80px">
       <button data-axis-stl-label="${ax}" style="font-size:10px;padding:2px 5px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:#6a8fa8;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;width:100%" title="${stlName} — klicken zum Laden">${stlName}</button>
-      <input type="file" data-axis-stl-input="${ax}" accept=".stl" style="display:none">
+      <input type="file" data-axis-stl-input="${ax}" accept=".stl,.stp,.step,.zip" style="display:none">
     </td>
     <td><button class="simBtn" data-sim-axis="${i}">▶</button></td>
   </tr>`;}).join('');}
@@ -1115,25 +1171,31 @@ function initAxisStlEvents() {
     }
   });
   $('axisStlInput').addEventListener('change', async e => {
-    const file = e.target.files[0]; if (!file || !_axisStlTarget) return;
-    const buf = await file.arrayBuffer();
-    const u8 = new Uint8Array(buf);
-    const geom = loader.parse(u8.buffer); geom.computeVertexNormals();
+    let file = e.target.files[0]; if (!file || !_axisStlTarget) return;
+    let rawBuf, fname;
+    if (/\.zip$/i.test(file.name)) {
+      try { const r = await extractFromZip(file); rawBuf = r.buf; fname = r.name; }
+      catch(er) { alert(er.message); e.target.value=''; return; }
+    } else { rawBuf = await file.arrayBuffer(); fname = file.name; }
+    let geom;
+    try { geom = await parseGeometry(rawBuf, fname); geom.computeVertexNormals(); }
+    catch(er) { alert('Fehler beim Laden: ' + er.message); e.target.value=''; return; }
+    const u8 = new Uint8Array(rawBuf);
+    const stlBuf = /\.(stp|step)$/i.test(fname) ? new Uint8Array(stlFromGeometry(geom)) : u8;
+    const displayName = fname.replace(/\.(stp|step)$/i, '.stl');
     const ax = _axisStlTarget;
     const mat = new THREE.MeshStandardMaterial({ color: colors[ax] || 0xe8a020, roughness: .62, metalness: .08 });
-    const mesh = new THREE.Mesh(geom, mat); mesh.name = file.name;
-    // In state aufnehmen
-    state.axisStlMap[ax] = file.name;
-    const fObj = { path: file.name, name: file.name, type: 'STL', size: file.size };
-    // Alten Mesh für diese Achse entfernen
+    const mesh = new THREE.Mesh(geom, mat); mesh.name = displayName;
+    state.axisStlMap[ax] = displayName;
+    const fObj = { path: displayName, name: displayName, type: 'STL', size: stlBuf.byteLength };
     state.stls = state.stls.filter(f => {
       const k = state.axisStlMap[ax] === norm(f.name) ? ax : partKey(f.name);
       return k !== ax;
     });
     state.stls.push(fObj);
     state.files = state.stls;
-    state.buffers.set(file.name, u8);
-    meshes.set(file.name, mesh);
+    state.buffers.set(displayName, stlBuf);
+    meshes.set(displayName, mesh);
     rebuildRobotKinematics(); applyTransforms();
     renderAxisStlRows(); renderAll();
     e.target.value = '';
@@ -1353,13 +1415,25 @@ $('effAddBtn').addEventListener('click', () => {
 });
 
 $('effStlInput').addEventListener('change', async e => {
-  const file = e.target.files[0]; if (!file) return;
-  const buf = new Uint8Array(await file.arrayBuffer());
+  let file = e.target.files[0]; if (!file) return;
+  let rawBuf, fname;
+  if (/\.zip$/i.test(file.name)) {
+    try { const r = await extractFromZip(file); rawBuf = r.buf; fname = r.name; }
+    catch(er) { alert(er.message); e.target.value=''; return; }
+  } else { rawBuf = await file.arrayBuffer(); fname = file.name; }
+  let buf;
+  if (/\.(stp|step)$/i.test(fname)) {
+    try {
+      const geo = await parseGeometry(rawBuf, fname);
+      buf = new Uint8Array(stlFromGeometry(geo));
+      fname = fname.replace(/\.(stp|step)$/i, '.stl');
+    } catch(er) { alert('STEP Fehler: ' + er.message); e.target.value=''; return; }
+  } else { buf = new Uint8Array(rawBuf); }
   const effIdx = parseInt($('effStlInput').dataset.effIdx ?? '-1');
   if (effIdx >= 0 && effIdx < state.effektoren.length) {
-    state.effektoren[effIdx].stlFile = { path: file.name, name: file.name, buf };
+    state.effektoren[effIdx].stlFile = { path: fname, name: fname, buf };
   } else {
-    state.effektoren.push({ stlFile: { path: file.name, name: file.name, buf }, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0}, typ: 'auftragend' });
+    state.effektoren.push({ stlFile: { path: fname, name: fname, buf }, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0}, typ: 'auftragend' });
     state.activeEff = state.effektoren.length - 1;
   }
   renderEffRow();
@@ -1374,16 +1448,28 @@ $('umfAddBtn')?.addEventListener('click', () => {
 });
 
 $('umfStlInput').addEventListener('change', async e => {
-  const files = Array.from(e.target.files);
+  const rawFiles = Array.from(e.target.files);
   if (!state.umfElemente) state.umfElemente = [];
   if (!state.umfStls) state.umfStls = [];
-  for (const file of files) {
-    const buf = new Uint8Array(await file.arrayBuffer());
+  for (const file of rawFiles) {
+    let rawBuf, fname;
+    if (/\.zip$/i.test(file.name)) {
+      try { const r = await extractFromZip(file); rawBuf = r.buf; fname = r.name; }
+      catch(er) { alert(er.message); continue; }
+    } else { rawBuf = await file.arrayBuffer(); fname = file.name; }
+    let buf;
+    if (/\.(stp|step)$/i.test(fname)) {
+      try {
+        const geo = await parseGeometry(rawBuf, fname);
+        buf = new Uint8Array(stlFromGeometry(geo));
+        fname = fname.replace(/\.(stp|step)$/i, '.stl');
+      } catch(er) { alert('STEP Fehler: ' + er.message); continue; }
+    } else { buf = new Uint8Array(rawBuf); }
     const umfIdx = parseInt($('umfStlInput').dataset.umfIdx ?? '-1');
     if (umfIdx >= 0 && umfIdx < state.umfElemente.length) {
-      state.umfElemente[umfIdx].stlFile = { path: file.name, name: file.name, buf };
+      state.umfElemente[umfIdx].stlFile = { path: fname, name: fname, buf };
     } else {
-      state.umfElemente.push({ stlFile:{path:file.name,name:file.name,buf}, offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0} });
+      state.umfElemente.push({ stlFile:{path:fname,name:fname,buf}, offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0} });
       state.activeUmf = state.umfElemente.length-1;
     }
   }
@@ -1771,18 +1857,29 @@ document.addEventListener('change', e => {
   const ax = t.dataset.axisStlInput;
   if (ax && t.files[0]) {
     const file = t.files[0];
-    file.arrayBuffer().then(buf => {
-      const u8 = new Uint8Array(buf);
-      state.buffers.set(file.name, u8);
-      // Alte Datei dieser Achse aus state.files entfernen
-      state.files = state.files.filter(f => partKey(f.name) !== ax || f.name === file.name);
-      if (!state.files.find(f => f.name === file.name))
-        state.files.push({ path: file.name, name: file.name, size: buf.byteLength, type: 'STL' });
-      state.axisStlMap[ax] = file.name;
+    (async () => {
+      let rawBuf, fname;
+      if (/\.zip$/i.test(file.name)) {
+        try { const r = await extractFromZip(file); rawBuf = r.buf; fname = r.name; }
+        catch(er) { alert(er.message); t.value=''; return; }
+      } else { rawBuf = await file.arrayBuffer(); fname = file.name; }
+      let u8;
+      if (/\.(stp|step)$/i.test(fname)) {
+        try {
+          const geo = await parseGeometry(rawBuf, fname);
+          u8 = new Uint8Array(stlFromGeometry(geo));
+          fname = fname.replace(/\.(stp|step)$/i, '.stl');
+        } catch(er) { alert('STEP Fehler: ' + er.message); t.value=''; return; }
+      } else { u8 = new Uint8Array(rawBuf); }
+      state.buffers.set(fname, u8);
+      state.files = state.files.filter(f => partKey(f.name) !== ax || f.name === fname);
+      if (!state.files.find(f => f.name === fname))
+        state.files.push({ path: fname, name: fname, size: u8.byteLength, type: 'STL' });
+      state.axisStlMap[ax] = fname;
       splitFiles();
       loadStls().then(() => { renderRows(); enableSave(); });
-    });
-    t.value = '';
+      t.value = '';
+    })();
   }
 });
 
@@ -2225,3 +2322,4 @@ $('ros-load').onclick = async function() {
     btn.disabled = false; btn.textContent = 'Laden & in RobModel öffnen';
   }
 };
+
