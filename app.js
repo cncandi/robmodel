@@ -1493,9 +1493,30 @@ $('umfStlInput').addEventListener('change', async e => {
 const ROBLIB_API = 'https://www.cnc-technik.de/robsimul/roblib/api.php';
 
 function openRoblibModal() {
-  $('rl-name').value   = state.robotName || '';
-  $('rl-achsen').value = 6;
   $('rl-msg').style.display = 'none';
+  // Felder aus letztem Library-Eintrag vorausfüllen
+  const r = _lastLibRobot;
+  if (r) {
+    const set = (id, val) => { const el=$(id); if(el) el.value = val||''; };
+    set('rl-name',       r.name);
+    set('rl-type',       r.type || 'robot');
+    if (typeof rlTypeChanged === 'function') rlTypeChanged();
+    set('rl-marke',      r.marke);
+    set('rl-modell',     r.modell);
+    set('rl-achsen',     r.achsen || 6);
+    set('rl-reichweite', r.reichweite_mm);
+    set('rl-nutzlast',   r.nutzlast_kg);
+    set('rl-gewicht',    r.gewicht_kg);
+    set('rl-wdh',        r.wiederholgenauigkeit_mm);
+    // Aktualisieren-Button anzeigen
+    const btnU = $('rl-mode-update');
+    if (btnU) btnU.style.display = '';
+  } else {
+    $('rl-name').value   = state.robotName || '';
+    $('rl-achsen').value = 6;
+    const btnU = $('rl-mode-update');
+    if (btnU) btnU.style.display = 'none';
+  }
 
   // Canvas-Screenshot als Thumbnail vorbelegen
   try {
@@ -1533,20 +1554,6 @@ $('rl-type')?.addEventListener('change', rlTypeChanged);
 
 async function updateRoblib() {
   if (!_lastLibRobot) { alert('Kein Library-Eintrag geladen.'); return; }
-  const r = _lastLibRobot;
-  // Formularfelder vorausfüllen
-  const set = (id, val) => { const el=$(id); if(el) el.value = val||''; };
-  set('rl-name',       r.name);
-  set('rl-type',       r.type || 'robot');
-  if (typeof rlTypeChanged === 'function') rlTypeChanged();
-  set('rl-marke',      r.marke);
-  set('rl-modell',     r.modell);
-  set('rl-achsen',     r.achsen);
-  set('rl-reichweite', r.reichweite_mm);
-  set('rl-nutzlast',   r.nutzlast_kg);
-  set('rl-gewicht',    r.gewicht_kg);
-  set('rl-wdh',        r.wiederholgenauigkeit_mm);
-  // Direkt hochladen
   await uploadToRoblib();
 }
 
@@ -1708,7 +1715,6 @@ let _lastLibRobot = null; // zuletzt geladener Library-Eintrag
 
 async function loadRobotFromLib(robot) {
   _lastLibRobot = robot; // merken für Aktualisieren
-  const updateBtn = $('libUpdateBtn'); if(updateBtn) updateBtn.disabled = false;
   const status = $('rl-lib-status');
   const bar    = $('rl-lib-bar');
   const prog   = $('rl-lib-progress');
@@ -1794,7 +1800,7 @@ $('roblibBtn').onclick  = openRoblibModal;
 $('toolModeWorld').onclick = () => setToolMode('world');
 $('toolModeA6').onclick    = () => setToolMode('a6');
 $('roblibClose').onclick = () => { $('roblibModal').style.display = 'none'; };
-$('rl-submit').onclick  = uploadToRoblib;
+$('rl-submit').onclick  = () => { const isUpd = $('rl-mode-update')?.style.background?.includes('34,197') || $('rl-submit').textContent==='Aktualisieren'; isUpd ? updateRoblib() : uploadToRoblib(); };
 const THEMES      = ['dark','bg-pro','bg-white','bg-minimal','bg-win11','bg-deep','bg-vivid','bg-matrix'];
 const THEME_NAMES = ['Dark','Pro','White','Minimal','Win11','Deep','Vivid','Matrix'];
 const THEME_BG    = [0x070d1a,0x1e1e1e,0xf0f0eb,0xf4f4f4,0xf3f6fc,0x000408,0x1a0a2e,0x000800];
@@ -1819,8 +1825,10 @@ function setRlMode(mode) {
   const isNew = mode === 'new';
   const btnNew    = $('rl-mode-new');
   const btnUpdate = $('rl-mode-update');
-  if (btnNew)    { btnNew.style.background    = isNew  ? 'rgba(37,99,235,.3)' : 'rgba(255,255,255,.05)'; btnNew.style.color    = isNew  ? '#60a5fa' : '#6a8fa8'; }
-  if (btnUpdate) { btnUpdate.style.background = !isNew ? 'rgba(37,99,235,.3)' : 'rgba(255,255,255,.05)'; btnUpdate.style.color = !isNew ? '#60a5fa' : '#6a8fa8'; }
+  const submitBtn = $('rl-submit');
+  if (btnNew)    { btnNew.style.background    = isNew  ? 'rgba(37,99,235,.3)' : 'rgba(255,255,255,.05)'; btnNew.style.color    = isNew  ? '#60a5fa' : '#6a8fa8'; btnNew.style.border    = isNew  ? '1px solid #2563eb' : '1px solid rgba(255,255,255,.2)'; }
+  if (btnUpdate) { btnUpdate.style.background = !isNew ? 'rgba(34,197,94,.3)' : 'rgba(255,255,255,.05)'; btnUpdate.style.color = !isNew ? '#4ade80' : '#6a8fa8'; btnUpdate.style.border = !isNew ? '1px solid #22c55e' : '1px solid rgba(255,255,255,.2)'; }
+  if (submitBtn) submitBtn.textContent = isNew ? 'Hochladen' : 'Aktualisieren';
 }
 window.setRlMode = setRlMode;
 
