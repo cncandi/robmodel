@@ -1149,12 +1149,16 @@ function renderAxisStlRows() {
 
 function setAxisColor(ax, hex) {
   colors[ax] = hex;
-  for (const [, mesh] of meshes) {
-    if (mesh.userData.axisKey === ax) {
-      mesh.material.color.set(hex);
-      mesh.material.needsUpdate = true;
+  const m = ax.match(/^A([1-6])$/);
+  if (!m) return;
+  const grp = axisPivotGroups[parseInt(m[1]) - 1];
+  if (!grp) return;
+  grp.traverse(child => {
+    if (child.isMesh && child.material) {
+      child.material.color.set(hex);
+      child.material.needsUpdate = true;
     }
-  }
+  });
 }
 
 function initAxisStlEvents() {
