@@ -3008,6 +3008,7 @@ async function uploadToRoblib() {
     for(const [k,v] of Object.entries(fields)) fd.append(k,v);
     fd.append('zip',zipBlob,base+'.zip');
     const thumb=$('rl-thumb').files[0]; if(thumb) fd.append('thumb',thumb,thumb.name);
+    const beschr=$('rl-beschreibung')?.value?.trim(); if(beschr) fd.append('beschreibung',beschr);
     const data=await new Promise((res,rej)=>{
       const xhr=new XMLHttpRequest(); xhr.open('POST',ROBLIB_API+'?action=upload');
       xhr.upload.onprogress=e=>{if(e.lengthComputable)setP('Lade hoch…',45+(e.loaded/e.total)*50);};
