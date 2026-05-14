@@ -48,7 +48,8 @@ const state = {
   axisPoints: ['A1','A2','A3','A4','A5','A6'].map((name, i) => ({ name, ...defOffset(i), rx: 0, ry: 0, rz: 0, source: 'KR8 Zielwert' })),
   selectedAxis: 0,
   jointAngles: [0, -90, 90, 0, 0, 0],
-  axisStlMap: { A1:null, A2:null, A3:null, A4:null, A5:null, A6:null }, // manuelle STL-Zuweisung
+  axisStlMap: { A1:null, A2:null, A3:null, A4:null, A5:null, A6:null },
+  axisStlParts: { A1:[], A2:[], A3:[], A4:[], A5:[], A6:[] }
   simulation: { active: false, axis: null, raf: null },
   joints: ['A1','A2','A3','A4','A5','A6'].map((n, i) => ({
     name: n,
