@@ -1630,7 +1630,7 @@ function rebuildRailMeshes() {
   const r = (state.schienen||[])[0];
   if(!r) return;
   const L=r.length_mm||2000, H=r.height_mm||200, W=r.width_mm||400, ax=r.axis||'X+';
-  const p=r.ePos||0;
+  const p=r.ePos||0, bo=r.boxOffset||{}, deg=Math.PI/180;
   const eAx = 'E'+(r.eNumber||1);
   const parts = state.axisStlParts[eAx]||[];
   if (parts.length) {
@@ -1640,18 +1640,22 @@ function rebuildRailMeshes() {
       railGroup.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:pt.color||0x2563eb,shininess:60})));
     });
   } else {
-    const geo=(ax==='X+'||ax==='X-')?new THREE.BoxGeometry(L,H,W):new THREE.BoxGeometry(W,H,L);
-    const mesh=new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:0x2563eb,transparent:true,opacity:0.3,side:THREE.DoubleSide}));
-    mesh.position.y=-H/2;
-    railGroup.add(mesh);
+    const geo=(ax==='X+'||ax==='X-')?new THREE.BoxGeometry(L,H,W):
+              (ax==='Y+'||ax==='Y-')?new THREE.BoxGeometry(W,L,H):
+                                     new THREE.BoxGeometry(W,H,L);
+    railGroup.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:0x2563eb,transparent:true,opacity:0.3,side:THREE.DoubleSide})));
   }
-  // Rail slides under robot base (origin)
-  var cx=0, cz=0;
+  // Sliding offset (rail moves so robot stays at origin)
+  var cx=0, cy=0, cz=0;
   if      (ax==='X+') cx =  L/2 - p;
   else if (ax==='X-') cx = -(L/2 - p);
+  else if (ax==='Y+') cy =  L/2 - p;
+  else if (ax==='Y-') cy = -(L/2 - p);
   else if (ax==='Z+') cz =  L/2 - p;
   else                cz = -(L/2 - p);
-  railGroup.position.set(cx, 0, cz);
+  // Apply box offset + slide
+  railGroup.position.set(cx+(bo.x||0), cy+(bo.y||0), cz+(bo.z||0));
+  railGroup.rotation.set((bo.rx||0)*deg, (bo.ry||0)*deg, (bo.rz||0)*deg, 'XYZ');
 }
 
 $('railAddBtn')?.addEventListener('click',()=>{
@@ -1664,6 +1668,13 @@ $('railAddBtn')?.addEventListener('click',()=>{
   $('rm-max').value    = existing?.eMax       ?? (existing?.length_mm || 2000);
   $('rm-start').value  = existing?.ePos       ?? 0;
   if($('rm-enum')) $('rm-enum').value = existing?.eNumber || 1;
+  const bo = existing?.boxOffset||{};
+  if($('rm-ox'))  $('rm-ox').value  = bo.x  ||0;
+  if($('rm-oy'))  $('rm-oy').value  = bo.y  ||0;
+  if($('rm-oz'))  $('rm-oz').value  = bo.z  ||0;
+  if($('rm-orx')) $('rm-orx').value = bo.rx ||0;
+  if($('rm-ory')) $('rm-ory').value = bo.ry ||0;
+  if($('rm-orz')) $('rm-orz').value = bo.rz ||0;
   _rmAxis = existing?.axis || 'X+';
   document.querySelectorAll('.rm-axis-btn').forEach(b=>{
     const on=b.dataset.ax===_rmAxis;
@@ -1698,7 +1709,15 @@ $('rm-submit')?.addEventListener('click',()=>{
     eNumber: parseInt($('rm-enum')?.value)||1,
     eMin:  parseFloat($('rm-min')?.value)  || 0,
     eMax:  parseFloat($('rm-max')?.value)  || 2000,
-    ePos:  parseFloat($('rm-start')?.value)|| 0
+    ePos:  parseFloat($('rm-start')?.value)|| 0,
+    boxOffset: {
+      x:  parseFloat($('rm-ox')?.value) ||0,
+      y:  parseFloat($('rm-oy')?.value) ||0,
+      z:  parseFloat($('rm-oz')?.value) ||0,
+      rx: parseFloat($('rm-orx')?.value)||0,
+      ry: parseFloat($('rm-ory')?.value)||0,
+      rz: parseFloat($('rm-orz')?.value)||0
+    }
   };
   // Stop any running sim before replacing state
   const old = state.schienen[0];
