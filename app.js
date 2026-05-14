@@ -1452,6 +1452,8 @@ $('om-submit')?.addEventListener('click',()=>{
   if(editIdx>=0){ state.objekte[editIdx]=entry; }
   else { state.objekte.push(entry); objekteGroups.push(null); }
   const idx=editIdx>=0?editIdx:state.objekte.length-1;
+  // STL → axisStlParts
+  if(_omStlBuf){ const lbl='Label'+(entry.labelNum||1); state.axisStlParts[lbl]=[{name:entry.name+'.stl',color:entry.color||'#4499cc',buf:_omStlBuf}]; _omStlBuf=null; }
   rebuildObjektMesh(idx);
   renderObjRows(); renderRows();
   $('objModal').style.display='none';
@@ -1615,6 +1617,8 @@ $('pm-submit')?.addEventListener('click',()=>{
   if(editIdx>=0){ _removePosGroup(editIdx); state.positioners[editIdx]=entry; }
   else { state.positioners.push(entry); positionerGroups.push(null); }
   const idx=editIdx>=0?editIdx:state.positioners.length-1;
+  // STL → axisStlParts
+  if(_pmStlBuf){ const eAx='E'+(entry.eNum||2); state.axisStlParts[eAx]=[{name:entry.name+'.stl',color:entry.color||'#e8a020',buf:_pmStlBuf}]; _pmStlBuf=null; }
   rebuildAllPositioners();
   renderPosRows(); renderRows();
   $('posModal').style.display='none';
@@ -1650,12 +1654,16 @@ function rebuildFixMesh(i) {
   if(!festeGrps[i]){ festeGrps[i]=new THREE.Group(); scene.add(festeGrps[i]); }
   const g=festeGrps[i];
   while(g.children.length) g.remove(g.children[0]);
-  if(o.showBox!==false){
-    const L=o.length||500,H=o.height||500,W=o.width||500,R=o.radius||200,deg=Math.PI/180;
+  const deg=Math.PI/180;
+  g.position.set(o.x||0,o.y||0,o.z||0);
+  g.rotation.set((o.rx||0)*deg,(o.ry||0)*deg,(o.rz||0)*deg,'XYZ');
+  if(o.stlFile?.buf){
+    const geo=loader.parse(o.stlFile.buf.buffer||o.stlFile.buf); geo.computeVertexNormals();
+    g.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:o.color||0x607080,shininess:60})));
+  } else if(o.showBox!==false){
+    const L=o.length||500,H=o.height||500,W=o.width||500,R=o.radius||200;
     const geo=o.type==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
     g.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:o.color||0x607080,transparent:true,opacity:0.6,side:THREE.DoubleSide})));
-    g.position.set(o.x||0,o.y||0,o.z||0);
-    g.rotation.set((o.rx||0)*deg,(o.ry||0)*deg,(o.rz||0)*deg,'XYZ');
   }
 }
 
@@ -1685,6 +1693,32 @@ function fmTypeChanged(){
 window.fmTypeChanged=fmTypeChanged;
 window.openFixModal=openFixModal;
 
+// ── STL-in-Modal Logik für alle Komponentenmodals ─────────────────
+var _rmStlBuf=null, _pmStlBuf=null, _omStlBuf=null, _fmStlBuf=null;
+
+function _wireModalStl(prefix, getBufVar, setBufVar) {
+  const btn=$(prefix+'-stl-btn'), input=$(prefix+'-stl-file'), clear=$(prefix+'-stl-clear'), disp=$(prefix+'-stl-display');
+  btn?.addEventListener('click',()=>input?.click());
+  clear?.addEventListener('click',()=>{ setBufVar(null); if(disp){disp.textContent='';} });
+  input?.addEventListener('change',async e=>{
+    const f=e.target.files[0]; if(!f) return;
+    setBufVar(new Uint8Array(await f.arrayBuffer()));
+    if(disp){disp.textContent=f.name; disp.style.color='#4499cc';}
+    e.target.value='';
+  });
+}
+
+_wireModalStl('rm', ()=>_rmStlBuf, v=>{ _rmStlBuf=v; });
+_wireModalStl('pm', ()=>_pmStlBuf, v=>{ _pmStlBuf=v; });
+_wireModalStl('om', ()=>_omStlBuf, v=>{ _omStlBuf=v; });
+_wireModalStl('fm', ()=>_fmStlBuf, v=>{ _fmStlBuf=v; });
+
+// Reset STL bufs when modals open
+const _origOpenObjModal = openObjModal;
+window.openObjModal = function(editIdx) { _omStlBuf=null; _origOpenObjModal(editIdx); };
+const _origOpenFixModal = openFixModal;
+window.openFixModal = function(editIdx) { _fmStlBuf=null; _origOpenFixModal(editIdx); };
+
 $('fixAddBtn')?.addEventListener('click',()=>openFixModal(-1));
 $('fixModalClose')?.addEventListener('click',()=>{ $('fixModal').style.display='none'; });
 
@@ -1700,8 +1734,10 @@ $('fm-submit')?.addEventListener('click',()=>{
     radius:  parseFloat($('fm-radius').value)||200,
     x: parseFloat($('fm-x').value)||0, y: parseFloat($('fm-y').value)||0, z: parseFloat($('fm-z').value)||0,
     rx:parseFloat($('fm-rx').value)||0,ry:parseFloat($('fm-ry').value)||0,rz:parseFloat($('fm-rz').value)||0,
-    showBox: $('fm-show').checked===true
+    showBox: $('fm-show').checked===true,
+    stlFile: _fmStlBuf ? {name:$('fm-name').value+'.stl',buf:_fmStlBuf} : (editIdx>=0?state.festeObjekte[editIdx]?.stlFile:null)
   };
+  _fmStlBuf=null;
   if(editIdx>=0){ state.festeObjekte[editIdx]=entry; }
   else { state.festeObjekte.push(entry); festeGrps.push(null); }
   rebuildFixMesh(editIdx>=0?editIdx:state.festeObjekte.length-1);
@@ -2134,121 +2170,161 @@ $('umfLibRefreshBtn').addEventListener('click', async () => {
 // state.effStl  = { path, name, buf }  (ein Endeffektor)
 // state.umfStls = [{ path, name, buf }]  (mehrere Umfeld-Teile)
 
+// ── Endeffektor Modal ─────────────────────────────────────────────
+var _effStlBuf = null;
+
 function renderEffRow() {
-  const el = $('effStlRows');
-  const badge = $('effBadge');
-  if (!el) return;
-  const effs = state.effektoren || [];
-  if (badge) badge.textContent = effs.length || '0';
-  if (!effs.length) {
-    el.innerHTML = '<div style="font-size:11px;color:#4a6a8a;padding:4px 0">Keine Endeffektoren</div>';
-    return;
-  }
-  const idx = Math.min(state.activeEff||0, effs.length-1);
-  const eff = effs[idx];
-  const o = eff.offset || {};
-  const lbl = eff.stlFile ? norm(eff.stlFile.name) : (eff.stlName || '—');
-  const fs = 'background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:2px 5px;font-family:inherit;font-size:12px;color:#d8e8f0;width:100%;text-align:right;outline:none';
-  const nav = (id,label,disabled) => `<button data-enav="${id}" ${disabled?'disabled':''} style="min-width:34px;height:32px;font-size:15px;cursor:${disabled?'default':'pointer'};background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,${disabled?'.05':'.15'});color:${disabled?'#3a5a7a':'#9ab'};border-radius:4px;padding:0 6px">${label}</button>`;
-
-  el.innerHTML = `
-    <div style="display:flex;align-items:center;gap:5px;margin-bottom:8px">
-      ${nav('first','⏮',idx===0)}
-      ${nav('prev','◀',idx===0)}
-      <span style="flex:1;text-align:center;font-family:monospace;font-size:12px;color:#d8e8f0">${idx+1} / ${effs.length}</span>
-      ${nav('next','▶',idx===effs.length-1)}
-      ${nav('last','⏭',idx===effs.length-1)}
-      <button data-enav="del" style="min-width:32px;height:32px;font-size:14px;cursor:pointer;background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:4px;padding:0 6px">✕</button>
-    </div>
-    <div style="display:flex;gap:4px;margin-bottom:8px">
-      ${['auftragend','abtragend','färbend'].map(t=>`<button data-etyp="${t}" style="flex:1;padding:4px 0;font-size:11px;font-family:monospace;cursor:pointer;border-radius:4px;border:1px solid ${(eff.typ||'auftragend')===t?'rgba(37,99,235,.6)':'rgba(255,255,255,.1)'};background:${(eff.typ||'auftragend')===t?'rgba(37,99,235,.25)':'rgba(255,255,255,.04)'};color:${(eff.typ||'auftragend')===t?'#60a5fa':'#6a8fa8'}">${t}</button>`).join('')}
-    </div>
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-      <span style="flex:1;font-size:11px;color:#d8e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${lbl}</span>
-      <button data-enav="stl" style="height:28px;padding:0 10px;font-size:11px;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#9ab;border-radius:4px;white-space:nowrap">STL laden</button>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px">
-      ${['x','y','z','rx','ry','rz'].map(k=>`<div><label style="font-size:10px;color:#6a8fa8;display:block;margin-bottom:2px">${k.toUpperCase()}</label><input data-eo="${idx}" data-k="${k}" type="number" step="0.1" value="${o[k]||0}" style="${fs}"></div>`).join('')}
-    </div>`;
-
-  const nav_click = {
-    first: () => { state.activeEff=0; },
-    prev:  () => { state.activeEff=Math.max(0,idx-1); },
-    next:  () => { state.activeEff=Math.min(effs.length-1,idx+1); },
-    last:  () => { state.activeEff=effs.length-1; },
-    del:   () => { effs.splice(idx,1); state.activeEff=Math.min(idx,Math.max(0,effs.length-1)); },
-    stl:   () => { $('effStlInput').dataset.effIdx=idx; $('effStlInput').click(); },
-  };
-  el.querySelectorAll('[data-etyp]').forEach(b => {
-    b.onclick = () => {
-      state.effektoren[idx].typ = b.dataset.etyp;
-      renderEffRow();
-    };
-  });
-  el.querySelectorAll('[data-enav]').forEach(b => {
-    if (b.disabled) return;
-    b.onclick = () => { nav_click[b.dataset.enav]?.(); syncTcpFromActiveEff?.(); renderEffRow(); updateEffTcpMarker(); };
-  });
-  el.querySelectorAll('[data-eo]').forEach(inp => inp.addEventListener('input', () => {
-    const i=+inp.dataset.eo, k=inp.dataset.k;
-    if (!state.effektoren[i]) return;
-    if (!state.effektoren[i].offset) state.effektoren[i].offset={};
-    state.effektoren[i].offset[k]=parseFloat(inp.value)||0;
-    if (i===(state.activeEff||0)) { syncTcpFromActiveEff?.(); updateEffTcpMarker(); }
+  const el=$('effStlRows'), badge=$('effBadge'); if(!el) return;
+  const effs=state.effektoren||[];
+  if(badge) badge.textContent=effs.length||'0';
+  if(!effs.length){el.innerHTML='';return;}
+  el.innerHTML=effs.map((e,i)=>`
+    <div style="border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:8px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="flex:1;font-family:monospace;font-size:12px;color:var(--txt)">🔧 ${e.name||'Endeffektor '+(i+1)}</span>
+        <button data-eff-edit="${i}" style="background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:11px">✏️</button>
+        <button data-eff-del="${i}" style="background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:12px">✕</button>
+      </div>
+      <div style="font-size:10px;color:#6a8fa8;font-family:monospace;margin-top:2px">${e.objectType||e.typ||'box'} | X:${e.offset?.x||0} Y:${e.offset?.y||0} Z:${e.offset?.z||0}</div>
+    </div>`).join('');
+  el.querySelectorAll('[data-eff-del]').forEach(btn=>btn.addEventListener('click',()=>{
+    state.effektoren.splice(+btn.dataset.effDel,1);
+    renderEffRow(); rebuildRobotKinematics(); applyTransforms();
   }));
+  el.querySelectorAll('[data-eff-edit]').forEach(btn=>btn.addEventListener('click',()=>openEffModal(+btn.dataset.effEdit)));
 }
+
+function openEffModal(editIdx) {
+  _effStlBuf=null;
+  const e=editIdx>=0?(state.effektoren||[])[editIdx]:null;
+  $('eff-name').value  = e?.name  || '';
+  $('eff-type').value  = e?.objectType||e?.typ||'box';
+  $('eff-color').value = e?.color || '#607080';
+  $('eff-length').value= e?.length||200; $('eff-width').value=e?.width||200;
+  $('eff-height').value= e?.height||300; $('eff-radius').value=e?.radius||80;
+  $('eff-x').value=e?.offset?.x||0; $('eff-y').value=e?.offset?.y||0; $('eff-z').value=e?.offset?.z||0;
+  $('eff-rx').value=e?.offset?.rx||0;$('eff-ry').value=e?.offset?.ry||0;$('eff-rz').value=e?.offset?.rz||0;
+  $('eff-stl-name').textContent=e?.stlFile?.name||'Keine STL gewählt';
+  if(e?.stlFile?.buf) _effStlBuf=e.stlFile.buf;
+  $('eff-edit-idx').value=editIdx>=0?editIdx:-1;
+  effTypeChanged();
+  $('effModal').style.display='flex';
+}
+window.openEffModal=openEffModal;
+
+function effTypeChanged(){
+  const t=$('eff-type')?.value||'box';
+  const pf=$('eff-prim-fields'),bf=$('eff-box-fields'),cf=$('eff-cyl-fields'),sf=$('eff-stl-field');
+  if(pf) pf.style.display=t==='stl'?'none':'contents';
+  if(bf) bf.style.display=t==='box'?'contents':'none';
+  if(cf) cf.style.display=t==='cylinder'?'contents':'none';
+  if(sf) sf.style.display=t==='stl'?'':'none';
+}
+window.effTypeChanged=effTypeChanged;
+
+$('eff-stl-btn')?.addEventListener('click',()=>$('eff-stl-input')?.click());
+$('eff-stl-input')?.addEventListener('change',async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  _effStlBuf=new Uint8Array(await f.arrayBuffer());
+  $('eff-stl-name').textContent=f.name; $('eff-stl-name').style.color='#4499cc';
+});
+$('effModalClose')?.addEventListener('click',()=>{ $('effModal').style.display='none'; });
+$('eff-submit')?.addEventListener('click',()=>{
+  const editIdx=parseInt($('eff-edit-idx').value);
+  const t=$('eff-type')?.value||'box';
+  const entry={
+    name:$('eff-name').value||'Endeffektor', objectType:t,
+    color:$('eff-color').value||'#607080',
+    length:parseFloat($('eff-length').value)||200, width:parseFloat($('eff-width').value)||200,
+    height:parseFloat($('eff-height').value)||300, radius:parseFloat($('eff-radius').value)||80,
+    stlFile: _effStlBuf ? {name:$('eff-name').value+'.stl', buf:_effStlBuf} : (editIdx>=0?state.effektoren[editIdx]?.stlFile:null),
+    offset:{x:parseFloat($('eff-x').value)||0,y:parseFloat($('eff-y').value)||0,z:parseFloat($('eff-z').value)||0,
+      rx:parseFloat($('eff-rx').value)||0,ry:parseFloat($('eff-ry').value)||0,rz:parseFloat($('eff-rz').value)||0}
+  };
+  state.effektoren=state.effektoren||[];
+  if(editIdx>=0) state.effektoren[editIdx]=entry; else state.effektoren.push(entry);
+  state.activeEff=editIdx>=0?editIdx:state.effektoren.length-1;
+  renderEffRow(); rebuildRobotKinematics(); applyTransforms(); updateEffTcpMarker?.();
+  $('effModal').style.display='none';
+});
+
+// ── Umgebung Modal ────────────────────────────────────────────────
+var _umfStlBuf = null;
 
 function renderUmfRows() {
-  const el = $('umfStlRows');
-  const badge = $('umfBadge');
-  if (!el) return;
-  const elms = state.umfElemente || [];
-  if (badge) badge.textContent = elms.length || '0';
-  if (!elms.length) {
-    el.innerHTML = '<div style="font-size:11px;color:#4a6a8a;padding:4px 0">Keine Umgebungselemente</div>';
-    return;
-  }
-  const idx = Math.min(state.activeUmf||0, elms.length-1);
-  const elm = elms[idx];
-  const o = elm.offset || {};
-  const lbl = elm.stlFile ? norm(elm.stlFile.name) : (elm.stlName || '—');
-  const fs = 'background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:2px 5px;font-family:inherit;font-size:12px;color:#d8e8f0;width:100%;text-align:right;outline:none';
-  const nav = (id,label,dis) => `<button data-unav="${id}" ${dis?'disabled':''} style="min-width:34px;height:32px;font-size:15px;cursor:${dis?'default':'pointer'};background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,${dis?'.05':'.15'});color:${dis?'#3a5a7a':'#9ab'};border-radius:4px;padding:0 6px">${label}</button>`;
-  el.innerHTML = `
-    <div style="display:flex;align-items:center;gap:5px;margin-bottom:8px">
-      ${nav('first','⏮',idx===0)}
-      ${nav('prev','◀',idx===0)}
-      <span style="flex:1;text-align:center;font-family:monospace;font-size:12px;color:#d8e8f0">${idx+1} / ${elms.length}</span>
-      ${nav('next','▶',idx===elms.length-1)}
-      ${nav('last','⏭',idx===elms.length-1)}
-      <button data-unav="del" style="min-width:32px;height:32px;font-size:14px;cursor:pointer;background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:4px;padding:0 6px">✕</button>
-    </div>
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-      <span style="flex:1;font-size:11px;color:#d8e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${lbl}</span>
-      <button data-unav="stl" style="height:28px;padding:0 10px;font-size:11px;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#9ab;border-radius:4px;white-space:nowrap">STL laden</button>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px">
-      ${['x','y','z','rx','ry','rz'].map(k=>`<div><label style="font-size:10px;color:#6a8fa8;display:block;margin-bottom:2px">${k.toUpperCase()}</label><input data-uo="${idx}" data-k="${k}" type="number" step="0.1" value="${o[k]||0}" style="${fs}"></div>`).join('')}
-    </div>`;
-  const nc = {
-    first:()=>{state.activeUmf=0;},
-    prev: ()=>{state.activeUmf=Math.max(0,idx-1);},
-    next: ()=>{state.activeUmf=Math.min(elms.length-1,idx+1);},
-    last: ()=>{state.activeUmf=elms.length-1;},
-    del:  ()=>{elms.splice(idx,1);state.activeUmf=Math.min(idx,Math.max(0,elms.length-1));},
-    stl:  ()=>{$('umfStlInput').dataset.umfIdx=idx;$('umfStlInput').click();},
-  };
-  el.querySelectorAll('[data-unav]').forEach(b=>{
-    if(b.disabled)return;
-    b.onclick=()=>{nc[b.dataset.unav]?.();renderUmfRows();};
-  });
-  el.querySelectorAll('[data-uo]').forEach(inp=>inp.addEventListener('input',()=>{
-    const i=+inp.dataset.uo,k=inp.dataset.k;
-    if(!state.umfElemente[i])return;
-    if(!state.umfElemente[i].offset)state.umfElemente[i].offset={};
-    state.umfElemente[i].offset[k]=parseFloat(inp.value)||0;
+  const el=$('umfStlRows'), badge=$('umfBadge'); if(!el) return;
+  const elms=state.umfElemente||[];
+  if(badge) badge.textContent=elms.length||'0';
+  if(!elms.length){el.innerHTML='';return;}
+  el.innerHTML=elms.map((u,i)=>`
+    <div style="border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:8px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="flex:1;font-family:monospace;font-size:12px;color:var(--txt)">🏭 ${u.name||'Umgebung '+(i+1)}</span>
+        <button data-umf-edit="${i}" style="background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:11px">✏️</button>
+        <button data-umf-del="${i}" style="background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:12px">✕</button>
+      </div>
+    </div>`).join('');
+  el.querySelectorAll('[data-umf-del]').forEach(btn=>btn.addEventListener('click',()=>{
+    state.umfElemente.splice(+btn.dataset.umfDel,1);
+    renderUmfRows(); rebuildRobotKinematics(); applyTransforms();
   }));
+  el.querySelectorAll('[data-umf-edit]').forEach(btn=>btn.addEventListener('click',()=>openUmfModal(+btn.dataset.umfEdit)));
 }
+
+function openUmfModal(editIdx) {
+  _umfStlBuf=null;
+  const u=editIdx>=0?(state.umfElemente||[])[editIdx]:null;
+  $('umf-name').value  = u?.name  || '';
+  $('umf-type').value  = u?.objectType||(u?.stlFile?'stl':'box');
+  $('umf-color').value = u?.color || '#3a5a7a';
+  $('umf-length').value= u?.length||2000; $('umf-width').value=u?.width||200;
+  $('umf-height').value= u?.height||2000; $('umf-radius').value=u?.radius||500;
+  const o=u?.offset||{};
+  $('umf-x').value=o.x||0;$('umf-y').value=o.y||0;$('umf-z').value=o.z||0;
+  $('umf-rx').value=o.rx||0;$('umf-ry').value=o.ry||0;$('umf-rz').value=o.rz||0;
+  $('umf-show').checked=u?.showBox!==false;
+  $('umf-stl-name').textContent=u?.stlFile?.name||'Keine STL gewählt';
+  if(u?.stlFile?.buf) _umfStlBuf=u.stlFile.buf;
+  $('umf-edit-idx').value=editIdx>=0?editIdx:-1;
+  umfTypeChanged();
+  $('umfModal').style.display='flex';
+}
+window.openUmfModal=openUmfModal;
+
+function umfTypeChanged(){
+  const t=$('umf-type')?.value||'box';
+  const pf=$('umf-prim-fields'),bf=$('umf-box-fields'),cf=$('umf-cyl-fields'),sf=$('umf-stl-field');
+  if(pf) pf.style.display=t==='stl'?'none':'contents';
+  if(bf) bf.style.display=t==='box'?'contents':'none';
+  if(cf) cf.style.display=t==='cylinder'?'contents':'none';
+  if(sf) sf.style.display=t==='stl'?'':'none';
+}
+window.umfTypeChanged=umfTypeChanged;
+
+$('umf-stl-btn')?.addEventListener('click',()=>$('umf-stl-input')?.click());
+$('umf-stl-input')?.addEventListener('change',async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  _umfStlBuf=new Uint8Array(await f.arrayBuffer());
+  $('umf-stl-name').textContent=f.name; $('umf-stl-name').style.color='#4499cc';
+});
+$('umfModalClose')?.addEventListener('click',()=>{ $('umfModal').style.display='none'; });
+$('umf-submit')?.addEventListener('click',()=>{
+  const editIdx=parseInt($('umf-edit-idx').value);
+  const t=$('umf-type')?.value||'box';
+  const entry={
+    name:$('umf-name').value||'Umgebung', objectType:t, color:$('umf-color').value||'#3a5a7a',
+    length:parseFloat($('umf-length').value)||2000, width:parseFloat($('umf-width').value)||200,
+    height:parseFloat($('umf-height').value)||2000, radius:parseFloat($('umf-radius').value)||500,
+    showBox:$('umf-show').checked!==false,
+    stlFile: _umfStlBuf ? {name:$('umf-name').value+'.stl',buf:_umfStlBuf} : (editIdx>=0?state.umfElemente[editIdx]?.stlFile:null),
+    offset:{x:parseFloat($('umf-x').value)||0,y:parseFloat($('umf-y').value)||0,z:parseFloat($('umf-z').value)||0,
+      rx:parseFloat($('umf-rx').value)||0,ry:parseFloat($('umf-ry').value)||0,rz:parseFloat($('umf-rz').value)||0}
+  };
+  state.umfElemente=state.umfElemente||[];
+  if(editIdx>=0) state.umfElemente[editIdx]=entry; else state.umfElemente.push(entry);
+  renderUmfRows(); rebuildRobotKinematics(); applyTransforms();
+  $('umfModal').style.display='none';
+});
 
 // ── Schienen (parametrisch) ───────────────────────────────────────
 function renderRailRows() {
@@ -2389,20 +2465,17 @@ $('rm-submit')?.addEventListener('click',()=>{
     eMax:  parseFloat($('rm-max')?.value)  || 2000,
     ePos:  parseFloat($('rm-start')?.value)|| 0,
     boxOffset: {
-      x:  parseFloat($('rm-ox')?.value) ||0,
-      y:  parseFloat($('rm-oy')?.value) ||0,
-      z:  parseFloat($('rm-oz')?.value) ||0,
-      rx: parseFloat($('rm-orx')?.value)||0,
-      ry: parseFloat($('rm-ory')?.value)||0,
-      rz: parseFloat($('rm-orz')?.value)||0
+      x:  parseFloat($('rm-ox')?.value) ||0, y:  parseFloat($('rm-oy')?.value) ||0, z:  parseFloat($('rm-oz')?.value) ||0,
+      rx: parseFloat($('rm-orx')?.value)||0, ry: parseFloat($('rm-ory')?.value)||0, rz: parseFloat($('rm-orz')?.value)||0
     },
     showBox: $('rm-show')?.checked === true,
     robotMoves: $('rm-robot-moves')?.checked === true
   };
-  // Stop any running sim before replacing state
   const old = state.schienen[0];
   if(old?._simInterval){ clearInterval(old._simInterval); delete old._simInterval; }
-  state.schienen[0] = entry; // max 1
+  state.schienen[0] = entry;
+  // STL → axisStlParts
+  if(_rmStlBuf){ const eAx='E'+(entry.eNumber||1); state.axisStlParts[eAx]=[{name:entry.name+'.stl',color:'#2563eb',buf:_rmStlBuf}]; _rmStlBuf=null; }
   renderRailRows(); rebuildRailMeshes(); renderRows();
   $('railModal').style.display='none';
 });
@@ -2476,73 +2549,36 @@ $('extAxesClose')?.addEventListener('click',()=>{ $('extAxesModal').style.displa
 
 
 
-$('effAddBtn').addEventListener('click', () => {
-  state.effektoren.push({ stlFile: null, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0}, typ: 'auftragend' });
-  state.activeEff = state.effektoren.length - 1;
-  renderEffRow(); updateEffTcpMarker();
-});
+// effAddBtn/umfAddBtn jetzt mit onclick in HTML — Fallback via JS:
+$('effAddBtn')?.addEventListener('click', () => openEffModal(-1));
+$('umfAddBtn')?.addEventListener('click', () => openUmfModal(-1));
 
-$('effStlInput').addEventListener('change', async e => {
+// Legacy effStlInput (hidden, kept for compat)
+$('effStlInput')?.addEventListener('change', async e => {
   let file = e.target.files[0]; if (!file) return;
-  let rawBuf, fname;
-  if (/\.zip$/i.test(file.name)) {
-    try { const r = await extractFromZip(file); rawBuf = r.buf; fname = r.name; }
-    catch(er) { alert(er.message); e.target.value=''; return; }
-  } else { rawBuf = await file.arrayBuffer(); fname = file.name; }
-  let buf;
-  if (/\.(stp|step)$/i.test(fname)) {
-    try {
-      const geo = await parseGeometry(rawBuf, fname);
-      buf = new Uint8Array(stlFromGeometry(geo));
-      fname = fname.replace(/\.(stp|step)$/i, '.stl');
-    } catch(er) { alert('STEP Fehler: ' + er.message); e.target.value=''; return; }
-  } else { buf = new Uint8Array(rawBuf); }
-  const effIdx = parseInt($('effStlInput').dataset.effIdx ?? '-1');
-  if (effIdx >= 0 && effIdx < state.effektoren.length) {
+  let rawBuf = await file.arrayBuffer(), fname = file.name;
+  const buf = new Uint8Array(rawBuf);
+  const effIdx = parseInt($('effStlInput').dataset.effIdx ?? state.activeEff ?? '0');
+  if (effIdx >= 0 && effIdx < (state.effektoren||[]).length) {
     state.effektoren[effIdx].stlFile = { path: fname, name: fname, buf };
-  } else {
-    state.effektoren.push({ stlFile: { path: fname, name: fname, buf }, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0}, typ: 'auftragend' });
-    state.activeEff = state.effektoren.length - 1;
   }
-  renderEffRow();
-  e.target.value = '';
+  renderEffRow(); e.target.value = '';
 });
 
-$('umfAddBtn')?.addEventListener('click', () => {
-  if (!state.umfElemente) state.umfElemente = [];
-  state.umfElemente.push({ stlFile: null, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0} });
-  state.activeUmf = state.umfElemente.length - 1;
-  renderUmfRows();
-});
-
-$('umfStlInput').addEventListener('change', async e => {
+// Legacy umfStlInput (hidden, kept for compat)
+$('umfStlInput')?.addEventListener('change', async e => {
   const rawFiles = Array.from(e.target.files);
   if (!state.umfElemente) state.umfElemente = [];
-  if (!state.umfStls) state.umfStls = [];
   for (const file of rawFiles) {
-    let rawBuf, fname;
-    if (/\.zip$/i.test(file.name)) {
-      try { const r = await extractFromZip(file); rawBuf = r.buf; fname = r.name; }
-      catch(er) { alert(er.message); continue; }
-    } else { rawBuf = await file.arrayBuffer(); fname = file.name; }
-    let buf;
-    if (/\.(stp|step)$/i.test(fname)) {
-      try {
-        const geo = await parseGeometry(rawBuf, fname);
-        buf = new Uint8Array(stlFromGeometry(geo));
-        fname = fname.replace(/\.(stp|step)$/i, '.stl');
-      } catch(er) { alert('STEP Fehler: ' + er.message); continue; }
-    } else { buf = new Uint8Array(rawBuf); }
+    const buf = new Uint8Array(await file.arrayBuffer());
     const umfIdx = parseInt($('umfStlInput').dataset.umfIdx ?? '-1');
     if (umfIdx >= 0 && umfIdx < state.umfElemente.length) {
-      state.umfElemente[umfIdx].stlFile = { path: fname, name: fname, buf };
+      state.umfElemente[umfIdx].stlFile = { path: file.name, name: file.name, buf };
     } else {
-      state.umfElemente.push({ stlFile:{path:fname,name:fname,buf}, offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0} });
-      state.activeUmf = state.umfElemente.length-1;
+      state.umfElemente.push({ stlFile:{path:file.name,name:file.name,buf}, offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0} });
     }
   }
-  renderUmfRows();
-  e.target.value = '';
+  renderUmfRows(); e.target.value = '';
 });
 
 // ── Endeffektor & Umfeld ────────────────────────────────────────
