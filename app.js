@@ -2640,23 +2640,197 @@ function openRoblibModal() {
   $('roblibModal').style.display = 'flex';
 }
 
-// Type change handler — show/hide robot-specific fields
+// Type change handler
 function rlTypeChanged() {
   const type = $('rl-type')?.value || 'robot';
-  const robotFields = $('rl-robot-fields');
-  if (robotFields) {
-    const labels = robotFields.querySelectorAll('label');
-    labels.forEach(l => l.style.display = type === 'robot' ? '' : 'none');
-  }
-  const railFields = $('rl-rail-fields');
-  if (railFields) railFields.style.display = type === 'rail' ? 'contents' : 'none';
-  const nameField = $('rl-name');
-  if (nameField) {
-    const placeholders = {robot:'KR 8 R1420', endeffektor:'Greifer 2-Finger', umfeld:'Sicherheitszaun', rail:'Linear Track 3m'};
-    nameField.placeholder = placeholders[type] || '';
-  }
+  // Robot fields
+  const rf=$('rl-robot-fields');
+  if(rf) rf.querySelectorAll('label').forEach(l=>l.style.display=type==='robot'?'':'none');
+  // Rail fields
+  const raf=$('rl-rail-fields'); if(raf) raf.style.display=type==='rail'?'contents':'none';
+  // Station fields
+  const sf=$('rl-station-fields'); if(sf) sf.style.display=type==='station'?'':'none';
+  if(type==='station') _buildStationChecks();
+  // Component selector
+  const cs=$('rl-comp-select'); if(cs) cs.style.display=['positioner','label','fixture'].includes(type)?'':'none';
+  if(type==='positioner') _fillCompSelect(state.positioners||[], p=>`E${p.eNum||'?'} — ${p.name||''}`);
+  if(type==='label')      _fillCompSelect(state.objekte||[],    o=>`Label${o.labelNum||'?'} — ${o.name||''}`);
+  if(type==='fixture')    _fillCompSelect(state.festeObjekte||[],o=>o.name||'Objekt');
+  // Placeholder
+  const ph={robot:'KR 8 R1420', rail:'Linear Track', positioner:'Drehtisch', label:'Palette', fixture:'Tisch', endeffektor:'Greifer', umfeld:'Zelle', station:'Schweißzelle'};
+  const nf=$('rl-name'); if(nf&&!nf.value) nf.placeholder=ph[type]||'Name';
+}
+window.rlTypeChanged=rlTypeChanged;
+
+function _fillCompSelect(arr, labelFn) {
+  const sel=$('rl-comp-idx'); if(!sel) return;
+  sel.innerHTML=arr.map((o,i)=>`<option value="${i}">${labelFn(o)}</option>`).join('');
+}
+
+function _buildStationChecks() {
+  const el=$('rl-station-checks'); if(!el) return;
+  const items=[];
+  if((state.joints||[]).length) items.push({key:'robot', label:`🦾 Roboter — ${state.robotName||'geladen'}`});
+  if((state.schienen||[]).length) items.push({key:'rail', label:`🛤️ Rail — ${state.schienen[0].name||''}`});
+  (state.positioners||[]).forEach((p,i)=>items.push({key:`pos_${i}`, label:`🔄 E${p.eNum||'?'} ${p.name||''}`}));
+  (state.objekte||[]).forEach((o,i)=>items.push({key:`lbl_${i}`, label:`📦 Label${o.labelNum||'?'} ${o.name||''}`}));
+  (state.festeObjekte||[]).forEach((o,i)=>items.push({key:`fix_${i}`, label:`🧱 ${o.name||'Festes Obj.'}`}));
+  (state.effektoren||[]).forEach((e,i)=>items.push({key:`eff_${i}`, label:`🔧 Endeffektor ${i+1}`}));
+  (state.umfElemente||[]).forEach((u,i)=>items.push({key:`umf_${i}`, label:`🏭 Umgebung ${i+1}`}));
+  el.innerHTML=items.map(({key,label})=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-station-key="${key}" checked style="accent-color:var(--acc)"> ${label}</label>`).join('');
 }
 $('rl-type')?.addEventListener('change', rlTypeChanged);
+
+// ── Komponenten ZIP-Builder ───────────────────────────────────────
+function _addStlsToZip(zip, axisKeys) {
+  // Adds STL buffers from state.axisStlParts to zip under stl/
+  for(const key of axisKeys){
+    const parts=state.axisStlParts[key]||[];
+    parts.forEach((p,pi)=>{ if(p.buf) zip.file(`stl/${key}${pi>0?'_'+pi:''}.stl`, p.buf); });
+  }
+}
+
+function buildRailJson(idx=0) {
+  const r=state.schienen[idx]; if(!r) return null;
+  const eAx='E'+(r.eNumber||1);
+  const parts=(state.axisStlParts[eAx]||[]).map(p=>({name:p.name||eAx+'.stl',color:p.color||'#2563eb'}));
+  return { type:'rail', name:r.name||'Rail', length_mm:r.length_mm||2000, height_mm:r.height_mm||200,
+    width_mm:r.width_mm||400, axis:r.axis||'X+', eNumber:r.eNumber||1,
+    eMin:r.eMin??0, eMax:r.eMax??r.length_mm??2000, showBox:r.showBox!==false,
+    boxOffset:r.boxOffset||{}, stlFiles:parts.length?{[eAx]:parts}:undefined };
+}
+
+function buildPositionerJson(idx) {
+  const p=state.positioners[idx]; if(!p) return null;
+  const eAx='E'+(p.eNum||idx+2);
+  const parts=(state.axisStlParts[eAx]||[]).map(pt=>({name:pt.name||eAx+'.stl',color:pt.color||p.color||'#e8a020'}));
+  return { type:'positioner', name:p.name||'Positionierer', objectType:p.type||'cylinder',
+    eNum:p.eNum||idx+2, rotAxis:p.rotAxis||'Y+', pivotX:p.pivotX||0, pivotY:p.pivotY||0, pivotZ:p.pivotZ||0,
+    eMin:p.eMin??-180, eMax:p.eMax??180, ePos:p.ePos||0,
+    radius:p.radius||300, length:p.length||500, width:p.width||500, height:p.height||100,
+    showBox:p.showBox!==false, color:p.color||'#e8a020', parentIdx:p.parentIdx??-1,
+    boxOffset:p.boxOffset||{}, stlFiles:parts.length?{[eAx]:parts}:undefined };
+}
+
+function buildLabelJson(idx) {
+  const o=state.objekte[idx]; if(!o) return null;
+  const lbl='Label'+(o.labelNum||idx+1);
+  const parts=(state.axisStlParts[lbl]||[]).map(p=>({name:p.name||lbl+'.stl',color:p.color||o.color||'#4499cc'}));
+  return { type:'label', name:o.name||'Label', objectType:o.type||'box', labelNum:o.labelNum||idx+1,
+    length:o.length||500, width:o.width||500, height:o.height||500, radius:o.radius||200,
+    axis:o.axis||'Y+', eMin:o.eMin||0, eMax:o.eMax||1000, ePos:o.ePos||0,
+    showBox:o.showBox!==false, color:o.color||'#4499cc', boxOffset:o.boxOffset||{},
+    stlFiles:parts.length?{[lbl]:parts}:undefined };
+}
+
+function buildFixtureJson(idx) {
+  const o=state.festeObjekte[idx]; if(!o) return null;
+  return { type:'fixture', name:o.name||'Objekt', objectType:o.type||'box',
+    length:o.length||500, width:o.width||500, height:o.height||500, radius:o.radius||200,
+    color:o.color||'#607080', x:o.x||0, y:o.y||0, z:o.z||0,
+    rx:o.rx||0, ry:o.ry||0, rz:o.rz||0, showBox:o.showBox!==false };
+}
+
+function buildEffectorJson(idx) {
+  const e=(state.effektoren||[])[idx]; if(!e) return null;
+  return { type:'endeffektor', name:e.name||'Endeffektor', mountMode:e.mountMode||'world',
+    stlFile:e.stlFile?`stl/eff_${idx}.stl`:undefined, offset:e.offset||{} };
+}
+
+function buildEnvironmentJson(idx) {
+  const u=(state.umfElemente||[])[idx]; if(!u) return null;
+  return { type:'umfeld', name:u.name||'Umgebung', stlFile:`stl/umf_${idx}.stl`, offset:u.offset||{} };
+}
+
+async function buildComponentZip(type, idx) {
+  const zip = new JSZip();
+  let cfg = null;
+  if(type==='robot'){
+    const prevMode=toolMountMode; if(prevMode!=='world'){detachToolFromA6();scene.updateMatrixWorld(true);}
+    cfg = buildJson();
+    for(const [,mesh] of meshes) zip.file(`stl/${mesh.name}`,exportBinaryStl(mesh));
+    state.effektoren.forEach((e,i)=>{ if(e.stlFile?.buf) zip.file(`stl/eff_${i}.stl`,e.stlFile.buf); });
+    if(prevMode!=='world') attachToolToA6();
+  } else if(type==='rail'){
+    cfg=buildRailJson(idx||0);
+    const eAx='E'+((state.schienen[idx||0]?.eNumber)||1);
+    _addStlsToZip(zip,[eAx]);
+  } else if(type==='positioner'){
+    cfg=buildPositionerJson(idx||0);
+    _addStlsToZip(zip,['E'+((state.positioners[idx||0]?.eNum)||2)]);
+  } else if(type==='label'){
+    cfg=buildLabelJson(idx||0);
+    _addStlsToZip(zip,['Label'+((state.objekte[idx||0]?.labelNum)||1)]);
+  } else if(type==='fixture'){
+    cfg=buildFixtureJson(idx||0);
+    // fixtures are parametric — no STL yet
+  } else if(type==='endeffektor'){
+    const e=(state.effektoren||[])[idx||0];
+    cfg=buildEffectorJson(idx||0);
+    if(e?.stlFile?.buf) zip.file(`stl/eff_${idx||0}.stl`,e.stlFile.buf);
+  } else if(type==='umfeld'){
+    const u=(state.umfElemente||[])[idx||0];
+    cfg=buildEnvironmentJson(idx||0);
+    if(u?.stlFile?.buf) zip.file(`stl/umf_${idx||0}.stl`,u.stlFile.buf);
+  } else if(type==='station'){
+    cfg = await buildStationJson(zip);
+  }
+  if(!cfg) return null;
+  zip.file('config.json', JSON.stringify(cfg, null, 2));
+  return zip;
+}
+
+async function buildStationJson(zip) {
+  // Collect selected station components
+  const checks=[...$('rl-station-checks')?.querySelectorAll('[data-station-key]')||[]];
+  const selected=new Set(checks.filter(c=>c.checked).map(c=>c.dataset.stationKey));
+  const cfg = { type:'station', name:$('rl-name').value.trim()||'Station', components:{} };
+
+  if(selected.has('robot') && (state.joints||[]).length){
+    const prevMode=toolMountMode; if(prevMode!=='world'){detachToolFromA6();scene.updateMatrixWorld(true);}
+    cfg.components.robot=buildJson();
+    for(const [,mesh] of meshes) zip.file(`stl/${mesh.name}`,exportBinaryStl(mesh));
+    if(prevMode!=='world') attachToolToA6();
+  }
+  if(selected.has('rail') && state.schienen[0]){
+    cfg.components.rail=buildRailJson(0);
+    _addStlsToZip(zip,['E'+(state.schienen[0].eNumber||1)]);
+  }
+  cfg.components.positioners=[];
+  (state.positioners||[]).forEach((p,i)=>{
+    if(!selected.has(`pos_${i}`)) return;
+    const pj=buildPositionerJson(i); if(!pj) return;
+    cfg.components.positioners.push(pj);
+    _addStlsToZip(zip,['E'+(p.eNum||i+2)]);
+  });
+  cfg.components.labels=[];
+  (state.objekte||[]).forEach((o,i)=>{
+    if(!selected.has(`lbl_${i}`)) return;
+    const lj=buildLabelJson(i); if(!lj) return;
+    cfg.components.labels.push(lj);
+    _addStlsToZip(zip,['Label'+(o.labelNum||i+1)]);
+  });
+  cfg.components.fixtures=[];
+  (state.festeObjekte||[]).forEach((o,i)=>{
+    if(!selected.has(`fix_${i}`)) return;
+    const fj=buildFixtureJson(i); if(fj) cfg.components.fixtures.push(fj);
+  });
+  cfg.components.effectors=[];
+  (state.effektoren||[]).forEach((e,i)=>{
+    if(!selected.has(`eff_${i}`)) return;
+    const ej=buildEffectorJson(i); if(!ej) return;
+    cfg.components.effectors.push(ej);
+    if(e?.stlFile?.buf) zip.file(`stl/eff_${i}.stl`,e.stlFile.buf);
+  });
+  cfg.components.environment=[];
+  (state.umfElemente||[]).forEach((u,i)=>{
+    if(!selected.has(`umf_${i}`)) return;
+    const uj=buildEnvironmentJson(i); if(!uj) return;
+    cfg.components.environment.push(uj);
+    if(u?.stlFile?.buf) zip.file(`stl/umf_${i}.stl`,u.stlFile.buf);
+  });
+  return cfg;
+}
 
 async function updateRoblib() {
   if (!_lastLibRobot) { alert('Kein Library-Eintrag geladen.'); return; }
@@ -2747,128 +2921,44 @@ async function updateRoblib() {
 }
 
 async function uploadToRoblib() {
-  const btn  = $('rl-submit');
-  const msg  = $('rl-msg');
-  const wrap = $('rl-progress-wrap');
-  const bar  = $('rl-progress-bar');
-  const lbl  = $('rl-progress-label');
-  const pct  = $('rl-progress-pct');
-
-  const show = (text, ok) => {
-    msg.textContent = text; msg.className = 'rl-msg ' + (ok ? 'rl-ok' : 'rl-err');
-    msg.style.display = ''; wrap.style.display = 'none';
-  };
-  const setProgress = (label, percent) => {
-    wrap.style.display = ''; msg.style.display = 'none';
-    lbl.textContent = label;
-    pct.textContent = Math.round(percent) + '%';
-    bar.style.width = percent + '%';
-    bar.style.background = percent === 100 ? '#22c55e' : '#2563eb';
-  };
-
-  const type = $('rl-type')?.value || 'robot';
-  const fields = {
-    name:  $('rl-name').value.trim(),
-    type,
-  };
-  if (!fields.name) { show('Name fehlt.', false); return; }
-  // Robot-specific fields
-  if (type === 'robot') {
-    Object.assign(fields, {
-      marke:                   $('rl-marke').value.trim(),
-      modell:                  $('rl-modell').value.trim(),
-      achsen:                  $('rl-achsen').value.trim(),
-      reichweite_mm:           $('rl-reichweite').value.trim(),
-      nutzlast_kg:             $('rl-nutzlast').value.trim(),
-      gewicht_kg:              $('rl-gewicht').value.trim(),
-      wiederholgenauigkeit_mm: $('rl-wdh').value.trim(),
-    });
-    for (const [k,v] of Object.entries(fields)) {
-      if (!v && !['type','pass'].includes(k)) { show('Feld "'+k+'" fehlt.', false); return; }
-    }
+  const btn=$('rl-submit'), msg=$('rl-msg'), wrap=$('rl-progress-wrap'), bar=$('rl-progress-bar'), lbl=$('rl-progress-label'), pct=$('rl-progress-pct');
+  const show=(text,ok)=>{ msg.textContent=text; msg.className='rl-msg '+(ok?'rl-ok':'rl-err'); msg.style.display=''; wrap.style.display='none'; };
+  const setP=(label,percent)=>{ wrap.style.display=''; msg.style.display='none'; lbl.textContent=label; pct.textContent=Math.round(percent)+'%'; bar.style.width=percent+'%'; bar.style.background=percent===100?'#22c55e':'#2563eb'; };
+  const type=$('rl-type')?.value||'robot';
+  const name=$('rl-name').value.trim();
+  if(!name){show('Name fehlt.',false);return;}
+  const fields={name,type};
+  if(type==='robot'){
+    const missing=['rl-marke','rl-modell','rl-achsen','rl-reichweite','rl-nutzlast','rl-gewicht','rl-wdh'].find(id=>!$(id)?.value.trim());
+    if(missing){show('Pflichtfeld fehlt.',false);return;}
+    Object.assign(fields,{marke:$('rl-marke').value.trim(),modell:$('rl-modell').value.trim(),
+      achsen:$('rl-achsen').value,reichweite_mm:$('rl-reichweite').value,
+      nutzlast_kg:$('rl-nutzlast').value,gewicht_kg:$('rl-gewicht').value,wiederholgenauigkeit_mm:$('rl-wdh').value});
   }
-
-  btn.disabled = true; btn.textContent = 'Lade…';
+  btn.disabled=true; btn.textContent='Lade…';
   try {
-    // ── Rail: nur JSON, kein STL ──────────────────────────────────
-    if (type === 'rail') {
-      const railData = {
-        name: fields.name, type: 'rail',
-        length_mm: parseFloat($('rl-rail-length')?.value)||2000,
-        height_mm: parseFloat($('rl-rail-height')?.value)||200,
-        width_mm:  parseFloat($('rl-rail-width')?.value)||400,
-        axis: $('rl-rail-axis')?.value||'X+'
-      };
-      setProgress('Erstelle ZIP…', 5);
-      const zip2 = new JSZip();
-      const base2 = zipName(fields.name || 'rail');
-      zip2.file(base2+'.json', JSON.stringify(railData, null, 2));
-      const zipBlob2 = await zip2.generateAsync({type:'blob'}, m => setProgress('Komprimiere…', 5+m.percent*0.4));
-      setProgress('Lade hoch…', 45);
-      const fd2 = new FormData();
-      for (const [k,v] of Object.entries(fields)) fd2.append(k,v);
-      fd2.append('zip', zipBlob2, base2+'.zip');
-      const thumb2 = $('rl-thumb').files[0];
-      if (thumb2) fd2.append('thumb', thumb2, thumb2.name);
-      const res2 = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', ROBLIB_API + '?action=upload');
-        xhr.upload.onprogress = e => { if(e.lengthComputable) setProgress('Lade hoch…', 45+(e.loaded/e.total)*50); };
-        xhr.onload = () => { try { resolve(JSON.parse(xhr.responseText)); } catch(e) { reject(new Error('Ungültige Serverantwort')); } };
-        xhr.onerror = () => reject(new Error('Verbindungsfehler'));
-        xhr.send(fd2);
-      });
-      if (res2.ok) { setProgress('Fertig!', 100); setTimeout(() => show('✓ Hochgeladen: '+res2.robot.name, true), 600); }
-      else show('Fehler: '+(res2.error||'Unbekannt'), false);
-      return;
-    }
-    // 1. ZIP erstellen
-    setProgress('Erstelle ZIP…', 5);
-    const prevMode = toolMountMode;
-    if (prevMode !== 'world') { detachToolFromA6(); scene.updateMatrixWorld(true); }
-    const zip  = new JSZip();
-    const base = zipName(state.robotName || 'robot');
-    zip.file(base + '.json', JSON.stringify(buildJson(), null, 2));
-    for (const [, mesh] of meshes) zip.file(mesh.name, exportBinaryStl(mesh));
-    state.effektoren.forEach((eff, i) => { if (eff.stlFile?.buf) zip.file('endeffektor_'+(i+1)+'.stl', eff.stlFile.buf); });
-    const allUmfZip = [...(state.umfElemente||[]), ...(state.umfStls||[]).map(u=>({stlFile:u}))];
-    allUmfZip.forEach((u, i) => { const buf = u.stlFile?.buf; if(buf) zip.file('umfeld_'+(i+1)+'.stl', buf); });
-    const zipBlob = await zip.generateAsync({ type: 'blob' }, m => setProgress('Komprimiere…', 5 + m.percent * 0.4));
-    if (prevMode !== 'world') attachToolToA6();
-    setProgress('Lade hoch…', 45);
-
-    const fd = new FormData();
-    for (const [k, v] of Object.entries(fields)) fd.append(k, v);
-    fd.append('zip', zipBlob, base + '.zip');
-    const thumb = $('rl-thumb').files[0];
-    if (thumb) fd.append('thumb', thumb, thumb.name);
-
-    // 2. XHR mit Upload-Progress
-    const data = await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', ROBLIB_API + '?action=upload');
-      xhr.upload.onprogress = e => {
-        if (e.lengthComputable) setProgress('Lade hoch…', 45 + (e.loaded / e.total) * 50);
-      };
-      xhr.onload = () => {
-        try { resolve(JSON.parse(xhr.responseText)); }
-        catch (e) { reject(new Error('Ungültige Serverantwort')); }
-      };
-      xhr.onerror = () => reject(new Error('Verbindungsfehler'));
-      xhr.send(fd);
+    setP('Erstelle ZIP…',5);
+    const idx=parseInt($('rl-comp-idx')?.value)||0;
+    const zip=await buildComponentZip(type,idx);
+    if(!zip){show('Keine Daten für diesen Typ.',false);btn.disabled=false;btn.textContent='Hochladen';return;}
+    setP('Komprimiere…',20);
+    const base=zipName(name);
+    const zipBlob=await zip.generateAsync({type:'blob'},m=>setP('Komprimiere…',20+m.percent*0.25));
+    setP('Lade hoch…',45);
+    const fd=new FormData();
+    for(const [k,v] of Object.entries(fields)) fd.append(k,v);
+    fd.append('zip',zipBlob,base+'.zip');
+    const thumb=$('rl-thumb').files[0]; if(thumb) fd.append('thumb',thumb,thumb.name);
+    const data=await new Promise((res,rej)=>{
+      const xhr=new XMLHttpRequest(); xhr.open('POST',ROBLIB_API+'?action=upload');
+      xhr.upload.onprogress=e=>{if(e.lengthComputable)setP('Lade hoch…',45+(e.loaded/e.total)*50);};
+      xhr.onload=()=>{try{res(JSON.parse(xhr.responseText));}catch(e){rej(new Error('Serverantwort ungültig'));}};
+      xhr.onerror=()=>rej(new Error('Verbindungsfehler')); xhr.send(fd);
     });
-
-    if (data.ok) {
-      setProgress('Fertig!', 100);
-      setTimeout(() => show('✓ Hochgeladen: ' + data.robot.name, true), 600);
-    } else {
-      show('Fehler: ' + data.error, false);
-    }
-  } catch (e) {
-    show('Fehler: ' + e.message, false);
-  } finally {
-    btn.disabled = false; btn.textContent = 'Hochladen';
-  }
+    if(data.ok){setP('Fertig!',100);setTimeout(()=>show('✓ Hochgeladen: '+name,true),600);}
+    else show('Fehler: '+(data.error||'Unbekannt'),false);
+  } catch(e){show('Fehler: '+e.message,false);}
+  btn.disabled=false; btn.textContent='Hochladen';
 }
 
 
