@@ -2556,9 +2556,10 @@ let _libTypeFilter = 'all';
 
 function filterLibItems(items) {
   if (_libTypeFilter === 'all') return items;
-  // fixture matches both 'fixture' and 'object' (server alias)
-  if (_libTypeFilter === 'fixture') return items.filter(r => (r.type||'robot') === 'fixture' || (r.type||'robot') === 'object');
-  // label matches both 'label' and 'object' from old saves... actually label is separate
+  // fixture and label both stored as 'object' on server
+  if (_libTypeFilter === 'fixture' || _libTypeFilter === 'label') {
+    return items.filter(r => (r.type||'robot') === 'object');
+  }
   return items.filter(r => (r.type||'robot') === _libTypeFilter);
 }
 
@@ -2954,7 +2955,10 @@ async function uploadToRoblib() {
   const type=$('rl-type')?.value||'robot';
   const name=$('rl-name').value.trim();
   if(!name){show('Name fehlt.',false);return;}
-  const fields={name,type};
+  // Map internal types to server category types
+  const serverTypeMap = { fixture:'object', label:'object', positioner:'positioner', rail:'rail', endeffektor:'endeffektor', umfeld:'umfeld', station:'station', robot:'robot' };
+  const serverType = serverTypeMap[type] || type;
+  const fields={name, type:serverType};
   if(type==='robot'){
     const missing=['rl-marke','rl-modell','rl-achsen','rl-reichweite','rl-nutzlast','rl-gewicht','rl-wdh'].find(id=>!$(id)?.value.trim());
     if(missing){show('Pflichtfeld fehlt.',false);return;}
