@@ -78,16 +78,10 @@
           <h2>🏭 Umgebung</h2>
           <div style="display:flex;gap:4px;align-items:center">
             <span class="badge info" id="umfBadge">0</span>
-            <button id="umfAddBtn" title="Umgebungselement hinzufügen" style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 6px;font-size:13px;cursor:pointer">+</button>
+            <button id="umfAddBtn" onclick="openUmfModal(-1)" title="Umgebungselement hinzufügen" style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 6px;font-size:13px;cursor:pointer">+</button>
           </div>
         </div>
         <div id="umfStlRows"></div>
-        <!-- Library -->
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;margin-top:4px">
-          <span style="font-size:10px;letter-spacing:.06em;color:#6a8fa8;font-family:monospace">LIBRARY</span>
-          <button id="umfLibRefreshBtn" title="Aus Library laden" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:4px;padding:6px 16px;font-size:16px;cursor:pointer">↻</button>
-        </div>
-        <div id="umfLibList" style="max-height:100px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace">Klicke ↻ zum Laden…</div>
       </section>
 
       <!-- Endeffektoren -->
@@ -96,21 +90,14 @@
           <h2>🔧 Endeffektoren</h2>
           <div style="display:flex;gap:4px;align-items:center">
             <span class="badge info" id="effBadge">0</span>
-            <button id="effAddBtn" title="Endeffektor hinzufügen" style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 6px;font-size:13px;cursor:pointer">+</button>
+            <button id="effAddBtn" onclick="openEffModal(-1)" title="Endeffektor hinzufügen" style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 6px;font-size:13px;cursor:pointer">+</button>
           </div>
         </div>
         <div id="effStlRows"></div>
-        <!-- Montage-Modus direkt unter Endeffektoren -->
         <div style="display:flex;gap:4px;margin-top:8px">
           <button id="toolModeWorld" class="tool-mode-btn active" style="flex:1" title="Werkzeug fix im Weltkoordinatensystem">🌍 an World</button>
           <button id="toolModeA6"    class="tool-mode-btn"        style="flex:1" title="Werkzeug an A6">🔩 An A6</button>
         </div>
-        <!-- Library -->
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;margin-top:8px">
-          <span style="font-size:10px;letter-spacing:.06em;color:#6a8fa8;font-family:monospace">LIBRARY</span>
-          <button id="effLibRefreshBtn" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:4px;padding:6px 16px;font-size:16px;cursor:pointer">↻</button>
-        </div>
-        <div id="effLibList" style="max-height:100px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace">Klicke ↻ zum Laden…</div>
       </section>
 
       <!-- Positionierer -->
@@ -179,6 +166,110 @@
     </aside>
   </main>
 
+<!-- ── Umgebung Modal ─────────────────────────────────────────── -->
+<div id="umfModal" class="rl-overlay" style="display:none">
+  <div class="rl-modal" style="width:min(390px,96vw)">
+    <div class="rl-modal-head">
+      <span>🏭 Umgebungselement definieren</span>
+      <button class="rl-close" id="umfModalClose">✕</button>
+    </div>
+    <div class="rl-modal-body">
+      <div class="rl-grid">
+        <label class="rl-span2">Name<input id="umf-name" type="text" placeholder="Sicherheitszaun"></label>
+        <label>Typ
+          <select id="umf-type" onchange="umfTypeChanged()" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%;margin-top:4px">
+            <option value="box">📦 Box</option>
+            <option value="cylinder">🔵 Zylinder</option>
+            <option value="stl">📁 STL-Datei</option>
+          </select>
+        </label>
+        <label>Farbe<input id="umf-color" type="color" value="#3a5a7a" style="width:100%;height:36px;margin-top:4px;cursor:pointer;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:#0f2030"></label>
+        <div id="umf-prim-fields" style="display:contents">
+          <div id="umf-box-fields" style="display:contents">
+            <label>Länge (mm)<input id="umf-length" type="number" value="2000" step="10"></label>
+            <label>Breite (mm)<input id="umf-width"  type="number" value="200"  step="10"></label>
+          </div>
+          <div id="umf-cyl-fields" style="display:none;contents">
+            <label>Radius (mm)<input id="umf-radius" type="number" value="500" step="10"></label>
+          </div>
+          <label>Höhe (mm)<input id="umf-height" type="number" value="2000" step="10"></label>
+        </div>
+        <div id="umf-stl-field" style="display:none;grid-column:1/-1">
+          <div id="umf-stl-name" style="font-family:monospace;font-size:11px;color:#6a8fa8;margin-bottom:6px">Keine STL gewählt</div>
+          <button id="umf-stl-btn" style="width:100%;padding:7px;background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:4px;cursor:pointer;font-family:monospace;font-size:12px">📁 STL laden…</button>
+          <input id="umf-stl-input" type="file" accept=".stl,.zip" style="display:none">
+        </div>
+        <label class="rl-span2" style="font-size:11px;color:#6a8fa8;letter-spacing:.05em">POSITION
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px">
+            <label style="font-size:10px;color:#6a8fa8">X mm<input id="umf-x"  type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Y mm<input id="umf-y"  type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Z mm<input id="umf-z"  type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rx °<input id="umf-rx" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Ry °<input id="umf-ry" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rz °<input id="umf-rz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+          </div>
+        </label>
+        <label class="rl-span2" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="umf-show" checked style="accent-color:var(--acc);width:15px;height:15px">
+          <span>Anzeigen</span>
+        </label>
+      </div>
+      <input type="hidden" id="umf-edit-idx" value="-1">
+      <button id="umf-submit" class="rl-submit" style="margin-top:12px">Übernehmen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Endeffektor Modal ──────────────────────────────────────── -->
+<div id="effModal" class="rl-overlay" style="display:none">
+  <div class="rl-modal" style="width:min(390px,96vw)">
+    <div class="rl-modal-head">
+      <span>🔧 Endeffektor definieren</span>
+      <button class="rl-close" id="effModalClose">✕</button>
+    </div>
+    <div class="rl-modal-body">
+      <div class="rl-grid">
+        <label class="rl-span2">Name<input id="eff-name" type="text" placeholder="Greifer"></label>
+        <label>Typ
+          <select id="eff-type" onchange="effTypeChanged()" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%;margin-top:4px">
+            <option value="box">📦 Box</option>
+            <option value="cylinder">🔵 Zylinder</option>
+            <option value="stl">📁 STL-Datei</option>
+          </select>
+        </label>
+        <label>Farbe<input id="eff-color" type="color" value="#607080" style="width:100%;height:36px;margin-top:4px;cursor:pointer;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:#0f2030"></label>
+        <div id="eff-prim-fields" style="display:contents">
+          <div id="eff-box-fields" style="display:contents">
+            <label>Länge (mm)<input id="eff-length" type="number" value="200" step="10"></label>
+            <label>Breite (mm)<input id="eff-width"  type="number" value="200" step="10"></label>
+          </div>
+          <div id="eff-cyl-fields" style="display:none;contents">
+            <label>Radius (mm)<input id="eff-radius" type="number" value="80" step="5"></label>
+          </div>
+          <label>Höhe (mm)<input id="eff-height" type="number" value="300" step="10"></label>
+        </div>
+        <div id="eff-stl-field" style="display:none;grid-column:1/-1">
+          <div id="eff-stl-name" style="font-family:monospace;font-size:11px;color:#6a8fa8;margin-bottom:6px">Keine STL gewählt</div>
+          <button id="eff-stl-btn" style="width:100%;padding:7px;background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:4px;cursor:pointer;font-family:monospace;font-size:12px">📁 STL laden…</button>
+          <input id="eff-stl-input" type="file" accept=".stl,.zip" style="display:none">
+        </div>
+        <label class="rl-span2" style="font-size:11px;color:#6a8fa8;letter-spacing:.05em">POSITION (Offset)
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px">
+            <label style="font-size:10px;color:#6a8fa8">X mm<input id="eff-x"  type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Y mm<input id="eff-y"  type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Z mm<input id="eff-z"  type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rx °<input id="eff-rx" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Ry °<input id="eff-ry" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rz °<input id="eff-rz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+          </div>
+        </label>
+      </div>
+      <input type="hidden" id="eff-edit-idx" value="-1">
+      <button id="eff-submit" class="rl-submit" style="margin-top:12px">Übernehmen</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Feste Objekte Modal ────────────────────────────────────── -->
 <div id="fixModal" class="rl-overlay" style="display:none">
   <div class="rl-modal" style="width:min(380px,96vw)">
@@ -218,6 +309,15 @@
           <input type="checkbox" id="fm-show" checked style="accent-color:var(--acc);width:15px;height:15px">
           <span>Anzeigen</span>
         </label>
+        <div class="rl-span2" style="border-top:1px solid rgba(255,255,255,.08);padding-top:10px;margin-top:2px">
+          <div style="font-size:10px;color:#6a8fa8;letter-spacing:.05em;margin-bottom:6px">STL STATT PRIMITIV</div>
+          <div id="fm-stl-display" style="font-family:monospace;font-size:11px;color:#4499cc;margin-bottom:4px;min-height:14px"></div>
+          <div style="display:flex;gap:6px">
+            <button type="button" id="fm-stl-btn" style="flex:1;padding:6px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);color:#60a5fa;border-radius:4px;cursor:pointer;font-family:monospace;font-size:11px">📁 STL laden…</button>
+            <button type="button" id="fm-stl-clear" style="padding:6px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#6a8fa8;border-radius:4px;cursor:pointer;font-size:11px">✕</button>
+          </div>
+          <input id="fm-stl-file" type="file" accept=".stl,.zip" style="display:none">
+        </div>
       </div>
       <input type="hidden" id="fm-edit-idx" value="-1">
       <button id="fm-submit" class="rl-submit" style="margin-top:12px">Übernehmen</button>
@@ -296,6 +396,15 @@
           <input type="checkbox" id="pm-show" checked style="accent-color:var(--acc);width:15px;height:15px">
           <span>Parametrisches Objekt anzeigen</span>
         </label>
+        <div class="rl-span2" style="border-top:1px solid rgba(255,255,255,.08);padding-top:10px;margin-top:2px">
+          <div style="font-size:10px;color:#6a8fa8;letter-spacing:.05em;margin-bottom:6px">STL STATT PRIMITIV</div>
+          <div id="pm-stl-display" style="font-family:monospace;font-size:11px;color:#4499cc;margin-bottom:4px;min-height:14px"></div>
+          <div style="display:flex;gap:6px">
+            <button type="button" id="pm-stl-btn" style="flex:1;padding:6px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);color:#60a5fa;border-radius:4px;cursor:pointer;font-family:monospace;font-size:11px">📁 STL laden…</button>
+            <button type="button" id="pm-stl-clear" style="padding:6px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#6a8fa8;border-radius:4px;cursor:pointer;font-size:11px">✕</button>
+          </div>
+          <input id="pm-stl-file" type="file" accept=".stl,.zip" style="display:none">
+        </div>
       </div>
       <input type="hidden" id="pm-edit-idx" value="-1">
       <button id="pm-submit" class="rl-submit" style="margin-top:12px">Übernehmen</button>
@@ -355,6 +464,15 @@
           <input type="checkbox" id="om-show" checked style="accent-color:var(--acc);width:15px;height:15px">
           <span>Parametrisches Objekt anzeigen</span>
         </label>
+        <div class="rl-span2" style="border-top:1px solid rgba(255,255,255,.08);padding-top:10px;margin-top:2px">
+          <div style="font-size:10px;color:#6a8fa8;letter-spacing:.05em;margin-bottom:6px">STL STATT PRIMITIV</div>
+          <div id="om-stl-display" style="font-family:monospace;font-size:11px;color:#4499cc;margin-bottom:4px;min-height:14px"></div>
+          <div style="display:flex;gap:6px">
+            <button type="button" id="om-stl-btn" style="flex:1;padding:6px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);color:#60a5fa;border-radius:4px;cursor:pointer;font-family:monospace;font-size:11px">📁 STL laden…</button>
+            <button type="button" id="om-stl-clear" style="padding:6px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#6a8fa8;border-radius:4px;cursor:pointer;font-size:11px">✕</button>
+          </div>
+          <input id="om-stl-file" type="file" accept=".stl,.zip" style="display:none">
+        </div>
       </div>
       <input type="hidden" id="om-edit-idx" value="-1">
       <button id="om-submit" class="rl-submit" style="margin-top:12px">Übernehmen</button>
@@ -413,6 +531,15 @@
           <input type="checkbox" id="rm-show" checked style="accent-color:var(--acc);width:15px;height:15px">
           <span>Parametrische Box anzeigen</span>
         </label>
+        <div class="rl-span2" style="border-top:1px solid rgba(255,255,255,.08);padding-top:10px;margin-top:2px">
+          <div style="font-size:10px;color:#6a8fa8;letter-spacing:.05em;margin-bottom:6px">STL STATT PRIMITIV</div>
+          <div id="rm-stl-display" style="font-family:monospace;font-size:11px;color:#4499cc;margin-bottom:4px;min-height:14px"></div>
+          <div style="display:flex;gap:6px">
+            <button type="button" id="rm-stl-btn" style="flex:1;padding:6px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);color:#60a5fa;border-radius:4px;cursor:pointer;font-family:monospace;font-size:11px">📁 STL laden…</button>
+            <button type="button" id="rm-stl-clear" style="padding:6px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#6a8fa8;border-radius:4px;cursor:pointer;font-size:11px">✕</button>
+          </div>
+          <input id="rm-stl-file" type="file" accept=".stl,.zip" style="display:none">
+        </div>
       <button id="rm-submit" class="rl-submit" style="margin-top:12px">Übernehmen</button>
     </div>
   </div>
