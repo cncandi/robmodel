@@ -2686,7 +2686,16 @@ function _buildStationChecks() {
 }
 $('rl-type')?.addEventListener('change', rlTypeChanged);
 
-// ── Komponenten ZIP-Builder ───────────────────────────────────────
+async function loadStlBufsIntoState(stlBufs) {
+  // Add raw buffers to state.buffers so loadStls() can pick them up
+  for (const [key, buf] of Object.entries(stlBufs)) {
+    const fname = key + '.stl';
+    state.buffers.set(fname, buf);
+    if (!state.files.find(f=>f.name===fname)) state.files.push({path:fname,name:fname,size:buf.byteLength,type:'STL'});
+  }
+  splitFiles();
+  await loadStls();
+}
 function _addStlsToZip(zip, axisKeys) {
   // Adds STL buffers from state.axisStlParts to zip under stl/
   for(const key of axisKeys){
@@ -3104,16 +3113,32 @@ async function loadFromLib(item) {
 
 // Liest config.json aus ZIP und dispatcht an den richtigen Loader
 async function loadComponentFromZip(zip) {
-  const cfgEntry = zip.files['config.json'];
-  if (!cfgEntry) throw new Error('Keine config.json in ZIP');
-  const cfg = JSON.parse(await cfgEntry.async('string'));
-  // Collect all STL buffers: stl/XX.stl → {key: buf}
+  // Try config.json first (new format)
+  let cfgEntry = zip.files['config.json'];
+  let cfg;
+
+  if (cfgEntry) {
+    cfg = JSON.parse(await cfgEntry.async('string'));
+  } else {
+    // Fallback: find any *.json file (old format)
+    const jsonKey = Object.keys(zip.files).find(n => !zip.files[n].dir && /\.json$/i.test(n));
+    if (!jsonKey) throw new Error('Keine JSON-Konfiguration in ZIP gefunden');
+    cfg = JSON.parse(await zip.files[jsonKey].async('string'));
+    // Old rail format had no explicit type field — detect by content
+    if (!cfg.type) {
+      if (cfg.length_mm !== undefined || cfg.axis !== undefined) cfg.type = 'rail';
+      else if (cfg.joints) cfg.type = 'robot';
+    }
+  }
+
+  // Collect all STL buffers: stl/XX.stl or XX.stl → key without extension
   const stlBufs = {};
   for (const name of Object.keys(zip.files)) {
     if (zip.files[name].dir || !/\.stl$/i.test(name)) continue;
     const key = name.split('/').pop().replace(/\.stl$/i,'');
     stlBufs[key] = await zip.files[name].async('uint8array');
   }
+
   const type = cfg.type;
   if      (type === 'rail')        applyRailConfig(cfg, stlBufs);
   else if (type === 'positioner')  applyPositionerConfig(cfg, stlBufs);
@@ -3122,6 +3147,7 @@ async function loadComponentFromZip(zip) {
   else if (type === 'endeffektor') applyEffectorConfig(cfg, stlBufs);
   else if (type === 'umfeld')      applyEnvironmentConfig(cfg, stlBufs);
   else if (type === 'station')     applyStationConfig(cfg, stlBufs);
+  else if (type === 'robot')       { applyJsonToState(cfg); await loadStlBufsIntoState(stlBufs); rebuildRobotKinematics(); applyTransforms(); enableSave(); }
   else throw new Error('Unbekannter Typ: ' + type);
   renderAll(); setView('iso');
 }
