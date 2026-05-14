@@ -46,6 +46,8 @@
         <div class="row gap4">
           <button id="resetView">↺ Ansicht</button>
           <button id="toggleGrid">Raster</button>
+          <button id="gimbalToggle" title="Komponente anklicken und verschieben/rotieren" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">🎯 Gimbal</button>
+          <button id="gimbalModeBtn" title="Wechsel Verschieben/Rotieren" style="display:none;background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">T</button>
         </div>
       </div>
       <div class="viewHelp">LMB: Rotation &nbsp;|&nbsp; MMB: Pan &nbsp;|&nbsp; RMB: Rotation &nbsp;|&nbsp; Scroll: Zoom</div>
@@ -198,9 +200,12 @@
         <label>Höhe (mm)<input id="pm-height" type="number" value="100" step="10"></label>
         <label>Rotationsachse
           <select id="pm-rotaxis" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%;margin-top:4px">
-            <option value="Y">Y (vertikal)</option>
-            <option value="X">X</option>
-            <option value="Z">Z</option>
+            <option value="Y+">Y+ (vertikal, links)</option>
+            <option value="Y-">Y− (vertikal, rechts)</option>
+            <option value="X+">X+</option>
+            <option value="X-">X−</option>
+            <option value="Z+">Z+</option>
+            <option value="Z-">Z−</option>
           </select>
         </label>
         <label>Min (°)<input id="pm-min" type="number" value="-180" step="1"></label>
