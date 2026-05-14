@@ -1676,7 +1676,7 @@ $('railAddBtn')?.addEventListener('click',()=>{
   if($('rm-orx')) $('rm-orx').value = bo.rx ||0;
   if($('rm-ory')) $('rm-ory').value = bo.ry ||0;
   if($('rm-orz')) $('rm-orz').value = bo.rz ||0;
-  _rmAxis = existing?.axis || 'X+';
+  _rmAxis = existing?.axis || 'Y+';
   document.querySelectorAll('.rm-axis-btn').forEach(b=>{
     const on=b.dataset.ax===_rmAxis;
     b.style.background=on?'rgba(37,99,235,.3)':'rgba(255,255,255,.05)';
