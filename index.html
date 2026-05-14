@@ -140,6 +140,18 @@
         <div id="railLibList" style="max-height:100px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace"></div>
       </section>
 
+      <!-- Feste Objekte -->
+      <section class="card">
+        <div class="card-head">
+          <h2>🧱 Feste Objekte</h2>
+          <div style="display:flex;gap:4px;align-items:center">
+            <span class="badge info" id="fixBadge">0</span>
+            <button id="fixAddBtn" title="Neues festes Objekt" style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 6px;font-size:13px;cursor:pointer">+</button>
+          </div>
+        </div>
+        <div id="fixRows"></div>
+      </section>
+
       <!-- Bewegliche Objekte -->
       <section class="card">
         <div class="card-head">
@@ -166,6 +178,52 @@
 
     </aside>
   </main>
+
+<!-- ── Feste Objekte Modal ────────────────────────────────────── -->
+<div id="fixModal" class="rl-overlay" style="display:none">
+  <div class="rl-modal" style="width:min(380px,96vw)">
+    <div class="rl-modal-head">
+      <span>🧱 Festes Objekt definieren</span>
+      <button class="rl-close" id="fixModalClose">✕</button>
+    </div>
+    <div class="rl-modal-body">
+      <div class="rl-grid">
+        <label class="rl-span2">Name<input id="fm-name" type="text" placeholder="Tisch"></label>
+        <label>Typ
+          <select id="fm-type" onchange="fmTypeChanged()" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%;margin-top:4px">
+            <option value="box">📦 Box</option>
+            <option value="cylinder">🔵 Zylinder</option>
+          </select>
+        </label>
+        <label>Farbe<input id="fm-color" type="color" value="#607080" style="width:100%;height:36px;margin-top:4px;cursor:pointer;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:#0f2030"></label>
+        <div id="fm-box-fields" style="display:contents">
+          <label>Länge (mm)<input id="fm-length" type="number" value="500" step="10"></label>
+          <label>Breite (mm)<input id="fm-width"  type="number" value="500" step="10"></label>
+        </div>
+        <div id="fm-cyl-fields" style="display:none;contents">
+          <label>Radius (mm)<input id="fm-radius" type="number" value="200" step="10"></label>
+        </div>
+        <label>Höhe (mm)<input id="fm-height" type="number" value="500" step="10"></label>
+        <label class="rl-span2" style="font-size:11px;color:#6a8fa8;letter-spacing:.05em">POSITION
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px">
+            <label style="font-size:10px;color:#6a8fa8">X mm<input id="fm-x" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Y mm<input id="fm-y" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Z mm<input id="fm-z" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rx °<input id="fm-rx" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Ry °<input id="fm-ry" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rz °<input id="fm-rz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+          </div>
+        </label>
+        <label class="rl-span2" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="fm-show" checked style="accent-color:var(--acc);width:15px;height:15px">
+          <span>Anzeigen</span>
+        </label>
+      </div>
+      <input type="hidden" id="fm-edit-idx" value="-1">
+      <button id="fm-submit" class="rl-submit" style="margin-top:12px">Übernehmen</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── Positionierer Modal ────────────────────────────────────── -->
 <div id="posModal" class="rl-overlay" style="display:none">
