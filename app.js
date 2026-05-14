@@ -1849,6 +1849,104 @@ $('gimbalModeBtn')?.addEventListener('click',()=>{
   if(_gimbalTarget) transformControls.setMode(_gimbalMode);
 });
 
+// ── Messtool ──────────────────────────────────────────────────────
+var _measureActive = false;
+var _measureP1 = null;
+var _measureP2 = null;
+var _measureLine = null;
+var _measureSpheres = [];
+
+function _measureReset() {
+  _measureP1 = null; _measureP2 = null;
+  if(_measureLine){ scene.remove(_measureLine); _measureLine=null; }
+  _measureSpheres.forEach(s=>scene.remove(s)); _measureSpheres=[];
+  $('msr-dist').textContent='—'; $('msr-dx').textContent='—';
+  $('msr-dy').textContent='—'; $('msr-dz').textContent='—';
+  $('msr-axy').textContent='—'; $('msr-ayz').textContent='—';
+  $('msr-hint').textContent='Klick: P1 setzen';
+}
+
+function _measureSphere(pos, color) {
+  const m = new THREE.Mesh(
+    new THREE.SphereGeometry(12,12,8),
+    new THREE.MeshStandardMaterial({color, emissive:color, emissiveIntensity:.5, depthTest:false})
+  );
+  m.position.copy(pos); m.renderOrder=999;
+  scene.add(m); _measureSpheres.push(m); return m;
+}
+
+function _measureDrawLine(p1, p2) {
+  if(_measureLine) scene.remove(_measureLine);
+  const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+  _measureLine = new THREE.Line(geo, new THREE.LineBasicMaterial({color:0x60a5fa, depthTest:false, linewidth:2}));
+  _measureLine.renderOrder=998;
+  scene.add(_measureLine);
+}
+
+function _measureUpdate(p1, p2) {
+  const dx = p2.x-p1.x, dy = p2.y-p1.y, dz = p2.z-p1.z;
+  const dist = Math.sqrt(dx*dx+dy*dy+dz*dz);
+  const r = v => Math.round(v);
+  const deg = v => (v*180/Math.PI).toFixed(1)+'°';
+  $('msr-dist').textContent = r(dist)+' mm';
+  $('msr-dx').textContent = r(dx)+' mm';
+  $('msr-dy').textContent = r(dy)+' mm';
+  $('msr-dz').textContent = r(dz)+' mm';
+  // Angle in XY plane (horizontal)
+  $('msr-axy').textContent = deg(Math.atan2(dy, dx));
+  // Inclination from XY plane (elevation)
+  const horiz = Math.sqrt(dx*dx+dy*dy);
+  $('msr-ayz').textContent = deg(Math.atan2(dz, horiz));
+}
+
+function _measurePick(event) {
+  if(!_measureActive) return;
+  if(event.button !== undefined && event.button !== 0) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  const mx = ((event.clientX-rect.left)/rect.width)*2-1;
+  const my = -((event.clientY-rect.top)/rect.height)*2+1;
+  const rc = new THREE.Raycaster();
+  rc.setFromCamera(new THREE.Vector2(mx,my), camera);
+  // Collect all pickable meshes
+  const pickable = [];
+  scene.traverse(obj=>{ if(obj.isMesh && obj.visible) pickable.push(obj); });
+  const hits = rc.intersectObjects(pickable, false);
+  if(!hits.length) return;
+  const pt = hits[0].point.clone();
+  if(!_measureP1) {
+    _measureP1 = pt;
+    _measureSphere(pt, 0xff4444);
+    $('msr-hint').textContent = 'P1 gesetzt — Klick: P2 setzen';
+  } else {
+    _measureP2 = pt;
+    _measureSphere(pt, 0x44ff88);
+    _measureDrawLine(_measureP1, _measureP2);
+    _measureUpdate(_measureP1, _measureP2);
+    $('msr-hint').textContent = 'Neuer Klick: neue Messung starten';
+    // Next click resets
+    _measureP1 = null; _measureP2 = null;
+  }
+}
+
+$('measureBtn')?.addEventListener('click',()=>{
+  _measureActive = !_measureActive;
+  const btn = $('measureBtn');
+  const panel = $('measurePanel');
+  if(_measureActive){
+    btn.style.background='rgba(37,99,235,.3)'; btn.style.borderColor='rgba(37,99,235,.6)'; btn.style.color='#60a5fa';
+    if(panel) panel.style.display='';
+    _measureReset();
+    renderer.domElement.addEventListener('pointerdown', _measurePick);
+    // Pause gimbal if active
+    if(_gimbalActive) $('gimbalToggle').click();
+  } else {
+    btn.style.background='rgba(255,255,255,.05)'; btn.style.borderColor='rgba(255,255,255,.15)'; btn.style.color='#6a8fa8';
+    if(panel) panel.style.display='none';
+    renderer.domElement.removeEventListener('pointerdown', _measurePick);
+    _measureReset();
+  }
+});
+
 function renderTcp(){qsa('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===state.activeTcp));const tcp=state.tcp[state.activeTcp];qsa('[data-tcp]').forEach(i=>i.value=tcp?.[i.dataset.tcp]??'');const x=num(tcp?.x),y=num(tcp?.y),z=num(tcp?.z);tcpMarker.visible=x!==null||y!==null||z!==null;tcpMarker.position.set(x||0,y||0,z||0);}
 
 
