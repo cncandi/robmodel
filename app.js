@@ -1171,7 +1171,7 @@ function renderRows(){
       return `<tr style="border-top:1px solid rgba(255,255,255,.08)">
         <td><b>${eAx}</b> <span style="font-size:9px;color:#6a8fa8">${p.name||''}</span></td>
         <td><input data-pos-angle type="number" step="1" value="${p.ePos||0}" min="${p.eMin??-180}" max="${p.eMax??180}" data-pi="${i}" style="width:70px"></td>
-        <td><span class="axisDir">R${p.rotAxis||'Y'}</span></td>
+        <td><span class="axisDir">R${p.rotAxis||'Y+'}</span></td>
         <td colspan="3" style="color:#4a6a8a;font-size:10px;text-align:center">—</td>
         <td><input data-pos-min type="number" step="1" value="${p.eMin??-180}" data-pi="${i}" style="width:60px"></td>
         <td><input data-pos-max type="number" step="1" value="${p.eMax??180}" data-pi="${i}" style="width:60px"></td>
@@ -1461,9 +1461,11 @@ function rebuildPositionerMesh(i) {
   const pivotGrp=new THREE.Group();
   pivotGrp.position.set(p.pivotX||0, p.pivotY||0, p.pivotZ||0);
   const ang=(p.ePos||0)*deg;
-  if(p.rotAxis==='X') pivotGrp.rotation.x=ang;
-  else if(p.rotAxis==='Z') pivotGrp.rotation.z=ang;
-  else pivotGrp.rotation.y=ang;
+  const rotAx = (p.rotAxis||'Y+').replace(/[+-]/,'');
+  const rotSign = (p.rotAxis||'Y+').includes('-') ? -1 : 1;
+  if(rotAx==='X') pivotGrp.rotation.x=ang*rotSign;
+  else if(rotAx==='Z') pivotGrp.rotation.z=ang*rotSign;
+  else pivotGrp.rotation.y=ang*rotSign;
   containerGrp.add(pivotGrp);
   // Mesh group: offset by -pivot so mesh stays at world position
   const meshGrp=new THREE.Group();
@@ -1572,6 +1574,85 @@ $('pm-submit')?.addEventListener('click',()=>{
   rebuildAllPositioners();
   renderPosRows(); renderRows();
   $('posModal').style.display='none';
+});
+
+// ── Gimbal (Transform-Picker) ─────────────────────────────────────
+var _gimbalActive = false;
+var _gimbalMode = 'translate'; // 'translate' | 'rotate'
+var _gimbalTarget = null; // {type, idx, grp}
+
+function _getGimbalMeshes() {
+  const meshes = [];
+  // Rail
+  if(parametricRail?.grp) parametricRail.grp.traverse(c=>{ if(c.isMesh) meshes.push({mesh:c, type:'rail', idx:0, grp:parametricRail.grp}); });
+  // Objects
+  (objekteGroups||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) meshes.push({mesh:c, type:'obj', idx:i, grp:g}); }); });
+  // Positioners
+  (positionerGroups||[]).forEach((g,i)=>{ if(g?.containerGrp) g.containerGrp.traverse(c=>{ if(c.isMesh) meshes.push({mesh:c, type:'pos', idx:i, grp:g.containerGrp}); }); });
+  return meshes;
+}
+
+function _gimbalPick(event) {
+  if(!_gimbalActive) return;
+  if(transformControls.dragging) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  const mx = ((event.clientX-rect.left)/rect.width)*2-1;
+  const my = -((event.clientY-rect.top)/rect.height)*2+1;
+  const rc = new THREE.Raycaster();
+  rc.setFromCamera(new THREE.Vector2(mx,my), camera);
+  const allMeshes = _getGimbalMeshes();
+  const hits = rc.intersectObjects(allMeshes.map(m=>m.mesh), false);
+  if(!hits.length){ transformControls.detach(); _gimbalTarget=null; return; }
+  const hit = allMeshes.find(m=>m.mesh===hits[0].object);
+  if(!hit) return;
+  _gimbalTarget = hit;
+  transformControls.setMode(_gimbalMode);
+  transformControls.attach(hit.grp);
+}
+
+function _gimbalChanged() {
+  if(!_gimbalTarget || !transformControls.object) return;
+  const grp = transformControls.object;
+  const deg = 180/Math.PI;
+  const {type, idx} = _gimbalTarget;
+  const bo = {
+    x: Math.round(grp.position.x), y: Math.round(grp.position.y), z: Math.round(grp.position.z),
+    rx: Math.round(grp.rotation.x*deg), ry: Math.round(grp.rotation.y*deg), rz: Math.round(grp.rotation.z*deg)
+  };
+  if(type==='rail' && state.schienen[0]){
+    state.schienen[0].boxOffset=bo;
+    const el=$('rail-panel');
+    if(el){ ['x','y','z','rx','ry','rz'].forEach(k=>{ const inp=el.querySelector(`#rail-${k}`); if(inp) inp.value=bo[k]||0; }); }
+  } else if(type==='obj' && state.objekte[idx]){
+    state.objekte[idx].boxOffset=bo;
+  } else if(type==='pos' && state.positioners[idx]){
+    Object.assign(state.positioners[idx].boxOffset, bo);
+  }
+}
+
+// Wire up gimbal toggle
+$('gimbalToggle')?.addEventListener('click',()=>{
+  _gimbalActive = !_gimbalActive;
+  const btn=$('gimbalToggle'), modeBtn=$('gimbalModeBtn');
+  if(_gimbalActive){
+    btn.style.background='rgba(37,99,235,.3)'; btn.style.borderColor='rgba(37,99,235,.6)'; btn.style.color='#60a5fa';
+    if(modeBtn) modeBtn.style.display='';
+    transformControls.addEventListener('objectChange', _gimbalChanged);
+    renderer.domElement.addEventListener('click', _gimbalPick);
+  } else {
+    btn.style.background='rgba(255,255,255,.05)'; btn.style.borderColor='rgba(255,255,255,.15)'; btn.style.color='#6a8fa8';
+    if(modeBtn) modeBtn.style.display='none';
+    transformControls.removeEventListener('objectChange', _gimbalChanged);
+    renderer.domElement.removeEventListener('click', _gimbalPick);
+    transformControls.detach(); _gimbalTarget=null;
+  }
+});
+
+$('gimbalModeBtn')?.addEventListener('click',()=>{
+  _gimbalMode = _gimbalMode==='translate' ? 'rotate' : 'translate';
+  const btn=$('gimbalModeBtn');
+  btn.textContent = _gimbalMode==='translate' ? 'T' : 'R';
+  if(_gimbalTarget) transformControls.setMode(_gimbalMode);
 });
 
 function renderTcp(){qsa('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===state.activeTcp));const tcp=state.tcp[state.activeTcp];qsa('[data-tcp]').forEach(i=>i.value=tcp?.[i.dataset.tcp]??'');const x=num(tcp?.x),y=num(tcp?.y),z=num(tcp?.z);tcpMarker.visible=x!==null||y!==null||z!==null;tcpMarker.position.set(x||0,y||0,z||0);}
