@@ -1643,6 +1643,10 @@ function _gimbalPick(event) {
   transformControls.setMode(_gimbalMode);
   transformControls.setSize(0.8);
   transformControls.attach(hit.grp);
+  // Open corresponding edit modal
+  if(hit.type==='pos') openPosModal(hit.idx);
+  else if(hit.type==='obj') openObjModal(hit.idx);
+  else if(hit.type==='rail') { $('railModal').style.display='flex'; }
 }
 
 function _gimbalChanged() {
@@ -1654,14 +1658,26 @@ function _gimbalChanged() {
     x: Math.round(grp.position.x), y: Math.round(grp.position.y), z: Math.round(grp.position.z),
     rx: Math.round(grp.rotation.x*deg), ry: Math.round(grp.rotation.y*deg), rz: Math.round(grp.rotation.z*deg)
   };
+
+  function fillModal(prefix) {
+    ['x','y','z','rx','ry','rz'].forEach(k=>{
+      const el=$(prefix+'-o'+k); if(el) el.value=bo[k]||0;
+    });
+  }
+
   if(type==='rail' && state.schienen[0]){
     state.schienen[0].boxOffset=bo;
-    const el=$('rail-panel');
-    if(el){ ['x','y','z','rx','ry','rz'].forEach(k=>{ const inp=el.querySelector(`#rail-${k}`); if(inp) inp.value=bo[k]||0; }); }
+    // Rail modal
+    if($('railModal')?.style.display!=='none') fillModal('rm');
+    // Rail panel inputs
+    const panel=$('rail-panel');
+    if(panel){ ['x','y','z','rx','ry','rz'].forEach(k=>{ const inp=panel.querySelector(`#rail-${k}`); if(inp) inp.value=bo[k]||0; }); }
   } else if(type==='obj' && state.objekte[idx]){
     state.objekte[idx].boxOffset=bo;
+    if($('objModal')?.style.display!=='none') fillModal('om');
   } else if(type==='pos' && state.positioners[idx]){
     Object.assign(state.positioners[idx].boxOffset, bo);
+    if($('posModal')?.style.display!=='none') fillModal('pm');
   }
 }
 
