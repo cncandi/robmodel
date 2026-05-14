@@ -469,34 +469,52 @@
     <div class="rl-modal-body">
       <div class="rl-grid">
         <label class="rl-span2">Typ
-          <select id="rl-type" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%" >
+          <select id="rl-type" onchange="rlTypeChanged()" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%">
             <option value="robot">🦾 Roboter</option>
+            <option value="rail">🛤️ Schiene / Rail</option>
+            <option value="positioner">🔄 Positionierer</option>
+            <option value="label">📦 Bewegliches Objekt</option>
+            <option value="fixture">🧱 Festes Objekt</option>
             <option value="endeffektor">🔧 Endeffektor</option>
             <option value="umfeld">🏭 Umfeld / Umgebung</option>
-            <option value="positioner">🔄 Rotationstisch / Positionierer</option>
-            <option value="object">📦 Bewegliches Objekt</option>
-            <option value="station">🏗️ Station</option>
-            <option value="rail">🛤️ Schiene / Rail</option>
+            <option value="station">🏗️ Station (alles)</option>
           </select>
         </label>
-        <label>Name *<input id="rl-name" type="text" placeholder="KR 8 R1420"></label>
-        <div id="rl-robot-fields" style="display:contents">
-        <label>Marke *<input id="rl-marke" type="text" placeholder="KUKA"></label>
-        <label>Modell *<input id="rl-modell" type="text" placeholder="KR 8 R1420"></label>
-        <label>Achsen *<input id="rl-achsen" type="number" value="6" min="1" max="9"></label>
-        <label>Reichweite (mm) *<input id="rl-reichweite" type="number" placeholder="1420"></label>
-        <label>Nutzlast (kg) *<input id="rl-nutzlast" type="number" placeholder="8"></label>
-        <label>Gewicht (kg) *<input id="rl-gewicht" type="number" placeholder="270"></label>
-        <label>Wiederholgenauigkeit (mm) *<input id="rl-wdh" type="number" step="0.001" placeholder="0.03"></label>
-        </div>
-        <div id="rl-rail-fields" style="display:none;contents">
-        <label>Länge (mm)<input id="rl-rail-length" type="number" value="2000" step="100" placeholder="2000"></label>
-        <label>Höhe (mm)<input id="rl-rail-height" type="number" value="200" step="10" placeholder="200"></label>
-        <label>Breite (mm)<input id="rl-rail-width" type="number" value="400" step="10" placeholder="400"></label>
-        <label>Verfahrrichtung<select id="rl-rail-axis" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%"><option value="X+">X+</option><option value="X-">X-</option><option value="Y+">Y+</option><option value="Y-">Y-</option></select></label>
-        </div>
-        <label class="rl-span2">Thumbnail<input id="rl-thumb" type="file" accept="image/*"><img id="rl-thumb-preview" style="display:none;width:100%;max-height:120px;object-fit:contain;margin-top:6px;border-radius:4px;border:1px solid rgba(255,255,255,.1)"></label>
+        <label class="rl-span2">Name *<input id="rl-name" type="text" placeholder="Name"></label>
 
+        <!-- Robot fields -->
+        <div id="rl-robot-fields" style="display:contents">
+          <label>Marke *<input id="rl-marke" type="text" placeholder="KUKA"></label>
+          <label>Modell *<input id="rl-modell" type="text" placeholder="KR 8 R1420"></label>
+          <label>Achsen *<input id="rl-achsen" type="number" value="6" min="1" max="9"></label>
+          <label>Reichweite (mm) *<input id="rl-reichweite" type="number" placeholder="1420"></label>
+          <label>Nutzlast (kg) *<input id="rl-nutzlast" type="number" placeholder="8"></label>
+          <label>Gewicht (kg) *<input id="rl-gewicht" type="number" placeholder="270"></label>
+          <label>Wiederholgenauigkeit (mm) *<input id="rl-wdh" type="number" step="0.001" placeholder="0.03"></label>
+        </div>
+
+        <!-- Rail fields -->
+        <div id="rl-rail-fields" style="display:none;contents">
+          <label>Länge (mm)<input id="rl-rail-length" type="number" value="2000" step="100"></label>
+          <label>Höhe (mm)<input id="rl-rail-height" type="number" value="200" step="10"></label>
+          <label>Breite (mm)<input id="rl-rail-width" type="number" value="400" step="10"></label>
+          <label>Verfahrrichtung<select id="rl-rail-axis" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%"><option>X+</option><option>X-</option><option>Y+</option><option>Y-</option><option>Z+</option><option>Z-</option></select></label>
+        </div>
+
+        <!-- Component index selector (for rail/positioner/label/fixture with multiple) -->
+        <div id="rl-comp-select" style="display:none;grid-column:1/-1">
+          <label style="font-size:11px;color:#6a8fa8;letter-spacing:.05em">KOMPONENTE WÄHLEN
+            <select id="rl-comp-idx" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%;margin-top:4px"></select>
+          </label>
+        </div>
+
+        <!-- Station checkboxes -->
+        <div id="rl-station-fields" style="display:none;grid-column:1/-1">
+          <div style="font-size:11px;color:#6a8fa8;letter-spacing:.05em;margin-bottom:6px">ENTHALTENE KOMPONENTEN</div>
+          <div id="rl-station-checks" style="display:flex;flex-direction:column;gap:4px;font-family:monospace;font-size:12px"></div>
+        </div>
+
+        <label class="rl-span2">Thumbnail<input id="rl-thumb" type="file" accept="image/*"><img id="rl-thumb-preview" style="display:none;width:100%;max-height:120px;object-fit:contain;margin-top:6px;border-radius:4px;border:1px solid rgba(255,255,255,.1)"></label>
       </div>
       <div id="rl-msg" class="rl-msg" style="display:none"></div>
       <div id="rl-progress-wrap" style="display:none;margin-bottom:10px">
