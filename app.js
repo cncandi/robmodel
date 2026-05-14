@@ -1684,16 +1684,17 @@ $('gimbalToggle')?.addEventListener('click',()=>{
   if(_gimbalActive){
     btn.style.background='rgba(37,99,235,.3)'; btn.style.borderColor='rgba(37,99,235,.6)'; btn.style.color='#60a5fa';
     if(modeBtn) modeBtn.style.display='';
-    transformControls.detach(); // detach axis selection
+    transformControls.detach();
+    transformControls.removeEventListener('objectChange', onAxisObjectMoved); // pause axis listener
     transformControls.addEventListener('objectChange', _gimbalChanged);
     renderer.domElement.addEventListener('pointerdown', _gimbalPick);
   } else {
     btn.style.background='rgba(255,255,255,.05)'; btn.style.borderColor='rgba(255,255,255,.15)'; btn.style.color='#6a8fa8';
     if(modeBtn) modeBtn.style.display='none';
     transformControls.removeEventListener('objectChange', _gimbalChanged);
+    transformControls.addEventListener('objectChange', onAxisObjectMoved); // restore axis listener
     renderer.domElement.removeEventListener('pointerdown', _gimbalPick);
     transformControls.detach(); _gimbalTarget=null;
-    // Reattach axis controls
     const selected = axisMeshes[state.selectedAxis];
     if(selected) transformControls.attach(selected);
   }
