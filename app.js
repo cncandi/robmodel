@@ -66,10 +66,11 @@ const state = {
   activeEff: 0,
   umfElemente: [],
   activeUmf: 0,
+  schienen: [],
 };
 
 // ── Three.js Variablen ────────────────────────────────────────────
-let scene, camera, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot;
+let scene, camera, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot, railGroup;
 let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup;
 const meshes = new Map();
 const axisMeshes = [];
@@ -135,6 +136,8 @@ function init3d() {
   toolGroup = new THREE.Group();
   kinematicsRoot = new THREE.Group(); // keine STL-Transformation!
   scene.add(robotGroup, toolGroup, kinematicsRoot);
+  railGroup = new THREE.Group();
+  scene.add(railGroup);
 
   axisPointGroup = new THREE.Group();
   scene.add(axisPointGroup);
@@ -1040,6 +1043,9 @@ function buildJson() {
   if (allUmf.length) result.umfeld = allUmf.map((u,i) => {
     const o = u.offset||{}; return { name: norm(u.stlFile?.name||u.name||('Umfeld '+(i+1))), stl: 'umfeld_'+(i+1)+'.stl', px:o.x||0, py:o.y||0, pz:o.z||0, rx:o.rx||0, ry:o.ry||0, rz:o.rz||0 };
   });
+  if ((state.schienen||[]).length) result.schienen = state.schienen.map(r=>({
+    name: r.name||'Rail', length_mm: r.length_mm||2000, height_mm: r.height_mm||200, width_mm: r.width_mm||400, axis: r.axis||'X+'
+  }));
   return result;
 }
 
@@ -1534,7 +1540,67 @@ function renderUmfRows() {
   }));
 }
 
-// File inputs
+// ── Schienen (parametrisch) ───────────────────────────────────────
+function renderRailRows() {
+  const el = $('railRows'); if(!el) return;
+  const badge = $('railBadge');
+  const schienen = state.schienen || [];
+  if(badge) badge.textContent = schienen.length||'0';
+  if(!schienen.length){ el.innerHTML=''; return; }
+  const fs='background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:2px 5px;font-family:inherit;font-size:12px;color:#d8e8f0;width:100%;text-align:right;outline:none';
+  el.innerHTML = schienen.map((r,i)=>`
+    <div style="border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:8px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <input data-ri="${i}" data-rf="name" type="text" value="${r.name||''}" placeholder="Name" style="${fs}">
+        <button data-rdel="${i}" style="min-width:28px;height:28px;cursor:pointer;background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:3px;font-size:12px">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:6px">
+        <div><label style="font-size:10px;color:#6a8fa8;display:block;margin-bottom:2px">LÄNGE mm</label><input data-ri="${i}" data-rf="length_mm" type="number" step="100" value="${r.length_mm||2000}" style="${fs}"></div>
+        <div><label style="font-size:10px;color:#6a8fa8;display:block;margin-bottom:2px">HÖHE mm</label><input data-ri="${i}" data-rf="height_mm" type="number" step="10" value="${r.height_mm||200}" style="${fs}"></div>
+        <div><label style="font-size:10px;color:#6a8fa8;display:block;margin-bottom:2px">BREITE mm</label><input data-ri="${i}" data-rf="width_mm" type="number" step="10" value="${r.width_mm||400}" style="${fs}"></div>
+      </div>
+      <div style="display:flex;gap:4px">
+        ${['X+','X-','Y+','Y-'].map(ax=>`<button data-raxis="${i}" data-axval="${ax}" style="flex:1;padding:3px;font-family:monospace;font-size:11px;border-radius:3px;cursor:pointer;${r.axis===ax?'background:rgba(37,99,235,.3);border:1px solid rgba(37,99,235,.6);color:#60a5fa':'background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8'}">${ax}</button>`).join('')}
+      </div>
+    </div>`).join('');
+  el.querySelectorAll('[data-rdel]').forEach(btn=>{
+    btn.onclick=()=>{ state.schienen.splice(+btn.dataset.rdel,1); renderRailRows(); rebuildRailMeshes(); };
+  });
+  el.querySelectorAll('[data-ri][data-rf]').forEach(inp=>{
+    inp.addEventListener('input',()=>{
+      const i=+inp.dataset.ri,f=inp.dataset.rf;
+      if(!state.schienen[i])return;
+      state.schienen[i][f]=f==='name'?inp.value:(parseFloat(inp.value)||0);
+      rebuildRailMeshes();
+    });
+  });
+  el.querySelectorAll('[data-raxis]').forEach(btn=>{
+    btn.onclick=()=>{
+      const i=+btn.dataset.raxis;
+      if(!state.schienen[i])return;
+      state.schienen[i].axis=btn.dataset.axval;
+      renderRailRows(); rebuildRailMeshes();
+    };
+  });
+}
+
+function rebuildRailMeshes() {
+  if(!railGroup) return;
+  clearGroup(railGroup);
+  (state.schienen||[]).forEach(r=>{
+    const L=r.length_mm||2000,H=r.height_mm||200,W=r.width_mm||400,ax=r.axis||'X+';
+    const geo=(ax==='X+'||ax==='X-')?new THREE.BoxGeometry(L,H,W):new THREE.BoxGeometry(W,H,L);
+    railGroup.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:0x2563eb,transparent:true,opacity:0.3,side:THREE.DoubleSide})));
+  });
+}
+
+$('railAddBtn')?.addEventListener('click',()=>{
+  if(!state.schienen) state.schienen=[];
+  state.schienen.push({name:'Rail '+(state.schienen.length+1),length_mm:2000,height_mm:200,width_mm:400,axis:'X+'});
+  renderRailRows(); rebuildRailMeshes();
+});
+
+
 $('effAddBtn').addEventListener('click', () => {
   state.effektoren.push({ stlFile: null, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0}, typ: 'auftragend' });
   state.activeEff = state.effektoren.length - 1;
