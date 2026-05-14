@@ -388,7 +388,9 @@ function rebuildRobotKinematics() {
       if (stlName && norm(stlName) === norm(file.name)) { assignedAxis = ax; break; }
     }
     const key = assignedAxis || partKey(file.name);
-    mesh.userData.axisKey = key; // Store for color updates
+    mesh.userData.axisKey = key;
+    const partDef=(state.axisStlParts[key]||[]).find(p=>norm(p.name)===norm(file.name));
+    if (partDef) mesh.material.color.set(partDef.color||'#e8a020');
     const m = key.match(/^A([1-6])$/);
     if (m) {
       const idx = Number(m[1]) - 1;
@@ -705,6 +707,11 @@ function findStl(stem) { const s = norm(stem); return state.stls.find(f=>norm(f.
 function clearGroup(g) { while (g.children.length) g.remove(g.children[0]); }
 
 async function loadStls() {
+  Object.entries(state.axisStlParts||{}).forEach(([ax,parts]) => {
+    parts.forEach(p => {
+      if (p.buf&&!state.buffers.has(p.name)){state.buffers.set(p.name,p.buf);if(!state.stls.find(f=>f.name===p.name))state.stls.push({path:p.name,name:p.name,type:'STL',size:p.buf.byteLength});}
+    });
+  });
   // STL-Rotation aus Inputs lesen und in Geometrie einbrennen
   const stlRx = parseFloat($('rRx')?.value || 0) || 0;
   const stlRy = parseFloat($('rRy')?.value || 0) || 0;
@@ -763,6 +770,7 @@ function resetData() {
   state.umfStls   = [];
   state.umfElemente = [];
   state.activeUmf   = 0;
+  ['A1','A2','A3','A4','A5','A6'].forEach(ax => { state.axisStlMap[ax]=null; state.axisStlParts[ax]=[]; });
   updateEffTcpMarker();
   renderEffRow?.(); renderUmfRows?.();
 }
@@ -993,9 +1001,10 @@ function buildJson() {
   const stlRz = parseFloat($('rRz')?.value||0)||0;
   const axNames = ['A1','A2','A3','A4','A5','A6'];
   const stlFiles = Object.fromEntries(axNames.map((ax, i) => {
-    const src = state.axisStlMap[ax] || state.stls.find(f => partKey(f.name) === ax)?.name || '';
-    const name = norm(src) || ('a'+(i+1));
-    return [ax, { name, posx:0, posy:0, posz:0, posrx:0, posry:0, posrz:0, color: colors[ax] || '#e8a020' }];
+    const parts = state.axisStlParts[ax]||[];
+    if (parts.length>0) return [ax, parts.map(p=>({name:norm(p.name),color:p.color||'#e8a020'}))];
+    const s = state.axisStlMap[ax]||state.stls.find(f=>partKey(f.name)===ax)?.name||'';
+    return [ax, [{name:norm(s)||('a'+(i+1)),color:colors[ax]||'#e8a020'}]];
   }));
   const tcp = state.tcp.auftragen;
   const toolName = norm(state.toolName || tcp.toolStl || '') || 'tool1_tcp';
@@ -1131,18 +1140,14 @@ function renderAxisStlRows() {
   const el = $('axisStlRows');
   if (!el) return;
   el.innerHTML = ['A1','A2','A3','A4','A5','A6'].map(ax => {
-    const mapped = state.axisStlMap[ax];
-    const fallback = state.stls.find(f => partKey(f.name) === ax)?.name || null;
-    const src = mapped || fallback;
-    const name = src ? norm(src) : '—';
-    const hasFile = !!src;
-    const col = colors[ax] || '#999999';
+    const parts=state.axisStlParts[ax]||[];
+    const hasFile=parts.length>0;
+    const lbl=hasFile?`${parts.length} Part${parts.length>1?'s':''}`:'—';
     return `<div class="axis-stl-row">
       <span class="axis-stl-label">${ax}</span>
-      <label style="display:inline-block;width:22px;height:22px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden;flex-shrink:0" title="Farbe ${ax}"><input type="color" class="axis-color-pick" data-ax="${ax}" value="${col}" style="opacity:0;width:1px;height:1px;position:absolute"></label>
-      <span class="axis-stl-name${hasFile ? ' has-file' : ''}" title="${name}">${name}</span>
-      <button class="axis-stl-btn" data-ax="${ax}">+ STL</button>
-      ${hasFile ? `<button class="axis-stl-clear" data-ax="${ax}">✕</button>` : ''}
+      <span class="axis-stl-name${hasFile?' has-file':''}">${lbl}</span>
+      <button class="axis-stl-btn" data-ax="${ax}">STL</button>
+      ${hasFile?`<button class="axis-stl-clear" data-ax="${ax}">✕</button>`:''}
     </div>`;
   }).join('');
 }
@@ -1161,6 +1166,77 @@ function setAxisColor(ax, hex) {
   });
 }
 
+
+// ── Multi-STL Parts Modal ─────────────────────────────────────────
+let _axisPartsTarget = null;
+
+function openAxisPartsModal(ax) {
+  _axisPartsTarget = ax;
+  $('axisPartsTitle').textContent = 'STL Parts — ' + ax;
+  renderAxisPartsList(ax);
+  const m = $('axisPartsModal');
+  m.style.cssText = 'display:flex;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.6);align-items:center;justify-content:center';
+}
+
+function closeAxisPartsModal() {
+  $('axisPartsModal').style.display='none';
+  _axisPartsTarget=null;
+  rebuildRobotKinematics(); applyTransforms();
+  renderAxisStlRows(); renderAll();
+}
+
+function renderAxisPartsList(ax) {
+  const el=$('axisPartsList'); if(!el)return;
+  const parts=state.axisStlParts[ax]||[];
+  if (!parts.length) { el.innerHTML='<div style="color:var(--txt3);font-size:12px;padding:8px 0">Keine STL. Klicke „+ STL hinzufügen“.</div>'; return; }
+  el.innerHTML=parts.map((p,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07)">
+      <label style="width:28px;height:28px;border-radius:3px;background:${p.color||'#e8a020'};border:1px solid rgba(255,255,255,.2);cursor:pointer;flex-shrink:0;overflow:hidden">
+        <input type="color" value="${p.color||'#e8a020'}" data-parts-ax="${ax}" data-parts-idx="${i}" style="opacity:0;width:1px;height:1px;position:absolute">
+      </label>
+      <span style="flex:1;font-family:monospace;font-size:11px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span>
+      <button data-parts-del="${i}" data-parts-ax="${ax}" style="background:rgba(204,51,51,.2);border:1px solid rgba(204,51,51,.4);color:#f87171;border-radius:3px;padding:2px 8px;cursor:pointer;font-size:12px">&#x2715;</button>
+    </div>`).join('');
+  el.querySelectorAll('[data-parts-del]').forEach(b=>{
+    b.onclick=()=>{ state.axisStlParts[ax].splice(+b.dataset.partsDel,1); renderAxisPartsList(ax); rebuildRobotKinematics(); applyTransforms(); };
+  });
+  el.querySelectorAll('input[type=color][data-parts-idx]').forEach(inp=>{
+    inp.addEventListener('change',()=>{
+      const p=state.axisStlParts[ax][+inp.dataset.partsIdx]; if(!p)return;
+      p.color=inp.value; inp.closest('label').style.background=inp.value;
+      for(const[,mesh]of meshes){if(norm(mesh.name)===norm(p.name)){mesh.material.color.set(inp.value);mesh.material.needsUpdate=true;}}
+    });
+  });
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const fi=$('axisPartsFileInput'); if(!fi)return;
+  fi.addEventListener('change',async e=>{
+    const file=e.target.files[0]; if(!file||!_axisPartsTarget)return; e.target.value='';
+    let rawBuf,fname;
+    if(/\.zip$/i.test(file.name)){try{const r=await extractFromZip(file);rawBuf=r.buf;fname=r.name;}catch(er){alert(er.message);return;}}
+    else{rawBuf=await file.arrayBuffer();fname=file.name;}
+    let geom;
+    try{geom=await parseGeometry(rawBuf,fname);geom.computeVertexNormals();}catch(er){alert('Fehler: '+er.message);return;}
+    const u8=new Uint8Array(rawBuf);
+    const stlBuf=/\.(stp|step)$/i.test(fname)?new Uint8Array(stlFromGeometry(geom)):u8;
+    const displayName=fname.replace(/\.(stp|step)$/i,'.stl');
+    const ax=_axisPartsTarget;
+    if(!state.axisStlParts[ax])state.axisStlParts[ax]=[];
+    if(!state.axisStlParts[ax].find(p=>norm(p.name)===norm(displayName)))
+      state.axisStlParts[ax].push({name:displayName,color:'#e8a020',buf:stlBuf});
+    state.axisStlMap[ax]=state.axisStlParts[ax][0].name;
+    if(!state.stls.find(f=>f.name===displayName))state.stls.push({path:displayName,name:displayName,type:'STL',size:stlBuf.byteLength});
+    state.files=state.stls; state.buffers.set(displayName,stlBuf);
+    const mat=new THREE.MeshStandardMaterial({color:'#e8a020',roughness:.62,metalness:.08});
+    const mesh=new THREE.Mesh(geom,mat); mesh.name=displayName;
+    meshes.set(displayName,mesh);
+    rebuildRobotKinematics();applyTransforms();
+    renderAxisPartsList(ax);renderAxisStlRows();
+  });
+  $('axisPartsModal')?.addEventListener('click',e=>{if(e.target===$('axisPartsModal'))closeAxisPartsModal();});
+});
+
 function initAxisStlEvents() {
   document.addEventListener('change', e => {
     const cp = e.target.closest('.axis-color-pick, [data-axis-color]');
@@ -1175,11 +1251,10 @@ function initAxisStlEvents() {
   document.addEventListener('click', e => {
     const btn = e.target.closest('.axis-stl-btn');
     const clr = e.target.closest('.axis-stl-clear');
-    if (btn) { _axisStlTarget = btn.dataset.ax; $('axisStlInput').click(); }
+    if (btn) { _axisPartsTarget = btn.dataset.ax; openAxisPartsModal(btn.dataset.ax); }
     if (clr) {
-      state.axisStlMap[clr.dataset.ax] = null;
-      renderAxisStlRows();
-      rebuildRobotKinematics(); applyTransforms();
+      const ax=clr.dataset.ax;state.axisStlMap[ax]=null;state.axisStlParts[ax]=[];
+      renderAxisStlRows();rebuildRobotKinematics();applyTransforms();
     }
   });
   $('axisStlInput').addEventListener('change', async e => {
@@ -1195,19 +1270,16 @@ function initAxisStlEvents() {
     const u8 = new Uint8Array(rawBuf);
     const stlBuf = /\.(stp|step)$/i.test(fname) ? new Uint8Array(stlFromGeometry(geom)) : u8;
     const displayName = fname.replace(/\.(stp|step)$/i, '.stl');
-    const ax = _axisStlTarget;
-    const mat = new THREE.MeshStandardMaterial({ color: colors[ax] || 0xe8a020, roughness: .62, metalness: .08 });
-    const mesh = new THREE.Mesh(geom, mat); mesh.name = displayName;
-    state.axisStlMap[ax] = displayName;
-    const fObj = { path: displayName, name: displayName, type: 'STL', size: stlBuf.byteLength };
-    state.stls = state.stls.filter(f => {
-      const k = state.axisStlMap[ax] === norm(f.name) ? ax : partKey(f.name);
-      return k !== ax;
-    });
-    state.stls.push(fObj);
-    state.files = state.stls;
-    state.buffers.set(displayName, stlBuf);
-    meshes.set(displayName, mesh);
+    const ax = _axisPartsTarget||_axisStlTarget;
+    if (!state.axisStlParts[ax]) state.axisStlParts[ax]=[];
+    if (!state.axisStlParts[ax].find(p=>norm(p.name)===norm(displayName)))
+      state.axisStlParts[ax].push({name:displayName,color:'#e8a020',buf:stlBuf});
+    state.axisStlMap[ax]=state.axisStlParts[ax][0]?.name||displayName;
+    if (!state.stls.find(f=>f.name===displayName)) state.stls.push({path:displayName,name:displayName,type:'STL',size:stlBuf.byteLength});
+    state.files=state.stls; state.buffers.set(displayName,stlBuf);
+    const mat=new THREE.MeshStandardMaterial({color:'#e8a020',roughness:.62,metalness:.08});
+    const mesh=new THREE.Mesh(geom,mat); mesh.name=displayName;
+    meshes.set(displayName,mesh);
     rebuildRobotKinematics(); applyTransforms();
     renderAxisStlRows(); renderAll();
     e.target.value = '';
@@ -1810,9 +1882,16 @@ async function loadRobotFromLib(robot) {
     // Achsfarben + STL-Zuweisung aus JSON
     if (state.packageJson?.stlFiles) {
       Object.entries(state.packageJson.stlFiles).forEach(([ax, info]) => {
-        const stlName = (info.name || '').replace(/\.stl$/i, '') + '.stl';
-        if (state.stls.find(f => f.name === stlName)) state.axisStlMap[ax] = stlName;
-        if (info.color) colors[ax] = info.color;
+        if (!ax.match(/^A[1-6]$/)) return;
+        const parts = Array.isArray(info) ? info : [info];
+        state.axisStlParts[ax] = [];
+        parts.forEach(p => {
+          const stlName=(p.name||'').replace(/\.stl$/i,'')+'.stl';
+          const buf=state.buffers.get(stlName);
+          state.axisStlParts[ax].push({name:stlName,color:p.color||'#e8a020',buf:buf||null});
+          if (!state.axisStlMap[ax]&&(buf||state.stls.find(f=>f.name===stlName))) state.axisStlMap[ax]=stlName;
+          if (p.color) colors[ax]=p.color;
+        });
       });
     }
 
