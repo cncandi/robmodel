@@ -1006,7 +1006,7 @@ function parseAxisPositions(xml) {
 
 function closeVal(a,b){return Math.abs((num(a)||0)-b)<.001}
 function setKnownOffsets(){state.joints.forEach((j,i)=>{j.offset=defOffset(i);j.axis=fixedAxisType(i);});state.axisPoints=state.joints.map((j,i)=>({name:'A'+(i+1),...defOffset(i),rx:0,ry:0,rz:0,source:'KR8 Zielwert'}));}
-function normalizeKnownOffsets(){const o=state.joints.map(j=>j.offset||{});const wS=closeVal(o[0].x,0)&&closeVal(o[0].y,0)&&closeVal(o[0].z,0)&&closeVal(o[1].x,495)&&closeVal(o[1].y,175);const wD=closeVal(o[0].x,495)&&closeVal(o[0].y,175)&&closeVal(o[0].z,0);const ok=closeVal(o[0].x,175)&&closeVal(o[0].y,0)&&closeVal(o[0].z,495);if((wS||wD)&&!ok)setKnownOffsets();}
+function normalizeKnownOffsets(){if((state.joints||[]).length<2)return;const o=state.joints.map(j=>j.offset||{});const wS=closeVal(o[0].x,0)&&closeVal(o[0].y,0)&&closeVal(o[0].z,0)&&closeVal(o[1].x,495)&&closeVal(o[1].y,175);const wD=closeVal(o[0].x,495)&&closeVal(o[0].y,175)&&closeVal(o[0].z,0);const ok=closeVal(o[0].x,175)&&closeVal(o[0].y,0)&&closeVal(o[0].z,495);if((wS||wD)&&!ok)setKnownOffsets();}
 
 // ── JSON ───────────────────────────────────────────────────────────
 function applyJsonToState(j) {
