@@ -2906,26 +2906,23 @@ async function buildComponentZip(type, idx) {
     state.effektoren.forEach((e,i)=>{ if(e.stlFile?.buf) zip.file(`stl/eff_${i}.stl`,e.stlFile.buf); });
     if(prevMode!=='world') attachToolToA6();
   } else if(type==='rail'){
-    cfg=buildRailJson(idx||0);
-    const eAx='E'+((state.schienen[idx||0]?.eNumber)||1);
-    _addStlsToZip(zip,[eAx]);
+    cfg=buildRailJson(0);
+    if(state.schienen[0]) _addStlsToZip(zip,['E'+(state.schienen[0].eNumber||1)]);
   } else if(type==='positioner'){
-    cfg=buildPositionerJson(idx||0);
-    _addStlsToZip(zip,['E'+((state.positioners[idx||0]?.eNum)||2)]);
+    const all=(state.positioners||[]).map((p,i)=>{ const j=buildPositionerJson(i); if(j) _addStlsToZip(zip,['E'+(p.eNum||i+2)]); return j; }).filter(Boolean);
+    cfg = all.length===1 ? all[0] : {type:'positioner', items:all};
   } else if(type==='label'){
-    cfg=buildLabelJson(idx||0);
-    _addStlsToZip(zip,['Label'+((state.objekte[idx||0]?.labelNum)||1)]);
+    const all=(state.objekte||[]).map((o,i)=>{ const j=buildLabelJson(i); if(j) _addStlsToZip(zip,['Label'+(o.labelNum||i+1)]); return j; }).filter(Boolean);
+    cfg = all.length===1 ? all[0] : {type:'label', items:all};
   } else if(type==='fixture'){
-    cfg=buildFixtureJson(idx||0);
-    // fixtures are parametric — no STL yet
+    const all=(state.festeObjekte||[]).map((_,i)=>buildFixtureJson(i)).filter(Boolean);
+    cfg = all.length===1 ? all[0] : {type:'fixture', items:all};
   } else if(type==='endeffektor'){
-    const e=(state.effektoren||[])[idx||0];
-    cfg=buildEffectorJson(idx||0);
-    if(e?.stlFile?.buf) zip.file(`stl/eff_${idx||0}.stl`,e.stlFile.buf);
+    const all=(state.effektoren||[]).map((e,i)=>{ const j=buildEffectorJson(i); if(j&&e?.stlFile?.buf) zip.file(`stl/eff_${i}.stl`,e.stlFile.buf); return j; }).filter(Boolean);
+    cfg = all.length===1 ? all[0] : {type:'endeffektor', items:all};
   } else if(type==='umfeld'){
-    const u=(state.umfElemente||[])[idx||0];
-    cfg=buildEnvironmentJson(idx||0);
-    if(u?.stlFile?.buf) zip.file(`stl/umf_${idx||0}.stl`,u.stlFile.buf);
+    const all=(state.umfElemente||[]).map((u,i)=>{ const j=buildEnvironmentJson(i); if(j&&u?.stlFile?.buf) zip.file(`stl/umf_${i}.stl`,u.stlFile.buf); return j; }).filter(Boolean);
+    cfg = all.length===1 ? all[0] : {type:'umfeld', items:all};
   } else if(type==='station'){
     cfg = await buildStationJson(zip);
   }
@@ -3314,11 +3311,26 @@ async function loadComponentFromZip(zip) {
     // append, don't clear
   }
   if      (type === 'rail')        applyRailConfig(cfg, stlBufs);
-  else if (type === 'positioner')  applyPositionerConfig(cfg, stlBufs);
-  else if (type === 'label')       applyLabelConfig(cfg, stlBufs);
-  else if (type === 'fixture')     applyFixtureConfig(cfg);
-  else if (type === 'endeffektor') applyEffectorConfig(cfg, stlBufs);
-  else if (type === 'umfeld')      applyEnvironmentConfig(cfg, stlBufs);
+  else if (type === 'positioner')  {
+    const items = cfg.items || [cfg];
+    items.forEach(p => applyPositionerConfig(p, stlBufs));
+  }
+  else if (type === 'label')       {
+    const items = cfg.items || [cfg];
+    items.forEach(l => applyLabelConfig(l, stlBufs));
+  }
+  else if (type === 'fixture')     {
+    const items = cfg.items || [cfg];
+    items.forEach(f => applyFixtureConfig(f));
+  }
+  else if (type === 'endeffektor') {
+    const items = cfg.items || [cfg];
+    items.forEach(e => applyEffectorConfig(e, stlBufs));
+  }
+  else if (type === 'umfeld')      {
+    const items = cfg.items || [cfg];
+    items.forEach(u => applyEnvironmentConfig(u, stlBufs));
+  }
   else if (type === 'station')     applyStationConfig(cfg, stlBufs);
   else if (type === 'robot')       { applyJsonToState(cfg); await loadStlBufsIntoState(stlBufs); rebuildRobotKinematics(); applyTransforms(); enableSave(); }
   else throw new Error('Unbekannter Typ: ' + type);
