@@ -67,11 +67,13 @@ const state = {
   umfElemente: [],
   activeUmf: 0,
   schienen: [],
+  objekte: [],
 };
 
 // ── Three.js Variablen ────────────────────────────────────────────
 let scene, camera, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot, railGroup;
 let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup;
+var objekteGroups = [];
 const meshes = new Map();
 const axisMeshes = [];
 const axisPivotGroups = [];
@@ -1104,10 +1106,11 @@ function renderAll(){renderAxisStlRows();renderRows();updateAxisPointVisuals();r
 
 function setParamTab(tab) {
   _paramTab = tab;
-  const btnA=$('tabAachsen'), btnE=$('tabEachsen');
   const on='rgba(37,99,235,.3)', onB='1px solid rgba(37,99,235,.6)', off='rgba(255,255,255,.05)', offB='1px solid rgba(255,255,255,.15)';
-  if(btnA){btnA.style.background=tab==='a'?on:off;btnA.style.border=tab==='a'?onB:offB;btnA.style.color=tab==='a'?'#60a5fa':'#6a8fa8';}
-  if(btnE){btnE.style.background=tab==='e'?on:off;btnE.style.border=tab==='e'?onB:offB;btnE.style.color=tab==='e'?'#60a5fa':'#6a8fa8';}
+  [['a','tabAachsen'],['e','tabEachsen'],['l','tabLabels']].forEach(([t,id])=>{
+    const btn=$(id); if(!btn) return;
+    btn.style.background=tab===t?on:off; btn.style.border=tab===t?onB:offB; btn.style.color=tab===t?'#60a5fa':'#6a8fa8';
+  });
   renderRows();
 }
 window.setParamTab = setParamTab;
@@ -1152,6 +1155,61 @@ function renderRows(){
     return;
   }
 
+  if (_paramTab === 'l') {
+    const objekte = state.objekte||[];
+    if(!objekte.length){$('jointRows').innerHTML=`<tr><td colspan="12" style="color:#4a6a8a;font-family:monospace;font-size:11px;padding:8px">Keine Objekte — über 📦 Bewegliche Objekte anlegen.</td></tr>`;return;}
+    $('jointRows').innerHTML = objekte.map((o,i)=>{
+      const lbl='Label'+(o.labelNum||i+1);
+      const parts=(state.axisStlParts[lbl]||[]);
+      const col=(parts[0]?.color)||o.color||'#4499cc';
+      return `<tr>
+        <td><b>${lbl}</b></td>
+        <td><input data-ol-pos data-oi="${i}" type="number" step="1" value="${o.ePos||0}" min="${o.eMin||0}" max="${o.eMax||1000}" style="width:70px"></td>
+        <td><span class="axisDir">${o.axis||'Y+'}</span></td>
+        <td colspan="3" style="color:#4a6a8a;font-size:10px;text-align:center">—</td>
+        <td><input data-ol-min data-oi="${i}" type="number" step="1" value="${o.eMin||0}" style="width:60px"></td>
+        <td><input data-ol-max data-oi="${i}" type="number" step="1" value="${o.eMax||1000}" style="width:60px"></td>
+        <td style="color:#4a6a8a">—</td>
+        <td><label style="display:inline-block;width:26px;height:22px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden"><input type="color" data-ol-color data-oi="${i}" value="${col}" style="opacity:0;width:1px;height:1px;position:absolute"></label></td>
+        <td><button data-ol-stl data-oi="${i}" style="font-size:10px;padding:3px 7px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:${parts.length?'#d8e8f0':'#6a8fa8'};width:100%">${parts.length?parts.length+' Part'+(parts.length>1?'s':''):'+ STL'}</button></td>
+        <td><button data-ol-sim data-oi="${i}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;padding:2px 7px;cursor:pointer;color:#9ab">▶</button></td>
+      </tr>`;
+    }).join('');
+    $('jointRows').querySelectorAll('[data-ol-pos]').forEach(inp=>inp.addEventListener('input',e=>{
+      const i=+inp.dataset.oi; if(!state.objekte[i])return;
+      state.objekte[i].ePos=parseFloat(inp.value)||0; rebuildObjektMesh(i);
+    }));
+    $('jointRows').querySelectorAll('[data-ol-min]').forEach(inp=>inp.addEventListener('input',e=>{
+      const i=+inp.dataset.oi; if(state.objekte[i]) state.objekte[i].eMin=parseFloat(inp.value)||0;
+    }));
+    $('jointRows').querySelectorAll('[data-ol-max]').forEach(inp=>inp.addEventListener('input',e=>{
+      const i=+inp.dataset.oi; if(state.objekte[i]) state.objekte[i].eMax=parseFloat(inp.value)||1000;
+    }));
+    $('jointRows').querySelectorAll('[data-ol-color]').forEach(inp=>inp.addEventListener('change',e=>{
+      const i=+inp.dataset.oi; if(!state.objekte[i])return;
+      state.objekte[i].color=inp.value; rebuildObjektMesh(i); renderRows();
+    }));
+    $('jointRows').querySelectorAll('[data-ol-stl]').forEach(btn=>btn.addEventListener('click',e=>{
+      const i=+btn.dataset.oi; const lbl='Label'+(state.objekte[i]?.labelNum||i+1);
+      openAxisPartsModal(lbl);
+    }));
+    $('jointRows').querySelectorAll('[data-ol-sim]').forEach(btn=>btn.addEventListener('click',e=>{
+      const i=+btn.dataset.oi; const o=state.objekte[i]; if(!o)return;
+      if(o._simInterval){clearInterval(o._simInterval);delete o._simInterval;return;}
+      const min=o.eMin||0, max=o.eMax||1000;
+      let pos=o.ePos||0, dir=1;
+      o._simInterval=setInterval(()=>{
+        pos+=dir*(max-min)/60;
+        if(pos>=max){pos=max;dir=-1;} else if(pos<=min){pos=min;dir=1;}
+        o.ePos=pos;
+        const inp=$('jointRows').querySelector(`[data-ol-pos][data-oi="${i}"]`);
+        if(inp) inp.value=Math.round(pos);
+        rebuildObjektMesh(i);
+      },16);
+    }));
+    return;
+  }
+
   $('jointRows').innerHTML = state.joints.map((j,i)=>{
     const ax=j.name||'A'+(i+1);
     const parts=state.axisStlParts[ax]||[];
@@ -1171,6 +1229,137 @@ function renderRows(){
       <td><button class="simBtn" data-sim-axis="${i}">▶</button></td>
     </tr>`;}).join('');
 }
+
+// ── Bewegliche Objekte ────────────────────────────────────────────
+var _omAxis = 'Y+';
+
+function renderObjRows() {
+  const el=$('objRows'); if(!el) return;
+  const badge=$('objBadge');
+  const objekte=state.objekte||[];
+  if(badge) badge.textContent=objekte.length||'0';
+  if(!objekte.length){el.innerHTML='';return;}
+  const fs='background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:2px 5px;font-family:inherit;font-size:12px;color:#d8e8f0;outline:none;width:100%';
+  el.innerHTML=objekte.map((o,i)=>`
+    <div style="border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:8px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span style="flex:1;font-family:monospace;font-size:12px;color:var(--txt)">Label${o.labelNum||i+1} — ${o.type==='cylinder'?'🔵':'📦'} ${o.name||''}</span>
+        <button data-obj-edit="${i}" style="background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:11px">✏️</button>
+        <button data-obj-del="${i}" style="background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:12px">✕</button>
+      </div>
+      <div style="font-size:10px;color:#6a8fa8;font-family:monospace">${o.axis||'Y+'} | ${o.eMin||0}–${o.eMax||1000} mm</div>
+    </div>`).join('');
+  el.querySelectorAll('[data-obj-del]').forEach(btn=>btn.addEventListener('click',()=>{
+    const i=+btn.dataset.objDel;
+    if(state.objekte[i]?._simInterval) clearInterval(state.objekte[i]._simInterval);
+    if(objekteGroups[i]){ scene.remove(objekteGroups[i]); objekteGroups[i]=null; }
+    state.objekte.splice(i,1); objekteGroups.splice(i,1);
+    renderObjRows(); renderRows();
+  }));
+  el.querySelectorAll('[data-obj-edit]').forEach(btn=>btn.addEventListener('click',()=>{
+    openObjModal(+btn.dataset.objEdit);
+  }));
+}
+
+function rebuildObjektMesh(i) {
+  const o=state.objekte[i]; if(!o) return;
+  if(!objekteGroups[i]){ objekteGroups[i]=new THREE.Group(); scene.add(objekteGroups[i]); }
+  const grp=objekteGroups[i];
+  while(grp.children.length) grp.remove(grp.children[0]);
+  const lbl='Label'+(o.labelNum||i+1);
+  const parts=state.axisStlParts[lbl]||[];
+  if(parts.length){
+    parts.forEach(p=>{ if(!p.buf)return; const geo=loader.parse(p.buf.buffer||p.buf); geo.computeVertexNormals(); grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:p.color||0x4499cc,shininess:60}))); });
+  } else if(o.showBox!==false){
+    const L=o.length||500,H=o.height||500,W=o.width||500,R=o.radius||200;
+    const geo=o.type==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
+    grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:o.color||0x4499cc,transparent:true,opacity:0.4,side:THREE.DoubleSide})));
+  }
+  // Position: base offset + movement along axis
+  const p=o.ePos||0, ax=o.axis||'Y+', bo=o.boxOffset||{}, deg=Math.PI/180;
+  var cx=0,cy=0,cz=0;
+  if(ax==='X+')cx=p; else if(ax==='X-')cx=-p; else if(ax==='Y+')cy=p; else if(ax==='Y-')cy=-p; else if(ax==='Z+')cz=p; else cz=-p;
+  grp.position.set((bo.x||0)+cx,(bo.y||0)+cy,(bo.z||0)+cz);
+  grp.rotation.set((bo.rx||0)*deg,(bo.ry||0)*deg,(bo.rz||0)*deg,'XYZ');
+}
+
+function openObjModal(editIdx) {
+  const o = editIdx>=0 ? (state.objekte||[])[editIdx] : null;
+  $('om-name').value   = o?.name    || '';
+  $('om-type').value   = o?.type    || 'box';
+  $('om-num').value    = o?.labelNum||(state.objekte||[]).length+1;
+  $('om-length').value = o?.length  || 500;
+  $('om-width').value  = o?.width   || 500;
+  $('om-height').value = o?.height  || 500;
+  $('om-radius').value = o?.radius  || 200;
+  $('om-min').value    = o?.eMin    ?? 0;
+  $('om-max').value    = o?.eMax    ?? 1000;
+  $('om-start').value  = o?.ePos    ?? 0;
+  $('om-show').checked = o?.showBox !== false;
+  $('om-edit-idx').value = editIdx >= 0 ? editIdx : -1;
+  const bo=o?.boxOffset||{};
+  $('om-ox').value=bo.x||0;$('om-oy').value=bo.y||0;$('om-oz').value=bo.z||0;
+  $('om-orx').value=bo.rx||0;$('om-ory').value=bo.ry||0;$('om-orz').value=bo.rz||0;
+  _omAxis=o?.axis||'Y+';
+  document.querySelectorAll('.om-axis-btn').forEach(b=>{
+    const on=b.dataset.ax===_omAxis;
+    b.style.background=on?'rgba(37,99,235,.3)':'rgba(255,255,255,.05)';
+    b.style.border=on?'1px solid rgba(37,99,235,.6)':'1px solid rgba(255,255,255,.15)';
+    b.style.color=on?'#60a5fa':'#6a8fa8';
+  });
+  omTypeChanged();
+  $('objModal').style.display='flex';
+}
+
+function omTypeChanged(){
+  const t=$('om-type')?.value||'box';
+  const bf=$('om-box-fields'), cf=$('om-cyl-fields');
+  if(bf) bf.style.display=t==='box'?'contents':'none';
+  if(cf) cf.style.display=t==='cylinder'?'contents':'none';
+}
+window.omTypeChanged=omTypeChanged;
+
+document.querySelectorAll('.om-axis-btn').forEach(b=>b.addEventListener('click',()=>{
+  _omAxis=b.dataset.ax;
+  document.querySelectorAll('.om-axis-btn').forEach(x=>{
+    const on=x.dataset.ax===_omAxis;
+    x.style.background=on?'rgba(37,99,235,.3)':'rgba(255,255,255,.05)';
+    x.style.border=on?'1px solid rgba(37,99,235,.6)':'1px solid rgba(255,255,255,.15)';
+    x.style.color=on?'#60a5fa':'#6a8fa8';
+  });
+}));
+
+$('objAddBtn')?.addEventListener('click',()=>openObjModal(-1));
+$('objModalClose')?.addEventListener('click',()=>{ $('objModal').style.display='none'; });
+
+$('om-submit')?.addEventListener('click',()=>{
+  const editIdx=parseInt($('om-edit-idx').value);
+  const entry={
+    name:      $('om-name').value||('Objekt '+(state.objekte.length+1)),
+    type:      $('om-type').value||'box',
+    labelNum:  parseInt($('om-num').value)||1,
+    length:    parseFloat($('om-length').value)||500,
+    width:     parseFloat($('om-width').value)||500,
+    height:    parseFloat($('om-height').value)||500,
+    radius:    parseFloat($('om-radius').value)||200,
+    axis:      _omAxis,
+    eMin:      parseFloat($('om-min').value)||0,
+    eMax:      parseFloat($('om-max').value)||1000,
+    ePos:      parseFloat($('om-start').value)||0,
+    showBox:   $('om-show').checked===true,
+    color:     '#4499cc',
+    boxOffset: {
+      x: parseFloat($('om-ox').value)||0, y: parseFloat($('om-oy').value)||0, z: parseFloat($('om-oz').value)||0,
+      rx:parseFloat($('om-orx').value)||0,ry:parseFloat($('om-ory').value)||0,rz:parseFloat($('om-orz').value)||0
+    }
+  };
+  if(editIdx>=0){ state.objekte[editIdx]=entry; }
+  else { state.objekte.push(entry); objekteGroups.push(null); }
+  const idx=editIdx>=0?editIdx:state.objekte.length-1;
+  rebuildObjektMesh(idx);
+  renderObjRows(); renderRows();
+  $('objModal').style.display='none';
+});
 
 function renderTcp(){qsa('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===state.activeTcp));const tcp=state.tcp[state.activeTcp];qsa('[data-tcp]').forEach(i=>i.value=tcp?.[i.dataset.tcp]??'');const x=num(tcp?.x),y=num(tcp?.y),z=num(tcp?.z);tcpMarker.visible=x!==null||y!==null||z!==null;tcpMarker.position.set(x||0,y||0,z||0);}
 
