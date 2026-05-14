@@ -351,13 +351,12 @@ function nominalAxisVec(i)   { return ['z','y','y','x','y','x'][i] || 'z'; }
 function axisDirectionLabel(i) { return fixedAxisType(i) + ' · ' + nominalAxisVec(i).toUpperCase(); }
 
 function cumulativeAxisPositions() {
-  // X=horizontal (Three.X), Z=vertikal (Three.Z)
-  // A2: lokales X zeigt bei Referenzpose nach oben → dx=0, dz=p.x
   let x=0, y=0, z=0;
   const pts = [new THREE.Vector3(0,0,0)];
   for (let i=0; i<5; i++) {
     const p = state.axisPoints[i];
-    if (i === 1) { z += num(p.x)||0; } // A2: X-Wert geht nach oben (Welt-Z)
+    if (!p) { pts.push(new THREE.Vector3(x,y,z)); continue; }
+    if (i === 1) { z += num(p.x)||0; }
     else { x += num(p.x)||0; z += num(p.z)||0; }
     y += num(p.y)||0;
     pts.push(new THREE.Vector3(x,y,z));
