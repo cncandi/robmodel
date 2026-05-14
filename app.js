@@ -1620,6 +1620,7 @@ function renderRailRows() {
   </div>`;
   $('railDelBtn')?.addEventListener('click',()=>{
     state.schienen=[];
+    kinematicsRoot.position.set(0,0,0);
     renderRailRows(); rebuildRailMeshes();
   });
 }
@@ -1646,17 +1647,18 @@ function rebuildRailMeshes() {
                                      new THREE.BoxGeometry(W,H,L);
     railGroup.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:0x2563eb,transparent:true,opacity:0.3,side:THREE.DoubleSide})));
   }
-  // Sliding offset (rail moves so robot stays at origin)
-  var cx=0, cy=0, cz=0;
-  if      (ax==='X+') cx =  L/2 - p;
-  else if (ax==='X-') cx = -(L/2 - p);
-  else if (ax==='Y+') cy =  L/2 - p;
-  else if (ax==='Y-') cy = -(L/2 - p);
-  else if (ax==='Z+') cz =  L/2 - p;
-  else                cz = -(L/2 - p);
-  // Apply box offset + slide
-  railGroup.position.set(cx+(bo.x||0), cy+(bo.y||0), cz+(bo.z||0));
+  // Rail stays fixed at boxOffset
+  railGroup.position.set(bo.x||0, bo.y||0, bo.z||0);
   railGroup.rotation.set((bo.rx||0)*deg, (bo.ry||0)*deg, (bo.rz||0)*deg, 'XYZ');
+  // Robot (kinematicsRoot) moves along rail direction
+  var cx=0, cy=0, cz=0;
+  if      (ax==='X+') cx =  p;
+  else if (ax==='X-') cx = -p;
+  else if (ax==='Y+') cy =  p;
+  else if (ax==='Y-') cy = -p;
+  else if (ax==='Z+') cz =  p;
+  else                cz = -p;
+  kinematicsRoot.position.set(cx, cy, cz);
 }
 
 $('railAddBtn')?.addEventListener('click',()=>{
