@@ -3112,7 +3112,7 @@ async function loadRobotFromLib(robot) {
 
 // ── Universeller Library-Loader ───────────────────────────────────
 async function loadFromLib(item) {
-  const type = item.type || 'robot';
+  const type = item.type === 'object' ? 'fixture' : (item.type || 'robot');
   if (type === 'robot') { loadRobotFromLib(item); return; }
   const status = $('rl-lib-status');
   const prog   = $('rl-lib-progress');
@@ -3152,8 +3152,11 @@ async function loadComponentFromZip(zip) {
     // Old rail format had no explicit type field — detect by content
     if (!cfg.type) {
       if (cfg.length_mm !== undefined || cfg.axis !== undefined) cfg.type = 'rail';
-      else if (cfg.joints) cfg.type = 'robot';
+      else if (cfg.joints?.length) cfg.type = 'robot';  // only real robot if has joints
+      else cfg.type = 'fixture'; // fallback: treat structureless JSON as fixture (won't show much)
     }
+    // Alias: server stores old "object" type
+    if (cfg.type === 'object') cfg.type = 'fixture';
   }
 
   // Collect all STL buffers: stl/XX.stl or XX.stl → key without extension
