@@ -1142,19 +1142,8 @@ function renderRows(){
     </tr>`;
   }
 
-  $('jointRows').innerHTML = robotRows + eRow;
-
-  // E-axis input bindings
-  const eposInp = $('jointRows').querySelector('[data-e-pos]');
-  if(eposInp) eposInp.addEventListener('input',()=>{
-    if(!state.schienen[0])return;
-    state.schienen[0].ePos = parseFloat(eposInp.value)||0;
-    rebuildRailMeshes();
-  });
-  const eminInp = $('jointRows').querySelector('[data-e-min]');
-  if(eminInp) eminInp.addEventListener('input',()=>{ if(state.schienen[0]) state.schienen[0].eMin=parseFloat(eminInp.value)||0; });
-  const emaxInp = $('jointRows').querySelector('[data-e-max]');
-  if(emaxInp) emaxInp.addEventListener('input',()=>{ if(state.schienen[0]) state.schienen[0].eMax=parseFloat(emaxInp.value)||0; });
+  $('jointRows').innerHTML = robotRows;
+  // Note: E-axis managed via "Externe Achsen" modal
 }
 
 function renderTcp(){qsa('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===state.activeTcp));const tcp=state.tcp[state.activeTcp];qsa('[data-tcp]').forEach(i=>i.value=tcp?.[i.dataset.tcp]??'');const x=num(tcp?.x),y=num(tcp?.y),z=num(tcp?.z);tcpMarker.visible=x!==null||y!==null||z!==null;tcpMarker.position.set(x||0,y||0,z||0);}
@@ -1678,6 +1667,56 @@ $('rm-submit')?.addEventListener('click',()=>{
 });
 
 $('railModalClose')?.addEventListener('click',()=>{ $('railModal').style.display='none'; });
+
+// ── Externe Achsen Modal ──────────────────────────────────────────
+function renderExtAxesModal() {
+  const body = $('extAxesBody'); if(!body) return;
+  const rail = (state.schienen||[])[0];
+  if(!rail){ body.innerHTML='<div style="font-size:11px;color:#4a6a8a;font-family:monospace">Keine externen Achsen definiert. Zuerst eine Schiene anlegen.</div>'; return; }
+  const eAx = 'E'+(rail.eNumber||1);
+  const parts = state.axisStlParts[eAx]||[];
+  const col = parts[0]?.color||'#2563eb';
+  const fs = 'background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:4px 6px;font-family:inherit;font-size:12px;color:#d8e8f0;width:100%;outline:none';
+  body.innerHTML = `
+    <div style="border:1px solid rgba(37,99,235,.3);border-radius:6px;padding:12px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-family:monospace;font-size:14px;color:#60a5fa;font-weight:bold">${eAx}</span>
+        <span style="font-size:11px;color:#6a8fa8;font-family:monospace">${rail.name||'Rail'} | ${rail.axis} | ${rail.length_mm} mm</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <label style="font-size:11px;color:#6a8fa8">Min (mm)<input id="ea-min" type="number" step="1" value="${rail.eMin??0}" style="${fs}"></label>
+        <label style="font-size:11px;color:#6a8fa8">Max (mm)<input id="ea-max" type="number" step="1" value="${rail.eMax??rail.length_mm??2000}" style="${fs}"></label>
+        <label style="font-size:11px;color:#6a8fa8">Aktuelle Position (mm)<input id="ea-pos" type="number" step="1" value="${rail.ePos||0}" min="${rail.eMin??0}" max="${rail.eMax??rail.length_mm??2000}" style="${fs}"></label>
+        <label style="font-size:11px;color:#6a8fa8">Farbe<br>
+          <label style="display:inline-block;width:40px;height:28px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden;margin-top:4px">
+            <input type="color" id="ea-color" value="${col}" style="opacity:0;width:1px;height:1px;position:absolute">
+          </label>
+        </label>
+      </div>
+      <div style="font-size:11px;color:#6a8fa8;margin-bottom:6px">STL Dateien (${parts.length})</div>
+      <div style="display:flex;gap:6px">
+        <button id="ea-stl-btn" style="padding:5px 14px;background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:4px;font-size:12px;cursor:pointer;font-family:monospace">+ STL laden</button>
+        ${parts.length?`<button id="ea-stl-clear" style="padding:5px 14px;background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:4px;font-size:12px;cursor:pointer;font-family:monospace">STL löschen</button>`:''}
+      </div>
+      <div id="ea-parts-list" style="margin-top:8px;font-size:11px;color:#6a8fa8;font-family:monospace">${parts.map(p=>`<div>${p.name||'—'}</div>`).join('')||''}</div>
+    </div>`;
+
+  $('ea-min')?.addEventListener('input',()=>{ if(rail) rail.eMin=parseFloat($('ea-min').value)||0; });
+  $('ea-max')?.addEventListener('input',()=>{ if(rail) rail.eMax=parseFloat($('ea-max').value)||0; });
+  $('ea-pos')?.addEventListener('input',()=>{ if(rail){ rail.ePos=parseFloat($('ea-pos').value)||0; rebuildRailMeshes(); }});
+  $('ea-color')?.addEventListener('change',()=>{
+    const c=$('ea-color').value;
+    if(state.axisStlParts[eAx]?.length) state.axisStlParts[eAx][0].color=c;
+    $('ea-color').closest('label').style.background=c;
+    rebuildRailMeshes(); renderAxisStlRows(); renderRows();
+  });
+  $('ea-stl-btn')?.addEventListener('click',()=>{ openAxisPartsModal(eAx); $('extAxesModal').style.display='none'; });
+  $('ea-stl-clear')?.addEventListener('click',()=>{ state.axisStlParts[eAx]=[]; renderExtAxesModal(); rebuildRailMeshes(); renderAxisStlRows(); });
+}
+
+$('extAxesBtn')?.addEventListener('click',()=>{ renderExtAxesModal(); $('extAxesModal').style.display='flex'; });
+$('extAxesClose')?.addEventListener('click',()=>{ $('extAxesModal').style.display='none'; });
+
 
 
 $('effAddBtn').addEventListener('click', () => {
