@@ -1451,10 +1451,16 @@ window.closeAxisPartsModal = closeAxisPartsModal;
 window.openNewItemModal = openNewItemModal;
 
 function saveAxisPartsModal() {
+  const savedAx = _axisPartsTarget;
   $('axisPartsModal').style.display='none';
   _axisPartsTarget=null; _axisPartsPending=null;
   rebuildRobotKinematics(); applyTransforms();
   renderAxisStlRows(); renderAll();
+  // Rebuild object mesh if saved axis is a Label
+  if(savedAx && savedAx.startsWith('Label')){
+    const idx=(state.objekte||[]).findIndex(o=>'Label'+(o.labelNum||0)===savedAx);
+    if(idx>=0) rebuildObjektMesh(idx);
+  }
 }
 
 function cancelAxisPartsModal() {
