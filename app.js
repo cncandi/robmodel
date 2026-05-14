@@ -1686,7 +1686,7 @@ $('railAddBtn')?.addEventListener('click',()=>{
   $('railModal').style.display='flex';
 });
 
-let _rmAxis='X+';
+let _rmAxis='Y+';
 document.querySelectorAll('.rm-axis-btn').forEach(b=>{
   b.addEventListener('click',()=>{
     _rmAxis=b.dataset.ax;
