@@ -1101,7 +1101,7 @@ function simulateAxis(axisIndex){
 function renderAll(){renderAxisStlRows();renderRows();updateAxisPointVisuals();renderTcp();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';}
 
 
-let _paramTab = 'a';
+var _paramTab = 'a';
 function setParamTab(tab) {
   _paramTab = tab;
   const btnA=$('tabAachsen'), btnE=$('tabEachsen');
