@@ -785,7 +785,25 @@ function resetData() {
 }
 
 function enableSave()  { $('downloadJson').disabled=false; $('downloadZip').disabled=false; $('roblibBtn').disabled=false; }
-function disableSave() { $('downloadJson').disabled=true;  $('downloadZip').disabled=true;  $('roblibBtn').disabled=true; }
+function disableSave() { $('downloadJson').disabled=true;  $('downloadZip').disabled=true; /* roblibBtn always enabled */ }
+
+function clearAll() {
+  if(!confirm('Kompletten Viewport leeren?')) return;
+  // Reset robot
+  resetData(); disableSave();
+  // Reset rail
+  if(railGroup){ clearGroup(railGroup); }
+  state.schienen=[];
+  if(typeof kinematicsRoot!=='undefined') kinematicsRoot.position.set(0,0,0);
+  // Reset objects
+  (objekteGroups||[]).forEach(g=>{ if(g){ while(g.children.length) g.remove(g.children[0]); if(g.parent) g.parent.remove(g); }});
+  objekteGroups.length=0; state.objekte=[];
+  // Reset positioners
+  (positionerGroups||[]).forEach(g=>{ if(g) _removePosGroup((positionerGroups||[]).indexOf(g)); });
+  positionerGroups.length=0; state.positioners=[];
+  // Render
+  renderRailRows(); renderObjRows(); renderPosRows(); renderAll(); setView('iso');
+}
 
 async function loadSourceZip(file) {
   resetData(); state.mode='source';
@@ -2891,6 +2909,7 @@ window.setRlMode = setRlMode;
 
 // ── Event-Listener ─────────────────────────────────────────────────
 $('newBtn').onclick     = () => { resetData(); disableSave(); renderAll(); setView('iso'); };
+$('clearAllBtn')?.addEventListener('click', clearAll);
 $('downloadJson').onclick = downloadJson;
 $('downloadZip').onclick  = downloadZip;
 $('toggleParam').onclick = () => {
