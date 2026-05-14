@@ -3304,6 +3304,28 @@ function applyStationConfig(cfg, stlBufs) {
 }
 
 $('robotLibBtn').onclick   = openRobotLibModal;
+
+// ── Komponenten-Library Buttons (↻) ──────────────────────────────
+function openLibFiltered(type) {
+  // Set filter and open Library modal
+  _libTypeFilter = type;
+  // Update filter tab visual
+  document.querySelectorAll('.lib-tab-btn').forEach(btn => {
+    const on = btn.dataset.libType === type;
+    btn.style.background = on ? 'rgba(37,99,235,.2)' : 'rgba(255,255,255,.05)';
+    btn.style.border = on ? '1px solid rgba(37,99,235,.4)' : '1px solid rgba(255,255,255,.15)';
+    btn.style.color = on ? '#60a5fa' : '#6a8fa8';
+    if(on) btn.classList.add('on'); else btn.classList.remove('on');
+  });
+  openRobotLibModal();
+  if (!_libRobots.length) loadRobotLibList();
+  else renderLibList(_libRobots);
+}
+
+$('posLibRefreshBtn')?.addEventListener('click', () => openLibFiltered('positioner'));
+$('railLibRefreshBtn')?.addEventListener('click', () => openLibFiltered('rail'));
+$('objLibRefreshBtn')?.addEventListener('click',  () => openLibFiltered('label'));
+$('fixLibRefreshBtn')?.addEventListener('click',  () => openLibFiltered('fixture'));
 $('robotLibClose').onclick = () => { $('robotLibModal').style.display = 'none'; };
 $('rl-lib-refresh').addEventListener('click', () => { _libRobots = []; loadRobotLibList(); });
 $('rl-lib-search').addEventListener('input', e => renderRobotLibList(e.target.value));
