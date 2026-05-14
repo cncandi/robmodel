@@ -262,7 +262,16 @@
           <div id="rl-lib-bar" style="height:100%;width:0%;background:#ff6000;border-radius:4px;transition:width .2s"></div>
         </div>
       </div>
-      <div id="rl-lib-list" style="max-height:360px;overflow-y:auto;background:#060e14;border-radius:4px;border:1px solid rgba(255,255,255,.08)">
+      <div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap">
+        <button class="lib-tab-btn on" data-lib-type="all" style="font-size:10px;padding:2px 8px;border-radius:3px;cursor:pointer;background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;font-family:monospace">Alle</button>
+        <button class="lib-tab-btn" data-lib-type="robot" style="font-size:10px;padding:2px 8px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8;font-family:monospace">🦾 Roboter</button>
+        <button class="lib-tab-btn" data-lib-type="positioner" style="font-size:10px;padding:2px 8px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8;font-family:monospace">🔄 Positionierer</button>
+        <button class="lib-tab-btn" data-lib-type="object" style="font-size:10px;padding:2px 8px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8;font-family:monospace">📦 Objekt</button>
+        <button class="lib-tab-btn" data-lib-type="station" style="font-size:10px;padding:2px 8px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8;font-family:monospace">🏗️ Station</button>
+        <button class="lib-tab-btn" data-lib-type="endeffektor" style="font-size:10px;padding:2px 8px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8;font-family:monospace">🔧 Endeffektor</button>
+        <button class="lib-tab-btn" data-lib-type="umfeld" style="font-size:10px;padding:2px 8px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8;font-family:monospace">🏭 Umfeld</button>
+      </div>
+      <div id="rl-lib-list" style="max-height:320px;overflow-y:auto;background:#060e14;border-radius:4px;border:1px solid rgba(255,255,255,.08)">
         <div style="padding:16px;font-family:monospace;font-size:11px;color:#4a6a8a">Klicke ↻ zum Laden…</div>
       </div>
     </div>
