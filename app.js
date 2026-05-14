@@ -1196,6 +1196,7 @@ window.openAxisPartsModal = openAxisPartsModal;
 window.saveAxisPartsModal = saveAxisPartsModal;
 window.cancelAxisPartsModal = cancelAxisPartsModal;
 window.closeAxisPartsModal = closeAxisPartsModal;
+window.openNewItemModal = openNewItemModal;
 
 function saveAxisPartsModal() {
   $('axisPartsModal').style.display='none';
