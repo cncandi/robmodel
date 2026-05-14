@@ -832,8 +832,19 @@ async function loadSourceZip(file) {
 }
 
 async function loadPackageZip(file) {
+  const z = await readZip(file);
+  // Check for config.json (new component format)
+  if (z.buffers.has('config.json')) {
+    const cfg = JSON.parse(new TextDecoder().decode(z.buffers.get('config.json')));
+    if (cfg.type && cfg.type !== 'robot') {
+      const zip = await JSZip.loadAsync(await file.arrayBuffer());
+      await loadComponentFromZip(zip);
+      return;
+    }
+  }
+  // Existing robot package
   resetData(); state.mode='package';
-  const z = await readZip(file); state.files=z.files; state.buffers=z.buffers;
+  state.files=z.files; state.buffers=z.buffers;
   splitFiles();
   if (state.jsons[0]) {
     try { state.packageJson=JSON.parse(new TextDecoder('utf-8').decode(state.buffers.get(state.jsons[0].path))); applyJsonToState(state.packageJson); }
@@ -2549,25 +2560,25 @@ function renderLibList(items) {
   const filtered = filterLibItems(items);
   const container = $('rl-lib-list');
   if (!container) return;
-  const TYPE_ICON = {robot:'🦾',endeffektor:'🔧',umfeld:'🏭',positioner:'🔄',object:'📦',station:'🏗️',rail:'🛤️'};
+  const TYPE_ICON = {robot:'🦾',endeffektor:'🔧',umfeld:'🏭',positioner:'🔄',object:'📦',label:'📦',fixture:'🧱',station:'🏗️',rail:'🛤️'};
   if (!filtered.length) {
     container.innerHTML = '<div style="padding:16px;font-family:monospace;font-size:11px;color:#4a6a8a">Keine Einträge.</div>';
     return;
   }
-  container.innerHTML = filtered.map((r,i) => `
+  container.innerHTML = filtered.map((r) => `
     <div data-lib-ri="${items.indexOf(r)}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer" class="lib-row">
       <span style="font-size:16px">${TYPE_ICON[r.type||'robot']||'📦'}</span>
       <div style="flex:1;min-width:0">
         <div style="font-family:monospace;font-size:12px;color:#d8e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
-        <div style="font-size:10px;color:#4a6a8a">${r.marke||''} ${r.modell||''}</div>
+        <div style="font-size:10px;color:#4a6a8a">${r.marke||''} ${r.modell||''} <span style="color:#2a5a7a">${r.type||'robot'}</span></div>
       </div>
       <button data-lib-load="${items.indexOf(r)}" style="font-size:10px;padding:2px 8px;background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;cursor:pointer;font-family:monospace">Laden</button>
     </div>`).join('');
   container.querySelectorAll('[data-lib-load]').forEach(btn => {
-    btn.onclick = e => { e.stopPropagation(); loadRobotFromLib(items[+btn.dataset.libLoad]); };
+    btn.onclick = e => { e.stopPropagation(); loadFromLib(items[+btn.dataset.libLoad]); };
   });
   container.querySelectorAll('.lib-row').forEach(row => {
-    row.onclick = e => { if (!e.target.closest('button')) loadRobotFromLib(items[+row.dataset.libRi]); };
+    row.onclick = e => { if (!e.target.closest('button')) loadFromLib(items[+row.dataset.libRi]); };
   });
 }
 
@@ -3069,6 +3080,191 @@ async function loadRobotFromLib(robot) {
     prog.style.display = 'none';
     status.textContent = 'Fehler: ' + e.message;
   }
+}
+
+// ── Universeller Library-Loader ───────────────────────────────────
+async function loadFromLib(item) {
+  const type = item.type || 'robot';
+  if (type === 'robot') { loadRobotFromLib(item); return; }
+  const status = $('rl-lib-status');
+  const prog   = $('rl-lib-progress');
+  const bar    = $('rl-lib-bar');
+  status.textContent = 'Lade ' + item.name + '…';
+  prog.style.display = 'block'; bar.style.width = '10%';
+  try {
+    const res = await fetch(item.zip_url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    bar.style.width = '40%';
+    const zip = await JSZip.loadAsync(await res.arrayBuffer());
+    bar.style.width = '70%';
+    await loadComponentFromZip(zip);
+    bar.style.width = '100%'; prog.style.display = 'none';
+    status.textContent = '✓ ' + item.name + ' geladen';
+    _lastLibRobot = item;
+    setTimeout(() => { $('robotLibModal').style.display = 'none'; }, 600);
+  } catch(e) {
+    prog.style.display = 'none';
+    status.textContent = 'Fehler: ' + e.message;
+  }
+}
+
+// Liest config.json aus ZIP und dispatcht an den richtigen Loader
+async function loadComponentFromZip(zip) {
+  const cfgEntry = zip.files['config.json'];
+  if (!cfgEntry) throw new Error('Keine config.json in ZIP');
+  const cfg = JSON.parse(await cfgEntry.async('string'));
+  // Collect all STL buffers: stl/XX.stl → {key: buf}
+  const stlBufs = {};
+  for (const name of Object.keys(zip.files)) {
+    if (zip.files[name].dir || !/\.stl$/i.test(name)) continue;
+    const key = name.split('/').pop().replace(/\.stl$/i,'');
+    stlBufs[key] = await zip.files[name].async('uint8array');
+  }
+  const type = cfg.type;
+  if      (type === 'rail')        applyRailConfig(cfg, stlBufs);
+  else if (type === 'positioner')  applyPositionerConfig(cfg, stlBufs);
+  else if (type === 'label')       applyLabelConfig(cfg, stlBufs);
+  else if (type === 'fixture')     applyFixtureConfig(cfg);
+  else if (type === 'endeffektor') applyEffectorConfig(cfg, stlBufs);
+  else if (type === 'umfeld')      applyEnvironmentConfig(cfg, stlBufs);
+  else if (type === 'station')     applyStationConfig(cfg, stlBufs);
+  else throw new Error('Unbekannter Typ: ' + type);
+  renderAll(); setView('iso');
+}
+
+function _setStlParts(axKey, stlBufs, fallbackColor) {
+  const buf = stlBufs[axKey];
+  if (buf) {
+    state.axisStlParts[axKey] = [{
+      name: axKey + '.stl', color: fallbackColor || '#4499cc', buf
+    }];
+  }
+}
+
+function applyRailConfig(cfg, stlBufs) {
+  const eAx = 'E' + (cfg.eNumber || 1);
+  const entry = {
+    name: cfg.name || 'Rail', length_mm: cfg.length_mm || 2000,
+    height_mm: cfg.height_mm || 200, width_mm: cfg.width_mm || 400,
+    axis: cfg.axis || 'X+', eNumber: cfg.eNumber || 1,
+    eMin: cfg.eMin ?? 0, eMax: cfg.eMax ?? cfg.length_mm ?? 2000,
+    ePos: 0, showBox: cfg.showBox !== false, boxOffset: cfg.boxOffset || {}
+  };
+  // Apply STL parts from config stlFiles or raw stlBufs
+  if (cfg.stlFiles?.[eAx]) {
+    const parts = Array.isArray(cfg.stlFiles[eAx]) ? cfg.stlFiles[eAx] : [cfg.stlFiles[eAx]];
+    state.axisStlParts[eAx] = parts.map((p,i) => {
+      const key = (p.name||eAx).replace(/\.stl$/i,'');
+      return { name: key+'.stl', color: p.color||'#2563eb', buf: stlBufs[key]||stlBufs[eAx]||null };
+    });
+  } else { _setStlParts(eAx, stlBufs, '#2563eb'); }
+  state.schienen = [entry];
+  rebuildRailMeshes();
+  renderRailRows(); renderRows();
+}
+
+function applyPositionerConfig(cfg, stlBufs) {
+  const eAx = 'E' + (cfg.eNum || 2);
+  const entry = {
+    name: cfg.name||'Positionierer', type: cfg.objectType||cfg.type_||'cylinder',
+    eNum: cfg.eNum||2, rotAxis: cfg.rotAxis||'Y+',
+    pivotX: cfg.pivotX||0, pivotY: cfg.pivotY||0, pivotZ: cfg.pivotZ||0,
+    eMin: cfg.eMin??-180, eMax: cfg.eMax??180, ePos: 0,
+    radius: cfg.radius||300, length: cfg.length||500, width: cfg.width||500, height: cfg.height||100,
+    showBox: cfg.showBox!==false, color: cfg.color||'#e8a020',
+    parentIdx: cfg.parentIdx??-1, boxOffset: cfg.boxOffset||{}
+  };
+  if (cfg.stlFiles?.[eAx]) {
+    const parts = Array.isArray(cfg.stlFiles[eAx]) ? cfg.stlFiles[eAx] : [cfg.stlFiles[eAx]];
+    state.axisStlParts[eAx] = parts.map(p => {
+      const key = (p.name||eAx).replace(/\.stl$/i,'');
+      return { name: key+'.stl', color: p.color||cfg.color||'#e8a020', buf: stlBufs[key]||stlBufs[eAx]||null };
+    });
+  } else { _setStlParts(eAx, stlBufs, cfg.color||'#e8a020'); }
+  state.positioners.push(entry);
+  positionerGroups.push(null);
+  rebuildPositionerMesh(state.positioners.length - 1);
+  renderPosRows(); renderRows();
+}
+
+function applyLabelConfig(cfg, stlBufs) {
+  const lbl = 'Label' + (cfg.labelNum || 1);
+  const entry = {
+    name: cfg.name||'Label', type: cfg.objectType||'box', labelNum: cfg.labelNum||1,
+    length: cfg.length||500, width: cfg.width||500, height: cfg.height||500, radius: cfg.radius||200,
+    axis: cfg.axis||'Y+', eMin: cfg.eMin||0, eMax: cfg.eMax||1000, ePos: 0,
+    showBox: cfg.showBox!==false, color: cfg.color||'#4499cc', boxOffset: cfg.boxOffset||{}
+  };
+  if (cfg.stlFiles?.[lbl]) {
+    const parts = Array.isArray(cfg.stlFiles[lbl]) ? cfg.stlFiles[lbl] : [cfg.stlFiles[lbl]];
+    state.axisStlParts[lbl] = parts.map(p => {
+      const key = (p.name||lbl).replace(/\.stl$/i,'');
+      return { name: key+'.stl', color: p.color||cfg.color||'#4499cc', buf: stlBufs[key]||stlBufs[lbl]||null };
+    });
+  } else { _setStlParts(lbl, stlBufs, cfg.color||'#4499cc'); }
+  state.objekte.push(entry);
+  objekteGroups.push(null);
+  rebuildObjektMesh(state.objekte.length - 1);
+  renderObjRows(); renderRows();
+}
+
+function applyFixtureConfig(cfg) {
+  const entry = {
+    name: cfg.name||'Objekt', type: cfg.objectType||'box',
+    length: cfg.length||500, width: cfg.width||500, height: cfg.height||500, radius: cfg.radius||200,
+    color: cfg.color||'#607080',
+    x: cfg.x||0, y: cfg.y||0, z: cfg.z||0,
+    rx: cfg.rx||0, ry: cfg.ry||0, rz: cfg.rz||0,
+    showBox: cfg.showBox!==false
+  };
+  state.festeObjekte.push(entry);
+  festeGrps.push(null);
+  rebuildFixMesh(state.festeObjekte.length - 1);
+  renderFixRows();
+}
+
+function applyEffectorConfig(cfg, stlBufs) {
+  const buf = stlBufs['eff_0'] || Object.values(stlBufs)[0] || null;
+  const eff = { name: cfg.name||'Endeffektor', mountMode: cfg.mountMode||'world',
+    offset: cfg.offset||{}, stlFile: buf ? { name: cfg.name+'.stl', buf } : null };
+  state.effektoren = state.effektoren||[];
+  state.effektoren.push(eff);
+  renderEffRow?.();
+}
+
+function applyEnvironmentConfig(cfg, stlBufs) {
+  const buf = stlBufs['umf_0'] || Object.values(stlBufs)[0] || null;
+  if (!buf) return;
+  const u = { name: cfg.name||'Umgebung', stlFile: { name: cfg.name+'.stl', buf }, offset: cfg.offset||{} };
+  state.umfElemente = state.umfElemente||[];
+  state.umfElemente.push(u);
+  renderUmfRows?.();
+}
+
+function applyStationConfig(cfg, stlBufs) {
+  const c = cfg.components || {};
+  if (c.robot && (c.robot.joints||[]).length) {
+    applyJsonToState(c.robot);
+    // Robot STLs (A1..A6)
+    if (c.robot.stlFiles) {
+      Object.entries(c.robot.stlFiles).forEach(([ax, info]) => {
+        if (!ax.match(/^A[1-6]$/)) return;
+        const parts = Array.isArray(info) ? info : [info];
+        state.axisStlParts[ax] = parts.map(p => {
+          const key = (p.name||ax).replace(/\.stl$/i,'');
+          return { name: key+'.stl', color: p.color||'#e8a020', buf: stlBufs[key]||null };
+        });
+        if (parts[0]?.color) colors[ax] = parts[0].color;
+      });
+    }
+    rebuildRobotKinematics(); applyTransforms(); enableSave();
+  }
+  if (c.rail) applyRailConfig(c.rail, stlBufs);
+  (c.positioners||[]).forEach(p => applyPositionerConfig(p, stlBufs));
+  (c.labels||[]).forEach(l => applyLabelConfig(l, stlBufs));
+  (c.fixtures||[]).forEach(f => applyFixtureConfig(f));
+  (c.effectors||[]).forEach(e => applyEffectorConfig(e, stlBufs));
+  (c.environment||[]).forEach(e => applyEnvironmentConfig(e, stlBufs));
 }
 
 $('robotLibBtn').onclick   = openRobotLibModal;
