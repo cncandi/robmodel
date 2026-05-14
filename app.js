@@ -2633,15 +2633,25 @@ function openRoblibModal() {
     if (btnU) btnU.style.display = '';
   } else {
     // Auto-detect type based on scene content
+    const hasRobot    = (state.joints||[]).length > 0;
+    const hasRail     = (state.schienen||[]).length > 0;
+    const hasPos      = (state.positioners||[]).length > 0;
+    const hasLabels   = (state.objekte||[]).length > 0;
+    const hasFixture  = (state.festeObjekte||[]).length > 0;
+    const hasEff      = (state.effektoren||[]).length > 0;
+    const hasUmf      = (state.umfElemente||[]).length > 0;
+    const typeCount   = [hasRobot, hasRail, hasPos, hasLabels, hasFixture, hasEff, hasUmf].filter(Boolean).length;
+
     let autoType = 'robot';
-    if (!(state.joints||[]).length) {
-      if ((state.festeObjekte||[]).length)   autoType = 'fixture';
-      else if ((state.schienen||[]).length)  autoType = 'rail';
-      else if ((state.positioners||[]).length) autoType = 'positioner';
-      else if ((state.objekte||[]).length)   autoType = 'label';
-      else if ((state.umfElemente||[]).length) autoType = 'umfeld';
-      else if ((state.effektoren||[]).length)  autoType = 'endeffektor';
-    }
+    if (typeCount > 1) {
+      autoType = 'station';
+    } else if (hasFixture)  autoType = 'fixture';
+    else if (hasRail)       autoType = 'rail';
+    else if (hasPos)        autoType = 'positioner';
+    else if (hasLabels)     autoType = 'label';
+    else if (hasEff)        autoType = 'endeffektor';
+    else if (hasUmf)        autoType = 'umfeld';
+    else if (hasRobot)      autoType = 'robot';
     const typeEl = $('rl-type'); if(typeEl) typeEl.value = autoType;
     $('rl-name').value   = state.robotName || '';
     $('rl-achsen').value = 6;
