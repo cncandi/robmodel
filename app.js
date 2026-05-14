@@ -1672,6 +1672,7 @@ function fmTypeChanged(){
   if(cf) cf.style.display=t==='cylinder'?'contents':'none';
 }
 window.fmTypeChanged=fmTypeChanged;
+window.openFixModal=openFixModal;
 
 $('fixAddBtn')?.addEventListener('click',()=>openFixModal(-1));
 $('fixModalClose')?.addEventListener('click',()=>{ $('fixModal').style.display='none'; });
