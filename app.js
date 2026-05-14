@@ -1095,9 +1095,8 @@ function renderAll(){renderAxisStlRows();renderRows();updateAxisPointVisuals();r
 
 function renderRows(){$('jointRows').innerHTML=state.joints.map((j,i)=>{
   const ax=j.name||'A'+(i+1);
-  const mapped=state.axisStlMap[ax];
-  const fallback=state.stls.find(f=>partKey(f.name)===ax)?.name||null;
-  const src=mapped||fallback; const stlName=src?norm(src):'—'; const col=colors[ax]||'#999999';
+  const parts=state.axisStlParts[ax]||[];
+  const col=(parts[0]?.color)||colors[ax]||'#999999';
   return `<tr data-param-row="${i}" class="${i===state.selectedAxis?'sel':''}">
     <td><b>${esc(j.name)}</b></td>
     <td><input class="angleInput" data-joint-angle="${i}" type="number" step="0.1" value="${state.jointAngles?.[i]??0}"></td>
@@ -1170,21 +1169,37 @@ function setAxisColor(ax, hex) {
 
 // ── Multi-STL Parts Modal ─────────────────────────────────────────
 let _axisPartsTarget = null;
+let _axisPartsPending = null;
 
 function openAxisPartsModal(ax) {
   _axisPartsTarget = ax;
+  _axisPartsPending = (state.axisStlParts[ax]||[]).map(p=>({name:p.name,color:p.color,buf:p.buf}));
   $('axisPartsTitle').textContent = 'STL Parts — ' + ax;
   renderAxisPartsList(ax);
   const m = $('axisPartsModal');
   m.style.cssText = 'display:flex;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.6);align-items:center;justify-content:center';
 }
 
-function closeAxisPartsModal() {
+function saveAxisPartsModal() {
   $('axisPartsModal').style.display='none';
-  _axisPartsTarget=null;
+  _axisPartsTarget=null; _axisPartsPending=null;
   rebuildRobotKinematics(); applyTransforms();
   renderAxisStlRows(); renderAll();
 }
+
+function cancelAxisPartsModal() {
+  const ax=_axisPartsTarget;
+  if (ax && _axisPartsPending) {
+    state.axisStlParts[ax]=_axisPartsPending;
+    state.axisStlMap[ax]=_axisPartsPending[0]?.name||null;
+    rebuildRobotKinematics(); applyTransforms();
+  }
+  $('axisPartsModal').style.display='none';
+  _axisPartsTarget=null; _axisPartsPending=null;
+  renderAxisStlRows(); renderAll();
+}
+
+function closeAxisPartsModal() { cancelAxisPartsModal(); }
 
 function renderAxisPartsList(ax) {
   const el=$('axisPartsList'); if(!el)return;
