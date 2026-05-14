@@ -1108,7 +1108,7 @@ function renderRows(){$('jointRows').innerHTML=state.joints.map((j,i)=>{
     <td><input data-j="${i}" data-f="max" value="${j.max??''}"></td>
     <td><select class="dirSel" data-j="${i}" data-f="rotationSign"><option value="1" ${(num(j.rotationSign)??1)>=0?'selected':''}>+</option><option value="-1" ${(num(j.rotationSign)??1)<0?'selected':''}>−</option></select></td>
     <td><label style="display:inline-block;width:26px;height:22px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden" title="Farbe ${ax}"><input type="color" data-axis-color="${ax}" value="${col}" style="opacity:0;width:1px;height:1px;position:absolute"></label></td>
-    <td><button onclick="openAxisPartsModal('${ax}')" style="font-size:10px;padding:3px 7px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:${parts.length?'#d8e8f0':'#6a8fa8'};width:100%">${parts.length?parts.length+' Part'+(parts.length>1?'s':''):'+ STL'}</button></td>
+    <td><button class="axis-stl-btn" data-ax="${ax}" style="font-size:10px;padding:3px 7px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:${parts.length?'#d8e8f0':'#6a8fa8'};width:100%">${parts.length?parts.length+' Part'+(parts.length>1?'s':''):'+ STL'}</button></td>
     <td><button class="simBtn" data-sim-axis="${i}">▶</button></td>
   </tr>`;}).join('');}
 
@@ -1176,6 +1176,11 @@ function openAxisPartsModal(ax) {
   const m = $('axisPartsModal');
   m.style.cssText = 'display:flex;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.6);align-items:center;justify-content:center';
 }
+
+window.openAxisPartsModal = openAxisPartsModal;
+window.saveAxisPartsModal = saveAxisPartsModal;
+window.cancelAxisPartsModal = cancelAxisPartsModal;
+window.closeAxisPartsModal = closeAxisPartsModal;
 
 function saveAxisPartsModal() {
   $('axisPartsModal').style.display='none';
