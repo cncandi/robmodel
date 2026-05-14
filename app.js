@@ -2122,48 +2122,7 @@ function libRenderList(container, items, onSelect) {
   });
 }
 
-// Endeffektor Library
-$('effLibRefreshBtn').addEventListener('click', async () => {
-  const el = $('effLibList');
-  el.textContent = 'Lade…';
-  try {
-    const items = await libFetchByType('endeffektor');
-    libRenderList(el, items, async item => {
-      el.textContent = 'Lade ' + item.name + '…';
-      try {
-        const stls = await libLoadZipAndExtract(item.zip_url, /endeffektor.*\.stl$/i);
-        if (!stls.length) throw new Error('Keine endeffektor.stl in ZIP');
-        state.effektoren.push({ stlFile: { path: stls[0].name, name: item.name + '.stl', buf: stls[0].buf }, offset: {x:0,y:0,z:0,rx:0,ry:0,rz:0}, typ: 'auftragend' });
-        state.activeEff = state.effektoren.length - 1;
-        renderEffRow();
-        updateEffTcpMarker();
-        el.textContent = '✓ ' + item.name + ' geladen';
-      } catch(e) { el.textContent = 'Fehler: ' + e.message; }
-    });
-  } catch(e) { el.textContent = 'Fehler: ' + e.message; }
-});
-
-// Umfeld Library
-$('umfLibRefreshBtn').addEventListener('click', async () => {
-  const el = $('umfLibList');
-  el.textContent = 'Lade…';
-  try {
-    const items = await libFetchByType('umfeld');
-    libRenderList(el, items, async item => {
-      el.textContent = 'Lade ' + item.name + '…';
-      try {
-        const stls = await libLoadZipAndExtract(item.zip_url, /umfeld.*\.stl$/i);
-        if (!stls.length) throw new Error('Keine umfeld*.stl in ZIP');
-        if (!state.umfElemente) state.umfElemente = [];
-  if (!state.umfStls) state.umfStls = [];
-        stls.forEach(s => state.umfElemente.push({ stlFile:{ path:s.name, name:item.name+' · '+s.name, buf:s.buf }, offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0} }));
-        state.activeUmf = state.umfElemente.length-1;
-        renderUmfRows();
-        el.textContent = '✓ ' + item.name + ' (' + stls.length + ' STL) geladen';
-      } catch(e) { el.textContent = 'Fehler: ' + e.message; }
-    });
-  } catch(e) { el.textContent = 'Fehler: ' + e.message; }
-});
+// Endeffektor und Umfeld Library: jetzt über die zentrale Library (Library-Button in Toolbar)
 
 // ── Endeffektor & Umfeld STL ────────────────────────────────────
 // state.effStl  = { path, name, buf }  (ein Endeffektor)
