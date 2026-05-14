@@ -142,10 +142,11 @@
           <h2>📦 Bewegliche Objekte</h2>
           <div style="display:flex;gap:4px;align-items:center">
             <span class="badge info" id="objBadge">0</span>
+            <button id="objAddBtn" title="Neues Objekt erstellen" style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 6px;font-size:13px;cursor:pointer">+</button>
             <button id="objLibRefreshBtn" title="Aus Library laden" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:4px;padding:6px 16px;font-size:16px;cursor:pointer">↻</button>
           </div>
         </div>
-        <div id="objLibList" style="max-height:100px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace">Klicke ↻ zum Laden…</div>
+        <div id="objRows"></div>
       </section>
 
       <!-- Hidden inputs -->
@@ -161,6 +162,65 @@
 
     </aside>
   </main>
+
+<!-- ── Objekt-Parametrik Modal ────────────────────────────────── -->
+<div id="objModal" class="rl-overlay" style="display:none">
+  <div class="rl-modal" style="width:min(400px,96vw)">
+    <div class="rl-modal-head">
+      <span>📦 Objekt definieren</span>
+      <button class="rl-close" id="objModalClose">✕</button>
+    </div>
+    <div class="rl-modal-body">
+      <div class="rl-grid">
+        <label class="rl-span2">Name<input id="om-name" type="text" placeholder="Label 1"></label>
+        <label>Typ
+          <select id="om-type" onchange="omTypeChanged()" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%;margin-top:4px">
+            <option value="box">📦 Box</option>
+            <option value="cylinder">🔵 Zylinder</option>
+          </select>
+        </label>
+        <label>Label Nr.<input id="om-num" type="number" value="1" min="1" max="99" step="1"></label>
+        <div id="om-box-fields" style="display:contents">
+          <label>Länge (mm)<input id="om-length" type="number" value="500" step="10"></label>
+          <label>Breite (mm)<input id="om-width"  type="number" value="500" step="10"></label>
+        </div>
+        <div id="om-cyl-fields" style="display:none;contents">
+          <label>Radius (mm)<input id="om-radius" type="number" value="200" step="10"></label>
+        </div>
+        <label>Höhe (mm)<input id="om-height" type="number" value="500" step="10"></label>
+        <label>Min (mm)<input id="om-min" type="number" value="0" step="1"></label>
+        <label>Max (mm)<input id="om-max" type="number" value="1000" step="1"></label>
+        <label>Startposition (mm)<input id="om-start" type="number" value="0" step="1"></label>
+        <label class="rl-span2">Verfahrrichtung
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <button class="om-axis-btn" data-ax="X+" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">X+</button>
+            <button class="om-axis-btn" data-ax="X-" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">X-</button>
+            <button class="om-axis-btn" data-ax="Y+" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(37,99,235,.3);border:1px solid rgba(37,99,235,.6);color:#60a5fa">Y+</button>
+            <button class="om-axis-btn" data-ax="Y-" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">Y-</button>
+            <button class="om-axis-btn" data-ax="Z+" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">Z+</button>
+            <button class="om-axis-btn" data-ax="Z-" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">Z-</button>
+          </div>
+        </label>
+        <label class="rl-span2" style="font-size:11px;color:#6a8fa8;letter-spacing:.05em">VERSCHIEBUNG
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px">
+            <label style="font-size:10px;color:#6a8fa8">X mm<input id="om-ox" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Y mm<input id="om-oy" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Z mm<input id="om-oz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rx °<input id="om-orx" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Ry °<input id="om-ory" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rz °<input id="om-orz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+          </div>
+        </label>
+        <label class="rl-span2" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="om-show" checked style="accent-color:var(--acc);width:15px;height:15px">
+          <span>Parametrisches Objekt anzeigen</span>
+        </label>
+      </div>
+      <input type="hidden" id="om-edit-idx" value="-1">
+      <button id="om-submit" class="rl-submit" style="margin-top:12px">Übernehmen</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── Rail-Parametrik Modal ─────────────────────────────────── -->
 <div id="railModal" class="rl-overlay" style="display:none">
@@ -224,6 +284,7 @@
       <span style="font-size:11px;font-weight:700;color:var(--txt3);letter-spacing:.5px;text-transform:uppercase">Parameter</span>
       <button id="tabAachsen" onclick="setParamTab('a')" style="font-family:monospace;font-size:10px;padding:1px 8px;border-radius:3px;cursor:pointer;background:rgba(37,99,235,.3);border:1px solid rgba(37,99,235,.6);color:#60a5fa">A1–A6</button>
       <button id="tabEachsen" onclick="setParamTab('e')" style="font-family:monospace;font-size:10px;padding:1px 8px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">E-Achsen</button>
+      <button id="tabLabels"  onclick="setParamTab('l')" style="font-family:monospace;font-size:10px;padding:1px 8px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">Labels</button>
     </div>
     <button id="toggleParam" title="Panel ein-/ausklappen" style="background:none;border:1px solid rgba(255,255,255,.15);color:var(--txt3);border-radius:3px;padding:0 8px;font-size:13px;cursor:pointer;line-height:1.6">▼</button>
   </div>
