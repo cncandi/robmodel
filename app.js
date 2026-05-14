@@ -1621,6 +1621,9 @@ function renderRailRows() {
   $('railDelBtn')?.addEventListener('click',()=>{
     state.schienen=[];
     kinematicsRoot.position.set(0,0,0);
+    robotGroup.position.set(state.robotTr?.x||0, state.robotTr?.y||0, state.robotTr?.z||0);
+    scene.updateMatrixWorld(true);
+    updateAxisPointVisuals(); updateSkeletonPositions();
     renderRailRows(); rebuildRailMeshes();
   });
 }
@@ -1650,7 +1653,7 @@ function rebuildRailMeshes() {
   // Rail stays fixed at boxOffset
   railGroup.position.set(bo.x||0, bo.y||0, bo.z||0);
   railGroup.rotation.set((bo.rx||0)*deg, (bo.ry||0)*deg, (bo.rz||0)*deg, 'XYZ');
-  // Robot (kinematicsRoot) moves along rail direction
+  // Robot moves along rail direction (all groups together)
   var cx=0, cy=0, cz=0;
   if      (ax==='X+') cx =  p;
   else if (ax==='X-') cx = -p;
@@ -1658,7 +1661,12 @@ function rebuildRailMeshes() {
   else if (ax==='Y-') cy = -p;
   else if (ax==='Z+') cz =  p;
   else                cz = -p;
-  kinematicsRoot.position.set(cx, cy, cz);
+  var bx=state.robotTr?.x||0, by=state.robotTr?.y||0, bz=state.robotTr?.z||0;
+  kinematicsRoot.position.set(bx+cx, by+cy, bz+cz);
+  robotGroup.position.set(bx+cx, by+cy, bz+cz);
+  scene.updateMatrixWorld(true);
+  updateAxisPointVisuals();
+  updateSkeletonPositions();
 }
 
 $('railAddBtn')?.addEventListener('click',()=>{
