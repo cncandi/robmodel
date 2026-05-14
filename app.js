@@ -68,12 +68,14 @@ const state = {
   activeUmf: 0,
   schienen: [],
   objekte: [],
+  positioners: [],
 };
 
 // ── Three.js Variablen ────────────────────────────────────────────
 let scene, camera, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot, railGroup;
 let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup;
 var objekteGroups = [];
+var positionerGroups = []; // [{containerGrp, pivotGrp, meshGrp, pivotSphere}]
 const meshes = new Map();
 const axisMeshes = [];
 const axisPivotGroups = [];
@@ -1152,6 +1154,47 @@ function renderRows(){
         rebuildRailMeshes();
       },16);
     });
+    // Append positioner rows
+    const posRows=(state.positioners||[]).map((p,i)=>{
+      const eAx='E'+(p.eNum||i+2);
+      const parts=state.axisStlParts[eAx]||[];
+      const col=(parts[0]?.color)||p.color||'#e8a020';
+      return `<tr style="border-top:1px solid rgba(255,255,255,.08)">
+        <td><b>${eAx}</b> <span style="font-size:9px;color:#6a8fa8">${p.name||''}</span></td>
+        <td><input data-pos-angle type="number" step="1" value="${p.ePos||0}" min="${p.eMin??-180}" max="${p.eMax??180}" data-pi="${i}" style="width:70px"></td>
+        <td><span class="axisDir">R${p.rotAxis||'Y'}</span></td>
+        <td colspan="3" style="color:#4a6a8a;font-size:10px;text-align:center">—</td>
+        <td><input data-pos-min type="number" step="1" value="${p.eMin??-180}" data-pi="${i}" style="width:60px"></td>
+        <td><input data-pos-max type="number" step="1" value="${p.eMax??180}" data-pi="${i}" style="width:60px"></td>
+        <td style="color:#4a6a8a">—</td>
+        <td><label style="display:inline-block;width:26px;height:22px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden"><input type="color" value="${col}" data-pos-color data-pi="${i}" style="opacity:0;width:1px;height:1px;position:absolute"></label></td>
+        <td><button data-pos-stl data-pi="${i}" style="font-size:10px;padding:3px 7px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:${parts.length?'#d8e8f0':'#6a8fa8'};width:100%">${parts.length?parts.length+' Part'+(parts.length>1?'s':''):'+ STL'}</button></td>
+        <td><button data-pos-sim data-pi="${i}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;padding:2px 7px;cursor:pointer;color:#9ab">▶</button></td>
+      </tr>`;
+    }).join('');
+    if(posRows) $('jointRows').innerHTML += posRows;
+    $('jointRows').querySelectorAll('[data-pos-angle]').forEach(inp=>inp.addEventListener('input',()=>{
+      const i=+inp.dataset.pi; if(!state.positioners[i])return;
+      state.positioners[i].ePos=parseFloat(inp.value)||0; rebuildPositionerMesh(i);
+    }));
+    $('jointRows').querySelectorAll('[data-pos-min]').forEach(inp=>inp.addEventListener('input',()=>{ const i=+inp.dataset.pi; if(state.positioners[i]) state.positioners[i].eMin=parseFloat(inp.value)||0; }));
+    $('jointRows').querySelectorAll('[data-pos-max]').forEach(inp=>inp.addEventListener('input',()=>{ const i=+inp.dataset.pi; if(state.positioners[i]) state.positioners[i].eMax=parseFloat(inp.value)||0; }));
+    $('jointRows').querySelectorAll('[data-pos-color]').forEach(inp=>inp.addEventListener('change',()=>{ const i=+inp.dataset.pi; if(!state.positioners[i])return; state.positioners[i].color=inp.value; rebuildPositionerMesh(i); renderRows(); }));
+    $('jointRows').querySelectorAll('[data-pos-stl]').forEach(btn=>btn.addEventListener('click',()=>{ const i=+btn.dataset.pi; openAxisPartsModal('E'+(state.positioners[i]?.eNum||i+2)); }));
+    $('jointRows').querySelectorAll('[data-pos-sim]').forEach(btn=>btn.addEventListener('click',()=>{
+      const i=+btn.dataset.pi; const p=state.positioners[i]; if(!p)return;
+      if(p._simInterval){clearInterval(p._simInterval);delete p._simInterval;return;}
+      const min=p.eMin??-180, max=p.eMax??180;
+      let ang=p.ePos||0, dir=1;
+      p._simInterval=setInterval(()=>{
+        ang+=dir*(max-min)/120;
+        if(ang>=max){ang=max;dir=-1;} else if(ang<=min){ang=min;dir=1;}
+        p.ePos=ang;
+        const inp=$('jointRows').querySelector(`[data-pos-angle][data-pi="${i}"]`);
+        if(inp) inp.value=Math.round(ang);
+        rebuildPositionerMesh(i);
+      },16);
+    }));
     return;
   }
 
@@ -1361,6 +1404,167 @@ $('om-submit')?.addEventListener('click',()=>{
   $('objModal').style.display='none';
 });
 
+// ── Positionierer ─────────────────────────────────────────────────
+function renderPosRows() {
+  const el=$('posRows'); if(!el) return;
+  const badge=$('posBadge');
+  const positioners=state.positioners||[];
+  if(badge) badge.textContent=positioners.length||'0';
+  if(!positioners.length){el.innerHTML='';return;}
+  el.innerHTML=positioners.map((p,i)=>`
+    <div style="border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:8px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span style="flex:1;font-family:monospace;font-size:12px;color:var(--txt)">E${p.eNum||i+2} — ${p.type==='cylinder'?'🔵':'📦'} ${p.name||''}</span>
+        <button data-pos-edit="${i}" style="background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:11px">✏️</button>
+        <button data-pos-del="${i}" style="background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:12px">✕</button>
+      </div>
+      <div style="font-size:10px;color:#6a8fa8;font-family:monospace">R${p.rotAxis||'Y'} | ${p.eMin??-180}°–${p.eMax??180}°${p.parentIdx>=0?' | dreht mit E'+(state.positioners[p.parentIdx]?.eNum||'?'):''}</div>
+    </div>`).join('');
+  el.querySelectorAll('[data-pos-del]').forEach(btn=>btn.addEventListener('click',()=>{
+    const i=+btn.dataset.posDel;
+    if(state.positioners[i]?._simInterval) clearInterval(state.positioners[i]._simInterval);
+    _removePosGroup(i);
+    state.positioners.splice(i,1); positionerGroups.splice(i,1);
+    rebuildAllPositioners(); renderPosRows(); renderRows();
+  }));
+  el.querySelectorAll('[data-pos-edit]').forEach(btn=>btn.addEventListener('click',()=>openPosModal(+btn.dataset.posEdit)));
+}
+
+function _removePosGroup(i) {
+  const g=positionerGroups[i]; if(!g) return;
+  if(g.pivotGrp?.parent) g.pivotGrp.parent.remove(g.pivotGrp);
+  else if(g.containerGrp?.parent) g.containerGrp.parent.remove(g.containerGrp);
+  if(g.pivotSphere?.parent) g.pivotSphere.parent.remove(g.pivotSphere);
+}
+
+function rebuildPositionerMesh(i) {
+  const p=state.positioners[i]; if(!p) return;
+  const deg=Math.PI/180;
+  // Remove old group
+  _removePosGroup(i);
+  const eAx='E'+(p.eNum||i+2);
+  const parts=state.axisStlParts[eAx]||[];
+  // Container group: positioned by boxOffset
+  const containerGrp=new THREE.Group();
+  containerGrp.position.set(p.boxOffset?.x||0, p.boxOffset?.y||0, p.boxOffset?.z||0);
+  containerGrp.rotation.set((p.boxOffset?.rx||0)*deg,(p.boxOffset?.ry||0)*deg,(p.boxOffset?.rz||0)*deg,'XYZ');
+  // Pivot group: at pivot point, rotation applied here
+  const pivotGrp=new THREE.Group();
+  pivotGrp.position.set(p.pivotX||0, p.pivotY||0, p.pivotZ||0);
+  const ang=(p.ePos||0)*deg;
+  if(p.rotAxis==='X') pivotGrp.rotation.x=ang;
+  else if(p.rotAxis==='Z') pivotGrp.rotation.z=ang;
+  else pivotGrp.rotation.y=ang;
+  containerGrp.add(pivotGrp);
+  // Mesh group: offset by -pivot so mesh stays at world position
+  const meshGrp=new THREE.Group();
+  meshGrp.position.set(-(p.pivotX||0),-(p.pivotY||0),-(p.pivotZ||0));
+  pivotGrp.add(meshGrp);
+  // Build mesh
+  if(parts.length){
+    parts.forEach(pt=>{ if(!pt.buf)return; const geo=loader.parse(pt.buf.buffer||pt.buf); geo.computeVertexNormals(); meshGrp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:pt.color||0xe8a020,shininess:60}))); });
+  } else if(p.showBox!==false){
+    const L=p.length||500,H=p.height||100,W=p.width||500,R=p.radius||300;
+    const geo=p.type==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
+    meshGrp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:p.color||0xe8a020,transparent:true,opacity:0.5,side:THREE.DoubleSide})));
+  }
+  // Yellow pivot sphere
+  const pivotSphere=new THREE.Mesh(
+    new THREE.SphereGeometry(18,16,10),
+    new THREE.MeshStandardMaterial({color:0xe8a020,emissive:0xe8a020,emissiveIntensity:.4})
+  );
+  // Sphere at pivot world pos within container
+  const sphereGrp=new THREE.Group();
+  sphereGrp.position.set(p.pivotX||0, p.pivotY||0, p.pivotZ||0);
+  sphereGrp.add(pivotSphere);
+  containerGrp.add(sphereGrp);
+  // Attach to parent or scene
+  if(p.parentIdx>=0 && positionerGroups[p.parentIdx]?.pivotGrp){
+    positionerGroups[p.parentIdx].pivotGrp.add(containerGrp);
+  } else {
+    scene.add(containerGrp);
+  }
+  positionerGroups[i]={containerGrp, pivotGrp, meshGrp, pivotSphere:sphereGrp};
+}
+
+function rebuildAllPositioners(){
+  (state.positioners||[]).forEach((_,i)=>rebuildPositionerMesh(i));
+}
+
+function openPosModal(editIdx){
+  const p=editIdx>=0?(state.positioners||[])[editIdx]:null;
+  // Populate parent dropdown
+  const sel=$('pm-parent'); if(sel){
+    sel.innerHTML='<option value="-1">— keiner —</option>';
+    (state.positioners||[]).forEach((pos,i)=>{ if(i!==editIdx) sel.innerHTML+=`<option value="${i}" ${p?.parentIdx===i?'selected':''}>E${pos.eNum||i+2} — ${pos.name||''}</option>`; });
+  }
+  $('pm-name').value    = p?.name     || '';
+  $('pm-type').value    = p?.type     || 'cylinder';
+  $('pm-enum').value    = p?.eNum     || (state.positioners.length+2);
+  $('pm-radius').value  = p?.radius   || 300;
+  $('pm-length').value  = p?.length   || 500;
+  $('pm-width').value   = p?.width    || 500;
+  $('pm-height').value  = p?.height   || 100;
+  $('pm-rotaxis').value = p?.rotAxis  || 'Y';
+  $('pm-min').value     = p?.eMin     ?? -180;
+  $('pm-max').value     = p?.eMax     ?? 180;
+  $('pm-start').value   = p?.ePos     ?? 0;
+  $('pm-px').value      = p?.pivotX   || 0;
+  $('pm-py').value      = p?.pivotY   || 0;
+  $('pm-pz').value      = p?.pivotZ   || 0;
+  $('pm-show').checked  = p?.showBox  !== false;
+  $('pm-edit-idx').value= editIdx>=0?editIdx:-1;
+  const bo=p?.boxOffset||{};
+  $('pm-ox').value=bo.x||0;$('pm-oy').value=bo.y||0;$('pm-oz').value=bo.z||0;
+  $('pm-orx').value=bo.rx||0;$('pm-ory').value=bo.ry||0;$('pm-orz').value=bo.rz||0;
+  pmTypeChanged();
+  $('posModal').style.display='flex';
+}
+
+function pmTypeChanged(){
+  const t=$('pm-type')?.value||'cylinder';
+  const bf=$('pm-box-fields'), cf=$('pm-cyl-fields');
+  if(bf) bf.style.display=t==='box'?'contents':'none';
+  if(cf) cf.style.display=t==='cylinder'?'contents':'none';
+}
+window.pmTypeChanged=pmTypeChanged;
+
+$('posAddBtn')?.addEventListener('click',()=>openPosModal(-1));
+$('posModalClose')?.addEventListener('click',()=>{ $('posModal').style.display='none'; });
+
+$('pm-submit')?.addEventListener('click',()=>{
+  const editIdx=parseInt($('pm-edit-idx').value);
+  const entry={
+    name:      $('pm-name').value||('Pos '+(state.positioners.length+1)),
+    type:      $('pm-type').value||'cylinder',
+    eNum:      parseInt($('pm-enum').value)||2,
+    radius:    parseFloat($('pm-radius').value)||300,
+    length:    parseFloat($('pm-length').value)||500,
+    width:     parseFloat($('pm-width').value)||500,
+    height:    parseFloat($('pm-height').value)||100,
+    rotAxis:   $('pm-rotaxis').value||'Y',
+    eMin:      parseFloat($('pm-min').value)??-180,
+    eMax:      parseFloat($('pm-max').value)??180,
+    ePos:      parseFloat($('pm-start').value)||0,
+    pivotX:    parseFloat($('pm-px').value)||0,
+    pivotY:    parseFloat($('pm-py').value)||0,
+    pivotZ:    parseFloat($('pm-pz').value)||0,
+    showBox:   $('pm-show').checked===true,
+    color:     '#e8a020',
+    parentIdx: parseInt($('pm-parent').value)??-1,
+    boxOffset: {
+      x:parseFloat($('pm-ox').value)||0,y:parseFloat($('pm-oy').value)||0,z:parseFloat($('pm-oz').value)||0,
+      rx:parseFloat($('pm-orx').value)||0,ry:parseFloat($('pm-ory').value)||0,rz:parseFloat($('pm-orz').value)||0
+    }
+  };
+  if(editIdx>=0){ _removePosGroup(editIdx); state.positioners[editIdx]=entry; }
+  else { state.positioners.push(entry); positionerGroups.push(null); }
+  const idx=editIdx>=0?editIdx:state.positioners.length-1;
+  rebuildAllPositioners();
+  renderPosRows(); renderRows();
+  $('posModal').style.display='none';
+});
+
 function renderTcp(){qsa('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===state.activeTcp));const tcp=state.tcp[state.activeTcp];qsa('[data-tcp]').forEach(i=>i.value=tcp?.[i.dataset.tcp]??'');const x=num(tcp?.x),y=num(tcp?.y),z=num(tcp?.z);tcpMarker.visible=x!==null||y!==null||z!==null;tcpMarker.position.set(x||0,y||0,z||0);}
 
 
@@ -1463,6 +1667,10 @@ function saveAxisPartsModal() {
   }
   // Rebuild rail mesh if saved axis is an E-axis
   if(savedAx && savedAx.startsWith('E')) rebuildRailMeshes();
+  // Rebuild positioner if saved axis matches
+  if(savedAx && savedAx.startsWith('E')){
+    (state.positioners||[]).forEach((p,i)=>{ if('E'+(p.eNum||i+2)===savedAx) rebuildPositionerMesh(i); });
+  }
 }
 
 function cancelAxisPartsModal() {
