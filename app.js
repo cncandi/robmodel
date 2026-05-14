@@ -1609,31 +1609,38 @@ var _gimbalMode = 'translate'; // 'translate' | 'rotate'
 var _gimbalTarget = null; // {type, idx, grp}
 
 function _getGimbalMeshes() {
-  const meshes = [];
-  // Rail
-  if(parametricRail?.grp) parametricRail.grp.traverse(c=>{ if(c.isMesh) meshes.push({mesh:c, type:'rail', idx:0, grp:parametricRail.grp}); });
+  const result = [];
+  // Rail (RobModel uses railGroup directly)
+  if(typeof railGroup!=='undefined' && railGroup) {
+    railGroup.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'rail', idx:0, grp:railGroup}); });
+  }
   // Objects
-  (objekteGroups||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) meshes.push({mesh:c, type:'obj', idx:i, grp:g}); }); });
+  (objekteGroups||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'obj', idx:i, grp:g}); }); });
   // Positioners
-  (positionerGroups||[]).forEach((g,i)=>{ if(g?.containerGrp) g.containerGrp.traverse(c=>{ if(c.isMesh) meshes.push({mesh:c, type:'pos', idx:i, grp:g.containerGrp}); }); });
-  return meshes;
+  (positionerGroups||[]).forEach((g,i)=>{ if(g?.containerGrp) g.containerGrp.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'pos', idx:i, grp:g.containerGrp}); }); });
+  return result;
 }
 
 function _gimbalPick(event) {
   if(!_gimbalActive) return;
+  if(event.button !== undefined && event.button !== 0) return; // left click only
   if(transformControls.dragging) return;
   const rect = renderer.domElement.getBoundingClientRect();
-  const mx = ((event.clientX-rect.left)/rect.width)*2-1;
-  const my = -((event.clientY-rect.top)/rect.height)*2+1;
+  const clientX = event.clientX ?? event.touches?.[0]?.clientX; if(clientX===undefined) return;
+  const clientY = event.clientY ?? event.touches?.[0]?.clientY;
+  const mx = ((clientX-rect.left)/rect.width)*2-1;
+  const my = -((clientY-rect.top)/rect.height)*2+1;
   const rc = new THREE.Raycaster();
   rc.setFromCamera(new THREE.Vector2(mx,my), camera);
   const allMeshes = _getGimbalMeshes();
+  if(!allMeshes.length) return;
   const hits = rc.intersectObjects(allMeshes.map(m=>m.mesh), false);
   if(!hits.length){ transformControls.detach(); _gimbalTarget=null; return; }
   const hit = allMeshes.find(m=>m.mesh===hits[0].object);
   if(!hit) return;
   _gimbalTarget = hit;
   transformControls.setMode(_gimbalMode);
+  transformControls.setSize(0.8);
   transformControls.attach(hit.grp);
 }
 
@@ -1664,14 +1671,18 @@ $('gimbalToggle')?.addEventListener('click',()=>{
   if(_gimbalActive){
     btn.style.background='rgba(37,99,235,.3)'; btn.style.borderColor='rgba(37,99,235,.6)'; btn.style.color='#60a5fa';
     if(modeBtn) modeBtn.style.display='';
+    transformControls.detach(); // detach axis selection
     transformControls.addEventListener('objectChange', _gimbalChanged);
-    renderer.domElement.addEventListener('click', _gimbalPick);
+    renderer.domElement.addEventListener('pointerdown', _gimbalPick);
   } else {
     btn.style.background='rgba(255,255,255,.05)'; btn.style.borderColor='rgba(255,255,255,.15)'; btn.style.color='#6a8fa8';
     if(modeBtn) modeBtn.style.display='none';
     transformControls.removeEventListener('objectChange', _gimbalChanged);
-    renderer.domElement.removeEventListener('click', _gimbalPick);
+    renderer.domElement.removeEventListener('pointerdown', _gimbalPick);
     transformControls.detach(); _gimbalTarget=null;
+    // Reattach axis controls
+    const selected = axisMeshes[state.selectedAxis];
+    if(selected) transformControls.attach(selected);
   }
 });
 
