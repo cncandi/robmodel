@@ -81,6 +81,7 @@ const LINK_COLOR=0xcc4400; const JOINT_COLOR=0xe8a020;
 const loader = new STLLoader();
 
 // ── Fehleranzeige ──────────────────────────────────────────────────
+var _paramTab = 'a'; // must be before renderAll
 function showError(msg) {
   const d = document.createElement('div');
   d.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c00;color:#fff;padding:8px 12px;z-index:9999;font-family:monospace;font-size:12px;white-space:pre-wrap';
@@ -1101,7 +1102,6 @@ function simulateAxis(axisIndex){
 function renderAll(){renderAxisStlRows();renderRows();updateAxisPointVisuals();renderTcp();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';}
 
 
-var _paramTab = 'a';
 function setParamTab(tab) {
   _paramTab = tab;
   const btnA=$('tabAachsen'), btnE=$('tabEachsen');
