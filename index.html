@@ -97,8 +97,13 @@
           </div>
         </div>
         <div id="effStlRows"></div>
+        <!-- Montage-Modus direkt unter Endeffektoren -->
+        <div style="display:flex;gap:4px;margin-top:8px">
+          <button id="toolModeWorld" class="tool-mode-btn active" style="flex:1" title="Werkzeug fix im Weltkoordinatensystem">🌍 an World</button>
+          <button id="toolModeA6"    class="tool-mode-btn"        style="flex:1" title="Werkzeug an A6">🔩 An A6</button>
+        </div>
         <!-- Library -->
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;margin-top:4px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;margin-top:8px">
           <span style="font-size:10px;letter-spacing:.06em;color:#6a8fa8;font-family:monospace">LIBRARY</span>
           <button id="effLibRefreshBtn" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:4px;padding:6px 16px;font-size:16px;cursor:pointer">↻</button>
         </div>
@@ -141,14 +146,6 @@
           </div>
         </div>
         <div id="objLibList" style="max-height:100px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace">Klicke ↻ zum Laden…</div>
-      </section>
-
-      <!-- Montage-Modus -->
-      <section class="card" style="padding:8px 10px">
-        <div style="display:flex;gap:4px">
-          <button id="toolModeWorld" class="tool-mode-btn active" style="flex:1" title="Werkzeug fix im Weltkoordinatensystem">🌍 an World</button>
-          <button id="toolModeA6"    class="tool-mode-btn"        style="flex:1" title="Werkzeug an A6">🔩 An A6</button>
-        </div>
       </section>
 
       <!-- Hidden inputs -->
