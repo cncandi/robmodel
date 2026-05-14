@@ -2612,7 +2612,6 @@ function openNewItemModal(type) {
 
 function openRoblibModal() {
   $('rl-msg').style.display = 'none';
-  // Felder aus letztem Library-Eintrag vorausfüllen
   const r = _lastLibRobot;
   if (r) {
     const set = (id, val) => { const el=$(id); if(el) el.value = val||''; };
@@ -2630,14 +2629,25 @@ function openRoblibModal() {
     set('rl-rail-height', r.height_mm || 200);
     set('rl-rail-width',  r.width_mm  || 400);
     if (r.axis && $('rl-rail-axis')) $('rl-rail-axis').value = r.axis;
-    // Aktualisieren-Button anzeigen
     const btnU = $('rl-mode-update');
     if (btnU) btnU.style.display = '';
   } else {
+    // Auto-detect type based on scene content
+    let autoType = 'robot';
+    if (!(state.joints||[]).length) {
+      if ((state.festeObjekte||[]).length)   autoType = 'fixture';
+      else if ((state.schienen||[]).length)  autoType = 'rail';
+      else if ((state.positioners||[]).length) autoType = 'positioner';
+      else if ((state.objekte||[]).length)   autoType = 'label';
+      else if ((state.umfElemente||[]).length) autoType = 'umfeld';
+      else if ((state.effektoren||[]).length)  autoType = 'endeffektor';
+    }
+    const typeEl = $('rl-type'); if(typeEl) typeEl.value = autoType;
     $('rl-name').value   = state.robotName || '';
     $('rl-achsen').value = 6;
     const btnU = $('rl-mode-update');
     if (btnU) btnU.style.display = 'none';
+    if (typeof rlTypeChanged === 'function') rlTypeChanged();
   }
 
   // Canvas-Screenshot als Thumbnail vorbelegen
