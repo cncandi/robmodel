@@ -2556,6 +2556,9 @@ let _libTypeFilter = 'all';
 
 function filterLibItems(items) {
   if (_libTypeFilter === 'all') return items;
+  // fixture matches both 'fixture' and 'object' (server alias)
+  if (_libTypeFilter === 'fixture') return items.filter(r => (r.type||'robot') === 'fixture' || (r.type||'robot') === 'object');
+  // label matches both 'label' and 'object' from old saves... actually label is separate
   return items.filter(r => (r.type||'robot') === _libTypeFilter);
 }
 
@@ -2564,7 +2567,7 @@ function renderLibList(items) {
   const filtered = filterLibItems(items);
   const container = $('rl-lib-list');
   if (!container) return;
-  const TYPE_ICON = {robot:'🦾',endeffektor:'🔧',umfeld:'🏭',positioner:'🔄',object:'📦',label:'📦',fixture:'🧱',station:'🏗️',rail:'🛤️'};
+  const TYPE_ICON = {robot:'🦾',endeffektor:'🔧',umfeld:'🏭',positioner:'🔄',object:'🧱',label:'📦',fixture:'🧱',station:'🏗️',rail:'🛤️'};
   if (!filtered.length) {
     container.innerHTML = '<div style="padding:16px;font-family:monospace;font-size:11px;color:#4a6a8a">Keine Einträge.</div>';
     return;
