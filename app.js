@@ -1121,10 +1121,16 @@ function renderRows(){
   const rail = (state.schienen||[])[0];
 
   if (_paramTab === 'e') {
-    if(!rail){$('jointRows').innerHTML=`<tr><td colspan="12" style="color:#4a6a8a;font-family:monospace;font-size:11px;padding:8px">Keine externen Achsen — zuerst Schiene anlegen.</td></tr>`;return;}
-    const eAx='E'+(rail.eNumber||1);
-    const parts=state.axisStlParts[eAx]||[];
-    const col=(parts[0]?.color)||'#2563eb';
+    const positioners = state.positioners||[];
+    if(!rail && !positioners.length){
+      $('jointRows').innerHTML=`<tr><td colspan="12" style="color:#4a6a8a;font-family:monospace;font-size:11px;padding:8px">Keine externen Achsen — Schiene oder Positionierer anlegen.</td></tr>`;
+      return;
+    }
+    // Rail row (optional)
+    if(rail){
+      const eAx='E'+(rail.eNumber||1);
+      const parts=state.axisStlParts[eAx]||[];
+      const col=(parts[0]?.color)||'#2563eb';
     $('jointRows').innerHTML=`<tr>
       <td><b>${eAx}</b></td>
       <td><input data-e-pos type="number" step="1" value="${rail.ePos||0}" min="${rail.eMin??0}" max="${rail.eMax??rail.length_mm??2000}" style="width:70px"></td>
@@ -1137,23 +1143,26 @@ function renderRows(){
       <td><button class="axis-stl-btn" data-ax="${eAx}" style="font-size:10px;padding:3px 7px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:${parts.length?'#d8e8f0':'#6a8fa8'};width:100%">${parts.length?parts.length+' Part'+(parts.length>1?'s':''):'+ STL'}</button></td>
       <td><button data-e-sim style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;padding:2px 7px;cursor:pointer;color:#9ab">▶</button></td>
     </tr>`;
-    $('jointRows').querySelector('[data-e-pos]')?.addEventListener('input',e=>{if(rail){rail.ePos=parseFloat(e.target.value)||0;rebuildRailMeshes();}});
-    $('jointRows').querySelector('[data-e-min]')?.addEventListener('input',e=>{if(rail)rail.eMin=parseFloat(e.target.value)||0;});
-    $('jointRows').querySelector('[data-e-max]')?.addEventListener('input',e=>{if(rail)rail.eMax=parseFloat(e.target.value)||0;});
-    $('jointRows').querySelector('[data-e-sim]')?.addEventListener('click',()=>{
-      if(!rail) return;
-      if(rail._simInterval){ clearInterval(rail._simInterval); delete rail._simInterval; return; }
-      const min=rail.eMin??0, max=rail.eMax??rail.length_mm??2000;
-      let pos=rail.ePos||0, dir=1;
-      rail._simInterval=setInterval(()=>{
-        pos+=dir*(max-min)/60;
-        if(pos>=max){pos=max;dir=-1;} else if(pos<=min){pos=min;dir=1;}
-        rail.ePos=pos;
-        const inp=$('jointRows').querySelector('[data-e-pos]');
-        if(inp) inp.value=Math.round(pos);
-        rebuildRailMeshes();
-      },16);
-    });
+      $('jointRows').querySelector('[data-e-pos]')?.addEventListener('input',e=>{if(rail){rail.ePos=parseFloat(e.target.value)||0;rebuildRailMeshes();}});
+      $('jointRows').querySelector('[data-e-min]')?.addEventListener('input',e=>{if(rail)rail.eMin=parseFloat(e.target.value)||0;});
+      $('jointRows').querySelector('[data-e-max]')?.addEventListener('input',e=>{if(rail)rail.eMax=parseFloat(e.target.value)||0;});
+      $('jointRows').querySelector('[data-e-sim]')?.addEventListener('click',()=>{
+        if(!rail) return;
+        if(rail._simInterval){ clearInterval(rail._simInterval); delete rail._simInterval; return; }
+        const min=rail.eMin??0, max=rail.eMax??rail.length_mm??2000;
+        let pos=rail.ePos||0, dir=1;
+        rail._simInterval=setInterval(()=>{
+          pos+=dir*(max-min)/60;
+          if(pos>=max){pos=max;dir=-1;} else if(pos<=min){pos=min;dir=1;}
+          rail.ePos=pos;
+          const inp=$('jointRows').querySelector('[data-e-pos]');
+          if(inp) inp.value=Math.round(pos);
+          rebuildRailMeshes();
+        },16);
+      });
+    } else {
+      $('jointRows').innerHTML='';
+    }
     // Append positioner rows
     const posRows=(state.positioners||[]).map((p,i)=>{
       const eAx='E'+(p.eNum||i+2);
