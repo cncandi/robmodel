@@ -69,13 +69,15 @@ const state = {
   schienen: [],
   objekte: [],
   positioners: [],
+  festeObjekte: [],
 };
 
 // ── Three.js Variablen ────────────────────────────────────────────
 let scene, camera, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot, railGroup;
 let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup;
 var objekteGroups = [];
-var positionerGroups = []; // [{containerGrp, pivotGrp, meshGrp, pivotSphere}]
+var positionerGroups = [];
+var festeGrps = []; // [{containerGrp, pivotGrp, meshGrp, pivotSphere}]
 const meshes = new Map();
 const axisMeshes = [];
 const axisPivotGroups = [];
@@ -809,8 +811,11 @@ function clearAll() {
   // Reset positioners
   (state.positioners||[]).forEach((_,i)=>_removePosGroup(i));
   positionerGroups.length=0; state.positioners=[];
+  // Reset feste Objekte
+  (festeGrps||[]).forEach(g=>{ if(g?.parent) g.parent.remove(g); });
+  festeGrps.length=0; state.festeObjekte=[];
   // Render minimal
-  renderRailRows(); renderObjRows(); renderPosRows();
+  renderRailRows(); renderObjRows(); renderPosRows(); renderFixRows();
   renderAxisStlRows(); renderRows(); renderTcp();
   setView('iso');
 }
@@ -1604,21 +1609,105 @@ $('pm-submit')?.addEventListener('click',()=>{
   $('posModal').style.display='none';
 });
 
-// ── Gimbal (Transform-Picker) ─────────────────────────────────────
+// ── Feste Objekte ─────────────────────────────────────────────────
+function renderFixRows() {
+  const el=$('fixRows'); if(!el) return;
+  const badge=$('fixBadge');
+  const items=state.festeObjekte||[];
+  if(badge) badge.textContent=items.length||'0';
+  if(!items.length){el.innerHTML='';return;}
+  el.innerHTML=items.map((o,i)=>`
+    <div style="border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:8px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="width:12px;height:12px;border-radius:2px;background:${o.color||'#607080'};flex-shrink:0"></div>
+        <span style="flex:1;font-family:monospace;font-size:12px;color:var(--txt)">${o.type==='cylinder'?'🔵':'📦'} ${o.name||'Objekt'}</span>
+        <button data-fix-edit="${i}" style="background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:11px">✏️</button>
+        <button data-fix-del="${i}" style="background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:12px">✕</button>
+      </div>
+    </div>`).join('');
+  el.querySelectorAll('[data-fix-del]').forEach(btn=>btn.addEventListener('click',()=>{
+    const i=+btn.dataset.fixDel;
+    if(festeGrps[i]?.parent) festeGrps[i].parent.remove(festeGrps[i]);
+    state.festeObjekte.splice(i,1); festeGrps.splice(i,1);
+    renderFixRows();
+  }));
+  el.querySelectorAll('[data-fix-edit]').forEach(btn=>btn.addEventListener('click',()=>openFixModal(+btn.dataset.fixEdit)));
+}
+
+function rebuildFixMesh(i) {
+  const o=state.festeObjekte[i]; if(!o) return;
+  if(!festeGrps[i]){ festeGrps[i]=new THREE.Group(); scene.add(festeGrps[i]); }
+  const g=festeGrps[i];
+  while(g.children.length) g.remove(g.children[0]);
+  if(o.showBox!==false){
+    const L=o.length||500,H=o.height||500,W=o.width||500,R=o.radius||200,deg=Math.PI/180;
+    const geo=o.type==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
+    g.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:o.color||0x607080,transparent:true,opacity:0.6,side:THREE.DoubleSide})));
+    g.position.set(o.x||0,o.y||0,o.z||0);
+    g.rotation.set((o.rx||0)*deg,(o.ry||0)*deg,(o.rz||0)*deg,'XYZ');
+  }
+}
+
+function openFixModal(editIdx) {
+  const o=editIdx>=0?(state.festeObjekte||[])[editIdx]:null;
+  $('fm-name').value   = o?.name   || '';
+  $('fm-type').value   = o?.type   || 'box';
+  $('fm-color').value  = o?.color  || '#607080';
+  $('fm-length').value = o?.length || 500;
+  $('fm-width').value  = o?.width  || 500;
+  $('fm-height').value = o?.height || 500;
+  $('fm-radius').value = o?.radius || 200;
+  $('fm-x').value  = o?.x  || 0; $('fm-y').value  = o?.y  || 0; $('fm-z').value  = o?.z  || 0;
+  $('fm-rx').value = o?.rx || 0; $('fm-ry').value = o?.ry || 0; $('fm-rz').value = o?.rz || 0;
+  $('fm-show').checked = o?.showBox !== false;
+  $('fm-edit-idx').value = editIdx>=0?editIdx:-1;
+  fmTypeChanged();
+  $('fixModal').style.display='flex';
+}
+
+function fmTypeChanged(){
+  const t=$('fm-type')?.value||'box';
+  const bf=$('fm-box-fields'), cf=$('fm-cyl-fields');
+  if(bf) bf.style.display=t==='box'?'contents':'none';
+  if(cf) cf.style.display=t==='cylinder'?'contents':'none';
+}
+window.fmTypeChanged=fmTypeChanged;
+
+$('fixAddBtn')?.addEventListener('click',()=>openFixModal(-1));
+$('fixModalClose')?.addEventListener('click',()=>{ $('fixModal').style.display='none'; });
+
+$('fm-submit')?.addEventListener('click',()=>{
+  const editIdx=parseInt($('fm-edit-idx').value);
+  const entry={
+    name:    $('fm-name').value||'Objekt',
+    type:    $('fm-type').value||'box',
+    color:   $('fm-color').value||'#607080',
+    length:  parseFloat($('fm-length').value)||500,
+    width:   parseFloat($('fm-width').value)||500,
+    height:  parseFloat($('fm-height').value)||500,
+    radius:  parseFloat($('fm-radius').value)||200,
+    x: parseFloat($('fm-x').value)||0, y: parseFloat($('fm-y').value)||0, z: parseFloat($('fm-z').value)||0,
+    rx:parseFloat($('fm-rx').value)||0,ry:parseFloat($('fm-ry').value)||0,rz:parseFloat($('fm-rz').value)||0,
+    showBox: $('fm-show').checked===true
+  };
+  if(editIdx>=0){ state.festeObjekte[editIdx]=entry; }
+  else { state.festeObjekte.push(entry); festeGrps.push(null); }
+  rebuildFixMesh(editIdx>=0?editIdx:state.festeObjekte.length-1);
+  renderFixRows();
+  $('fixModal').style.display='none';
+});
 var _gimbalActive = false;
 var _gimbalMode = 'translate'; // 'translate' | 'rotate'
 var _gimbalTarget = null; // {type, idx, grp}
 
 function _getGimbalMeshes() {
   const result = [];
-  // Rail (RobModel uses railGroup directly)
   if(typeof railGroup!=='undefined' && railGroup) {
     railGroup.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'rail', idx:0, grp:railGroup}); });
   }
-  // Objects
   (objekteGroups||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'obj', idx:i, grp:g}); }); });
-  // Positioners
   (positionerGroups||[]).forEach((g,i)=>{ if(g?.containerGrp) g.containerGrp.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'pos', idx:i, grp:g.containerGrp}); }); });
+  (festeGrps||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'fix', idx:i, grp:g}); }); });
   return result;
 }
 
@@ -1674,6 +1763,11 @@ function _gimbalChanged() {
   } else if(type==='pos' && state.positioners[idx]){
     Object.assign(state.positioners[idx].boxOffset, bo);
     if($('posModal')?.style.display!=='none') fillModal('pm');
+  } else if(type==='fix' && state.festeObjekte[idx]){
+    Object.assign(state.festeObjekte[idx], {x:bo.x,y:bo.y,z:bo.z,rx:bo.rx,ry:bo.ry,rz:bo.rz});
+    if($('fixModal')?.style.display!=='none'){
+      ['x','y','z','rx','ry','rz'].forEach(k=>{ const el=$('fm-'+k); if(el) el.value=bo[k]||0; });
+    }
   }
 }
 
