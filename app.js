@@ -1461,6 +1461,8 @@ function saveAxisPartsModal() {
     const idx=(state.objekte||[]).findIndex(o=>'Label'+(o.labelNum||0)===savedAx);
     if(idx>=0) rebuildObjektMesh(idx);
   }
+  // Rebuild rail mesh if saved axis is an E-axis
+  if(savedAx && savedAx.startsWith('E')) rebuildRailMeshes();
 }
 
 function cancelAxisPartsModal() {
