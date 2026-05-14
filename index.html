@@ -123,11 +123,12 @@
           <h2>🛤️ Schienen / Rails</h2>
           <div style="display:flex;gap:4px;align-items:center">
             <span class="badge info" id="railBadge">0</span>
-            <button id="railAddBtn" title="Neue Schiene erstellen" onclick="openNewItemModal('rail')" style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 6px;font-size:13px;cursor:pointer">+</button>
+            <button id="railAddBtn" title="Neue Schiene erstellen" style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 6px;font-size:13px;cursor:pointer">+</button>
             <button id="railLibRefreshBtn" title="Aus Library laden" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:4px;padding:6px 16px;font-size:16px;cursor:pointer">↻</button>
           </div>
         </div>
-        <div id="railLibList" style="max-height:100px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace">Klicke ↻ zum Laden…</div>
+        <div id="railRows"></div>
+        <div id="railLibList" style="max-height:100px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace"></div>
       </section>
 
       <!-- Bewegliche Objekte -->
