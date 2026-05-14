@@ -116,10 +116,11 @@
           <h2>🔄 Positionierer</h2>
           <div style="display:flex;gap:4px;align-items:center">
             <span class="badge info" id="posBadge">0</span>
+            <button id="posAddBtn" title="Neuen Positionierer erstellen" style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 6px;font-size:13px;cursor:pointer">+</button>
             <button id="posLibRefreshBtn" title="Aus Library laden" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:4px;padding:6px 16px;font-size:16px;cursor:pointer">↻</button>
           </div>
         </div>
-        <div id="posLibList" style="max-height:100px;overflow-y:auto;font-size:11px;color:#6a8fa8;font-family:monospace">Klicke ↻ zum Laden…</div>
+        <div id="posRows"></div>
       </section>
 
       <!-- Schienen -->
@@ -162,6 +163,74 @@
 
     </aside>
   </main>
+
+<!-- ── Positionierer Modal ────────────────────────────────────── -->
+<div id="posModal" class="rl-overlay" style="display:none">
+  <div class="rl-modal" style="width:min(420px,96vw)">
+    <div class="rl-modal-head">
+      <span>🔄 Positionierer definieren</span>
+      <button class="rl-close" id="posModalClose">✕</button>
+    </div>
+    <div class="rl-modal-body">
+      <div class="rl-grid">
+        <label class="rl-span2">Name<input id="pm-name" type="text" placeholder="Drehtisch"></label>
+        <label>Typ
+          <select id="pm-type" onchange="pmTypeChanged()" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%;margin-top:4px">
+            <option value="cylinder">🔵 Zylinder</option>
+            <option value="box">📦 Box</option>
+          </select>
+        </label>
+        <label>E-Achse Nr.<input id="pm-enum" type="number" value="2" min="1" max="99" step="1"></label>
+        <div id="pm-box-fields" style="display:none;contents">
+          <label>Länge (mm)<input id="pm-length" type="number" value="500" step="10"></label>
+          <label>Breite (mm)<input id="pm-width"  type="number" value="500" step="10"></label>
+        </div>
+        <div id="pm-cyl-fields" style="display:contents">
+          <label>Radius (mm)<input id="pm-radius" type="number" value="300" step="10"></label>
+        </div>
+        <label>Höhe (mm)<input id="pm-height" type="number" value="100" step="10"></label>
+        <label>Rotationsachse
+          <select id="pm-rotaxis" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%;margin-top:4px">
+            <option value="Y">Y (vertikal)</option>
+            <option value="X">X</option>
+            <option value="Z">Z</option>
+          </select>
+        </label>
+        <label>Min (°)<input id="pm-min" type="number" value="-180" step="1"></label>
+        <label>Max (°)<input id="pm-max" type="number" value="180" step="1"></label>
+        <label>Startwinkel (°)<input id="pm-start" type="number" value="0" step="1"></label>
+        <label class="rl-span2" style="font-size:11px;color:#6a8fa8;letter-spacing:.05em">DREHPUNKT
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px">
+            <label style="font-size:10px;color:#6a8fa8">X mm<input id="pm-px" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Y mm<input id="pm-py" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Z mm<input id="pm-pz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+          </div>
+        </label>
+        <label class="rl-span2" style="font-size:11px;color:#6a8fa8;letter-spacing:.05em">POSITION
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px">
+            <label style="font-size:10px;color:#6a8fa8">X mm<input id="pm-ox" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Y mm<input id="pm-oy" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Z mm<input id="pm-oz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rx °<input id="pm-orx" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Ry °<input id="pm-ory" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rz °<input id="pm-orz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+          </div>
+        </label>
+        <label class="rl-span2">Dreht gemeinsam mit
+          <select id="pm-parent" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%;margin-top:4px">
+            <option value="-1">— keiner —</option>
+          </select>
+        </label>
+        <label class="rl-span2" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="pm-show" checked style="accent-color:var(--acc);width:15px;height:15px">
+          <span>Parametrisches Objekt anzeigen</span>
+        </label>
+      </div>
+      <input type="hidden" id="pm-edit-idx" value="-1">
+      <button id="pm-submit" class="rl-submit" style="margin-top:12px">Übernehmen</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── Objekt-Parametrik Modal ────────────────────────────────── -->
 <div id="objModal" class="rl-overlay" style="display:none">
