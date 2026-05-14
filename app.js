@@ -1653,7 +1653,7 @@ function rebuildRailMeshes() {
   // Rail stays fixed at boxOffset
   railGroup.position.set(bo.x||0, bo.y||0, bo.z||0);
   railGroup.rotation.set((bo.rx||0)*deg, (bo.ry||0)*deg, (bo.rz||0)*deg, 'XYZ');
-  // Robot moves along rail direction (all groups together)
+  // Movement direction
   var cx=0, cy=0, cz=0;
   if      (ax==='X+') cx =  p;
   else if (ax==='X-') cx = -p;
@@ -1661,12 +1661,25 @@ function rebuildRailMeshes() {
   else if (ax==='Y-') cy = -p;
   else if (ax==='Z+') cz =  p;
   else                cz = -p;
-  var bx=state.robotTr?.x||0, by=state.robotTr?.y||0, bz=state.robotTr?.z||0;
-  kinematicsRoot.position.set(bx+cx, by+cy, bz+cz);
-  robotGroup.position.set(bx+cx, by+cy, bz+cz);
-  scene.updateMatrixWorld(true);
-  updateAxisPointVisuals();
-  updateSkeletonPositions();
+
+  if (r.robotMoves !== false) {
+    // Roboter verfährt, Rail bleibt
+    var bx=state.robotTr?.x||0, by=state.robotTr?.y||0, bz=state.robotTr?.z||0;
+    kinematicsRoot.position.set(bx+cx, by+cy, bz+cz);
+    robotGroup.position.set(bx+cx, by+cy, bz+cz);
+    scene.updateMatrixWorld(true);
+    updateAxisPointVisuals();
+    updateSkeletonPositions();
+  } else {
+    // Rail verfährt, Roboter bleibt
+    var bx=state.robotTr?.x||0, by=state.robotTr?.y||0, bz=state.robotTr?.z||0;
+    kinematicsRoot.position.set(bx, by, bz);
+    robotGroup.position.set(bx, by, bz);
+    railGroup.position.set((bo.x||0) - cx, (bo.y||0) - cy, (bo.z||0) - cz);
+    scene.updateMatrixWorld(true);
+    updateAxisPointVisuals();
+    updateSkeletonPositions();
+  }
 }
 
 $('railAddBtn')?.addEventListener('click',()=>{
@@ -1679,6 +1692,7 @@ $('railAddBtn')?.addEventListener('click',()=>{
   $('rm-max').value    = existing?.eMax       ?? (existing?.length_mm || 2000);
   $('rm-start').value  = existing?.ePos       ?? 0;
   if($('rm-show')) $('rm-show').checked = existing?.showBox !== false;
+  if($('rm-robot-moves')) $('rm-robot-moves').checked = existing?.robotMoves !== false;
   const bo = existing?.boxOffset||{};
   if($('rm-ox'))  $('rm-ox').value  = bo.x  ||0;
   if($('rm-oy'))  $('rm-oy').value  = bo.y  ||0;
@@ -1729,7 +1743,8 @@ $('rm-submit')?.addEventListener('click',()=>{
       ry: parseFloat($('rm-ory')?.value)||0,
       rz: parseFloat($('rm-orz')?.value)||0
     },
-    showBox: $('rm-show')?.checked !== false
+    showBox: $('rm-show')?.checked !== false,
+    robotMoves: $('rm-robot-moves')?.checked !== false
   };
   // Stop any running sim before replacing state
   const old = state.schienen[0];
