@@ -1630,21 +1630,28 @@ function rebuildRailMeshes() {
   const r = (state.schienen||[])[0];
   if(!r) return;
   const L=r.length_mm||2000, H=r.height_mm||200, W=r.width_mm||400, ax=r.axis||'X+';
+  const p=r.ePos||0;
   const eAx = 'E'+(r.eNumber||1);
   const parts = state.axisStlParts[eAx]||[];
   if (parts.length) {
-    parts.forEach(p=>{
-      if(!p.buf) return;
-      const geo=loader.parse(p.buf.buffer||p.buf); geo.computeVertexNormals();
-      railGroup.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:p.color||0x2563eb,shininess:60})));
+    parts.forEach(pt=>{
+      if(!pt.buf) return;
+      const geo=loader.parse(pt.buf.buffer||pt.buf); geo.computeVertexNormals();
+      railGroup.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:pt.color||0x2563eb,shininess:60})));
     });
   } else {
-    // X+/X- → entlang X; Z+/Z- → entlang Z
     const geo=(ax==='X+'||ax==='X-')?new THREE.BoxGeometry(L,H,W):new THREE.BoxGeometry(W,H,L);
     const mesh=new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:0x2563eb,transparent:true,opacity:0.3,side:THREE.DoubleSide}));
-    mesh.position.y=-H/2; // top face at BASE (y=0), box extends downward
+    mesh.position.y=-H/2;
     railGroup.add(mesh);
   }
+  // Rail slides under robot base (origin)
+  var cx=0, cz=0;
+  if      (ax==='X+') cx =  L/2 - p;
+  else if (ax==='X-') cx = -(L/2 - p);
+  else if (ax==='Z+') cz =  L/2 - p;
+  else                cz = -(L/2 - p);
+  railGroup.position.set(cx, 0, cz);
 }
 
 $('railAddBtn')?.addEventListener('click',()=>{
