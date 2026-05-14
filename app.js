@@ -1640,6 +1640,27 @@ function renderLibList(items) {
   });
 }
 
+function openNewItemModal(type) {
+  _lastLibRobot = null;
+  const t = $('rl-type'); if(t) { t.value = type; }
+  if (typeof rlTypeChanged === 'function') rlTypeChanged();
+  $('rl-name').value = '';
+  const btnU = $('rl-mode-update'); if(btnU) btnU.style.display='none';
+  $('rl-msg').style.display='none';
+  try {
+    renderer.render(scene, camera);
+    renderer.domElement.toBlob(blob => {
+      if (!blob) return;
+      const file = new File([blob],'screenshot.jpg',{type:'image/jpeg'});
+      const dt = new DataTransfer(); dt.items.add(file);
+      $('rl-thumb').files = dt.files;
+      $('rl-thumb-preview').src = URL.createObjectURL(blob);
+      $('rl-thumb-preview').style.display = 'block';
+    }, 'image/jpeg', 0.92);
+  } catch(e) {}
+  $('roblibModal').style.display = 'flex';
+}
+
 function openRoblibModal() {
   $('rl-msg').style.display = 'none';
   // Felder aus letztem Library-Eintrag vorausfüllen
