@@ -1854,7 +1854,17 @@ function renderTcp(){qsa('.tab').forEach(t=>t.classList.toggle('active',t.datase
 
 
 // ── Kameraansichten ────────────────────────────────────────────────
-function sceneBox(){const box=new THREE.Box3().setFromObject(robotGroup);box.expandByObject(toolGroup);box.expandByObject(axisPointGroup);if(!Number.isFinite(box.min.x)){box.min.set(-500,-500,0);box.max.set(1500,500,1500);}return box;}
+function sceneBox(){
+  const box=new THREE.Box3().setFromObject(robotGroup);
+  box.expandByObject(toolGroup);
+  box.expandByObject(axisPointGroup);
+  (festeGrps||[]).forEach(g=>{ if(g) box.expandByObject(g); });
+  (objekteGroups||[]).forEach(g=>{ if(g) box.expandByObject(g); });
+  (positionerGroups||[]).forEach(g=>{ if(g?.containerGrp) box.expandByObject(g.containerGrp); });
+  if(railGroup?.children?.length) box.expandByObject(railGroup);
+  if(!Number.isFinite(box.min.x)){box.min.set(-500,-500,0);box.max.set(1500,500,1500);}
+  return box;
+}
 function setView(view){
   const box=sceneBox(),center=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());
   const dist=Math.max(size.length()*.85,1200);
@@ -3155,6 +3165,17 @@ async function loadComponentFromZip(zip) {
   }
 
   const type = cfg.type;
+  // Clear only same-type components before loading
+  if (type === 'fixture') {
+    (festeGrps||[]).forEach(g=>{if(g?.parent) g.parent.remove(g);}); festeGrps.length=0; state.festeObjekte=[];
+  } else if (type === 'rail') {
+    if(railGroup) while(railGroup.children.length) railGroup.remove(railGroup.children[0]);
+    state.schienen=[];
+  } else if (type === 'positioner') {
+    // append, don't clear
+  } else if (type === 'label') {
+    // append, don't clear
+  }
   if      (type === 'rail')        applyRailConfig(cfg, stlBufs);
   else if (type === 'positioner')  applyPositionerConfig(cfg, stlBufs);
   else if (type === 'label')       applyLabelConfig(cfg, stlBufs);
