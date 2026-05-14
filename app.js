@@ -49,7 +49,7 @@ const state = {
   selectedAxis: 0,
   jointAngles: [0, -90, 90, 0, 0, 0],
   axisStlMap: { A1:null, A2:null, A3:null, A4:null, A5:null, A6:null },
-  axisStlParts: { A1:[], A2:[], A3:[], A4:[], A5:[], A6:[] }
+  axisStlParts: { A1:[], A2:[], A3:[], A4:[], A5:[], A6:[] },
   simulation: { active: false, axis: null, raf: null },
   joints: ['A1','A2','A3','A4','A5','A6'].map((n, i) => ({
     name: n,
