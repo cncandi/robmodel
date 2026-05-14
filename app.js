@@ -789,20 +789,29 @@ function disableSave() { $('downloadJson').disabled=true;  $('downloadZip').disa
 
 function clearAll() {
   if(!confirm('Kompletten Viewport leeren?')) return;
-  // Reset robot
+  // Reset robot state
   resetData(); disableSave();
+  // Clear robot 3D groups
+  clearGroup(robotGroup);
+  clearGroup(toolGroup); toolGroup.add(tcpMarker);
+  clearGroup(kinematicsRoot);
+  clearGroup(axisPointGroup);
+  clearGroup(csHelperGroup);
+  skeletonCyls.length=0; skeletonSphs.length=0; axisPivotGroups.length=0;
+  kinematicsRoot.position.set(0,0,0);
   // Reset rail
-  if(railGroup){ clearGroup(railGroup); }
+  if(railGroup) clearGroup(railGroup);
   state.schienen=[];
-  if(typeof kinematicsRoot!=='undefined') kinematicsRoot.position.set(0,0,0);
   // Reset objects
-  (objekteGroups||[]).forEach(g=>{ if(g){ while(g.children.length) g.remove(g.children[0]); if(g.parent) g.parent.remove(g); }});
+  (objekteGroups||[]).forEach(g=>{ if(g&&g.parent) g.parent.remove(g); });
   objekteGroups.length=0; state.objekte=[];
   // Reset positioners
-  (positionerGroups||[]).forEach(g=>{ if(g) _removePosGroup((positionerGroups||[]).indexOf(g)); });
+  (state.positioners||[]).forEach((_,i)=>_removePosGroup(i));
   positionerGroups.length=0; state.positioners=[];
-  // Render
-  renderRailRows(); renderObjRows(); renderPosRows(); renderAll(); setView('iso');
+  // Render minimal
+  renderRailRows(); renderObjRows(); renderPosRows();
+  renderAxisStlRows(); renderRows(); renderTcp();
+  setView('iso');
 }
 
 async function loadSourceZip(file) {
