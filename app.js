@@ -1662,7 +1662,7 @@ function rebuildRailMeshes() {
   else if (ax==='Z+') cz =  p;
   else                cz = -p;
 
-  if (r.robotMoves !== false) {
+  if (r.robotMoves === true) {
     // Roboter verfährt, Rail bleibt
     var bx=state.robotTr?.x||0, by=state.robotTr?.y||0, bz=state.robotTr?.z||0;
     kinematicsRoot.position.set(bx+cx, by+cy, bz+cz);
@@ -1743,8 +1743,8 @@ $('rm-submit')?.addEventListener('click',()=>{
       ry: parseFloat($('rm-ory')?.value)||0,
       rz: parseFloat($('rm-orz')?.value)||0
     },
-    showBox: $('rm-show')?.checked !== false,
-    robotMoves: $('rm-robot-moves')?.checked !== false
+    showBox: $('rm-show')?.checked === true,
+    robotMoves: $('rm-robot-moves')?.checked === true
   };
   // Stop any running sim before replacing state
   const old = state.schienen[0];
