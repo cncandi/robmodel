@@ -1227,32 +1227,41 @@ function renderAxisPartsList(ax) {
   });
 }
 
-document.addEventListener('DOMContentLoaded',()=>{
-  const fi=$('axisPartsFileInput'); if(!fi)return;
-  fi.addEventListener('change',async e=>{
-    const file=e.target.files[0]; if(!file||!_axisPartsTarget)return; e.target.value='';
-    let rawBuf,fname;
-    if(/\.zip$/i.test(file.name)){try{const r=await extractFromZip(file);rawBuf=r.buf;fname=r.name;}catch(er){alert(er.message);return;}}
-    else{rawBuf=await file.arrayBuffer();fname=file.name;}
-    let geom;
-    try{geom=await parseGeometry(rawBuf,fname);geom.computeVertexNormals();}catch(er){alert('Fehler: '+er.message);return;}
-    const u8=new Uint8Array(rawBuf);
-    const stlBuf=/\.(stp|step)$/i.test(fname)?new Uint8Array(stlFromGeometry(geom)):u8;
-    const displayName=fname.replace(/\.(stp|step)$/i,'.stl');
-    const ax=_axisPartsTarget;
-    if(!state.axisStlParts[ax])state.axisStlParts[ax]=[];
-    if(!state.axisStlParts[ax].find(p=>norm(p.name)===norm(displayName)))
-      state.axisStlParts[ax].push({name:displayName,color:'#e8a020',buf:stlBuf});
-    state.axisStlMap[ax]=state.axisStlParts[ax][0].name;
-    if(!state.stls.find(f=>f.name===displayName))state.stls.push({path:displayName,name:displayName,type:'STL',size:stlBuf.byteLength});
-    state.files=state.stls; state.buffers.set(displayName,stlBuf);
-    const mat=new THREE.MeshStandardMaterial({color:'#e8a020',roughness:.62,metalness:.08});
-    const mesh=new THREE.Mesh(geom,mat); mesh.name=displayName;
-    meshes.set(displayName,mesh);
-    rebuildRobotKinematics();applyTransforms();
-    renderAxisPartsList(ax);renderAxisStlRows();
+async function _loadPartFile(file, ax) {
+  let rawBuf, fname;
+  if (/\.zip$/i.test(file.name)) {
+    try { const r = await extractFromZip(file); rawBuf=r.buf; fname=r.name; } catch(er){alert(er.message);return;}
+  } else { rawBuf = await file.arrayBuffer(); fname = file.name; }
+  let geom;
+  try { geom = await parseGeometry(rawBuf, fname); geom.computeVertexNormals(); } catch(er){alert('Fehler: '+er.message);return;}
+  const u8 = new Uint8Array(rawBuf);
+  const stlBuf = /\.(stp|step)$/i.test(fname) ? new Uint8Array(stlFromGeometry(geom)) : u8;
+  const displayName = fname.replace(/\.(stp|step)$/i, '.stl');
+  if (!state.axisStlParts[ax]) state.axisStlParts[ax] = [];
+  if (!state.axisStlParts[ax].find(p => norm(p.name)===norm(displayName)))
+    state.axisStlParts[ax].push({name:displayName, color:'#e8a020', buf:stlBuf});
+  state.axisStlMap[ax] = state.axisStlParts[ax][0].name;
+  if (!state.stls.find(f=>f.name===displayName))
+    state.stls.push({path:displayName, name:displayName, type:'STL', size:stlBuf.byteLength});
+  state.files = state.stls;
+  state.buffers.set(displayName, stlBuf);
+  const mat = new THREE.MeshStandardMaterial({color:'#e8a020', roughness:.62, metalness:.08});
+  const mesh = new THREE.Mesh(geom, mat); mesh.name = displayName;
+  meshes.set(displayName, mesh);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  $('axisPartsModal')?.addEventListener('click', e => {
+    if (e.target === $('axisPartsModal')) closeAxisPartsModal();
   });
-  $('axisPartsModal')?.addEventListener('click',e=>{if(e.target===$('axisPartsModal'))closeAxisPartsModal();});
+  const fi = $('axisPartsFileInput');
+  if (fi) fi.addEventListener('change', async e => {
+    const ax = _axisPartsTarget; if (!ax) return;
+    const files = Array.from(e.target.files); e.target.value = '';
+    for (const file of files) await _loadPartFile(file, ax);
+    rebuildRobotKinematics(); applyTransforms();
+    renderAxisPartsList(ax); renderAxisStlRows();
+  });
 });
 
 function initAxisStlEvents() {
