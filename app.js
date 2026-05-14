@@ -2653,7 +2653,16 @@ function openRoblibModal() {
     else if (hasUmf)        autoType = 'umfeld';
     else if (hasRobot)      autoType = 'robot';
     const typeEl = $('rl-type'); if(typeEl) typeEl.value = autoType;
-    $('rl-name').value   = state.robotName || '';
+    // Pre-fill name from the right component
+    const autoName =
+      autoType === 'fixture'    ? (state.festeObjekte[0]?.name || '') :
+      autoType === 'rail'       ? (state.schienen[0]?.name || '') :
+      autoType === 'positioner' ? (state.positioners[0]?.name || '') :
+      autoType === 'label'      ? (state.objekte[0]?.name || '') :
+      autoType === 'endeffektor'? (state.effektoren[0]?.name || '') :
+      autoType === 'station'    ? '' :
+      (state.robotName || '');
+    $('rl-name').value = autoName;
     $('rl-achsen').value = 6;
     const btnU = $('rl-mode-update');
     if (btnU) btnU.style.display = 'none';
