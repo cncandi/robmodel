@@ -201,8 +201,8 @@
           <div style="display:flex;gap:6px;margin-top:4px">
             <button class="rm-axis-btn" data-ax="X+" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(37,99,235,.3);border:1px solid rgba(37,99,235,.6);color:#60a5fa">X+</button>
             <button class="rm-axis-btn" data-ax="X-" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">X-</button>
-            <button class="rm-axis-btn" data-ax="Y+" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">Y+</button>
-            <button class="rm-axis-btn" data-ax="Y-" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">Y-</button>
+            <button class="rm-axis-btn" data-ax="Z+" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">Z+</button>
+            <button class="rm-axis-btn" data-ax="Z-" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">Z-</button>
           </div>
         </label>
       </div>
@@ -213,7 +213,11 @@
 
   <!-- ─── FOOTER / PARAMETER-TABELLE ──────────────────────────── -->
   <div style="background:var(--bg3);border-top:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;padding:2px 8px;flex-shrink:0">
-    <span style="font-size:11px;font-weight:700;color:var(--txt3);letter-spacing:.5px;text-transform:uppercase">Parameter · Drehpunkte (Lokal CS)</span>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:11px;font-weight:700;color:var(--txt3);letter-spacing:.5px;text-transform:uppercase">Parameter</span>
+      <button id="tabAachsen" onclick="setParamTab('a')" style="font-family:monospace;font-size:10px;padding:1px 8px;border-radius:3px;cursor:pointer;background:rgba(37,99,235,.3);border:1px solid rgba(37,99,235,.6);color:#60a5fa">A1–A6</button>
+      <button id="tabEachsen" onclick="setParamTab('e')" style="font-family:monospace;font-size:10px;padding:1px 8px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">E-Achsen</button>
+    </div>
     <button id="toggleParam" title="Panel ein-/ausklappen" style="background:none;border:1px solid rgba(255,255,255,.15);color:var(--txt3);border-radius:3px;padding:0 8px;font-size:13px;cursor:pointer;line-height:1.6">▼</button>
   </div>
   <div style="background:var(--bg3);border-top:1px solid var(--bdr);display:flex;align-items:center;gap:6px;padding:3px 8px;flex-shrink:0;font-family:monospace;font-size:11px">
