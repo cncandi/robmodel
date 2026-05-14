@@ -1639,7 +1639,8 @@ function rebuildRailMeshes() {
       const geo=loader.parse(pt.buf.buffer||pt.buf); geo.computeVertexNormals();
       railGroup.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:pt.color||0x2563eb,shininess:60})));
     });
-  } else {
+  }
+  if (r.showBox !== false && !parts.length) {
     const geo=(ax==='X+'||ax==='X-')?new THREE.BoxGeometry(L,H,W):
               (ax==='Y+'||ax==='Y-')?new THREE.BoxGeometry(W,L,H):
                                      new THREE.BoxGeometry(W,H,L);
@@ -1667,7 +1668,7 @@ $('railAddBtn')?.addEventListener('click',()=>{
   $('rm-min').value    = existing?.eMin       ?? 0;
   $('rm-max').value    = existing?.eMax       ?? (existing?.length_mm || 2000);
   $('rm-start').value  = existing?.ePos       ?? 0;
-  if($('rm-enum')) $('rm-enum').value = existing?.eNumber || 1;
+  if($('rm-show')) $('rm-show').checked = existing?.showBox !== false;
   const bo = existing?.boxOffset||{};
   if($('rm-ox'))  $('rm-ox').value  = bo.x  ||0;
   if($('rm-oy'))  $('rm-oy').value  = bo.y  ||0;
@@ -1717,7 +1718,8 @@ $('rm-submit')?.addEventListener('click',()=>{
       rx: parseFloat($('rm-orx')?.value)||0,
       ry: parseFloat($('rm-ory')?.value)||0,
       rz: parseFloat($('rm-orz')?.value)||0
-    }
+    },
+    showBox: $('rm-show')?.checked !== false
   };
   // Stop any running sim before replacing state
   const old = state.schienen[0];
