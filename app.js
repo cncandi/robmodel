@@ -1177,6 +1177,21 @@ function openAxisPartsModal(ax) {
   m.style.cssText = 'display:flex;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.6);align-items:center;justify-content:center';
 }
 
+// Library type filter tabs
+document.addEventListener('click', e => {
+  const tab = e.target.closest('.lib-tab-btn');
+  if (!tab) return;
+  _libTypeFilter = tab.dataset.libType || 'all';
+  document.querySelectorAll('.lib-tab-btn').forEach(b => {
+    const active = b.dataset.libType === _libTypeFilter;
+    b.style.background = active ? 'rgba(37,99,235,.2)' : 'rgba(255,255,255,.05)';
+    b.style.borderColor = active ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.15)';
+    b.style.color = active ? '#60a5fa' : '#6a8fa8';
+  });
+  // Re-render the visible library list
+  if (window._libAllItems) renderLibList(window._libAllItems);
+});
+
 window.openAxisPartsModal = openAxisPartsModal;
 window.saveAxisPartsModal = saveAxisPartsModal;
 window.cancelAxisPartsModal = cancelAxisPartsModal;
@@ -1591,6 +1606,40 @@ $('umfStlInput').addEventListener('change', async e => {
 // ── Endeffektor & Umfeld ────────────────────────────────────────
 const ROBLIB_API = 'https://www.cnc-technik.de/robsimul/roblib/api.php';
 
+let _libTypeFilter = 'all';
+
+function filterLibItems(items) {
+  if (_libTypeFilter === 'all') return items;
+  return items.filter(r => (r.type||'robot') === _libTypeFilter);
+}
+
+function renderLibList(items) {
+  window._libAllItems = items;
+  const filtered = filterLibItems(items);
+  const container = $('rl-lib-list');
+  if (!container) return;
+  const TYPE_ICON = {robot:'🦾',endeffektor:'🔧',umfeld:'🏭',positioner:'🔄',object:'📦',station:'🏗️'};
+  if (!filtered.length) {
+    container.innerHTML = '<div style="padding:16px;font-family:monospace;font-size:11px;color:#4a6a8a">Keine Einträge.</div>';
+    return;
+  }
+  container.innerHTML = filtered.map((r,i) => `
+    <div data-lib-ri="${items.indexOf(r)}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer" class="lib-row">
+      <span style="font-size:16px">${TYPE_ICON[r.type||'robot']||'📦'}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-family:monospace;font-size:12px;color:#d8e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
+        <div style="font-size:10px;color:#4a6a8a">${r.marke||''} ${r.modell||''}</div>
+      </div>
+      <button data-lib-load="${items.indexOf(r)}" style="font-size:10px;padding:2px 8px;background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;cursor:pointer;font-family:monospace">Laden</button>
+    </div>`).join('');
+  container.querySelectorAll('[data-lib-load]').forEach(btn => {
+    btn.onclick = e => { e.stopPropagation(); loadRobotFromLib(items[+btn.dataset.libLoad]); };
+  });
+  container.querySelectorAll('.lib-row').forEach(row => {
+    row.onclick = e => { if (!e.target.closest('button')) loadRobotFromLib(items[+row.dataset.libRi]); };
+  });
+}
+
 function openRoblibModal() {
   $('rl-msg').style.display = 'none';
   // Felder aus letztem Library-Eintrag vorausfüllen
@@ -1820,10 +1869,11 @@ async function loadRobotLibList() {
     const r = await fetch(ROBLIB_API + '?action=list');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
-    _libRobots = (data.robots || []).filter(e => (e.type || 'robot') === 'robot');
+    _libRobots = data.robots || [];
+    window._libAllItems = _libRobots;
     bar.style.width = '100%'; prog.style.display = 'none';
-    status.textContent = _libRobots.length + ' Roboter';
-    renderRobotLibList($('rl-lib-search').value);
+    status.textContent = _libRobots.length + ' Einträge';
+    renderLibList(_libRobots);
   } catch(e) {
     prog.style.display = 'none';
     status.textContent = 'Fehler: ' + e.message;
@@ -1831,34 +1881,9 @@ async function loadRobotLibList() {
 }
 
 function renderRobotLibList(query) {
-  const listEl = $('rl-lib-list');
   const q = (query || '').toLowerCase();
-  const items = q ? _libRobots.filter(r =>
-    r.name.toLowerCase().includes(q) || (r.marke||'').toLowerCase().includes(q)) : _libRobots;
-  if (!items.length) {
-    listEl.innerHTML = '<div style="padding:16px;font-family:monospace;font-size:11px;color:#4a6a8a">Keine Roboter gefunden.</div>';
-    return;
-  }
-  listEl.innerHTML = items.map((r, i) =>
-    `<div data-lib-ri="${i}" style="padding:8px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:10px">
-      ${r.thumb_url
-        ? `<img src="${r.thumb_url}" style="width:48px;height:48px;object-fit:contain;border-radius:3px;flex-shrink:0;background:#0f2030;border:1px solid rgba(255,255,255,.08)">`
-        : '<span style="width:48px;text-align:center;font-size:28px">🦾</span>'}
-      <div style="flex:1;min-width:0">
-        <div style="font-family:monospace;font-size:13px;color:#d8e8f0;font-weight:700">${esc(r.name)}</div>
-        <div style="font-family:monospace;font-size:11px;color:#6a8fa8">${esc(r.marke||'')} · ${r.achsen||6} Achsen · ${r.reichweite_mm||'?'} mm · ${r.nutzlast_kg||'?'} kg</div>
-      </div>
-      <button data-lib-load="${i}" style="padding:4px 12px;background:rgba(37,99,235,.3);border:1px solid #2563eb;color:#60a5fa;border-radius:3px;font-family:monospace;font-size:11px;cursor:pointer;flex-shrink:0">Laden</button>
-    </div>`
-  ).join('');
-  listEl.querySelectorAll('[data-lib-load]').forEach(btn => {
-    btn.onclick = e => { e.stopPropagation(); loadRobotFromLib(items[parseInt(btn.dataset.libLoad)]); };
-  });
-  listEl.querySelectorAll('[data-lib-ri]').forEach(row => {
-    row.onmouseover = () => row.style.background = 'rgba(255,255,255,.04)';
-    row.onmouseout  = () => row.style.background = '';
-    row.onclick = e => { if (!e.target.closest('button')) loadRobotFromLib(items[parseInt(row.dataset.libRi)]); };
-  });
+  const filtered = q ? _libRobots.filter(r => r.name.toLowerCase().includes(q)||(r.marke||'').toLowerCase().includes(q)) : _libRobots;
+  renderLibList(filtered);
 }
 
 let _lastLibRobot = null; // zuletzt geladener Library-Eintrag
