@@ -1643,10 +1643,6 @@ function _gimbalPick(event) {
   transformControls.setMode(_gimbalMode);
   transformControls.setSize(0.8);
   transformControls.attach(hit.grp);
-  // Open corresponding edit modal
-  if(hit.type==='pos') openPosModal(hit.idx);
-  else if(hit.type==='obj') openObjModal(hit.idx);
-  else if(hit.type==='rail') { $('railModal').style.display='flex'; }
 }
 
 function _gimbalChanged() {
