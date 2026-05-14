@@ -2556,10 +2556,8 @@ let _libTypeFilter = 'all';
 
 function filterLibItems(items) {
   if (_libTypeFilter === 'all') return items;
-  // fixture and label both stored as 'object' on server
-  if (_libTypeFilter === 'fixture' || _libTypeFilter === 'label') {
-    return items.filter(r => (r.type||'robot') === 'object');
-  }
+  // label stored as 'object' on server; fixture stored as 'fixture'
+  if (_libTypeFilter === 'label') return items.filter(r => (r.type||'robot') === 'object');
   return items.filter(r => (r.type||'robot') === _libTypeFilter);
 }
 
@@ -2956,7 +2954,7 @@ async function uploadToRoblib() {
   const name=$('rl-name').value.trim();
   if(!name){show('Name fehlt.',false);return;}
   // Map internal types to server category types
-  const serverTypeMap = { fixture:'object', label:'object', positioner:'positioner', rail:'rail', endeffektor:'endeffektor', umfeld:'umfeld', station:'station', robot:'robot' };
+  const serverTypeMap = { label:'object', positioner:'positioner', rail:'rail', endeffektor:'endeffektor', umfeld:'umfeld', station:'station', robot:'robot', fixture:'fixture' };
   const serverType = serverTypeMap[type] || type;
   const fields={name, type:serverType};
   if(type==='robot'){
