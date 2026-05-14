@@ -525,6 +525,7 @@ function updateSkeletonPositions() {
 function updateAxisPointVisuals() {
   if (!axisPointGroup) return;
   clearAxisPointVisuals();
+  if (!(state.joints||[]).length) return; // no robot — skip skeleton
   scene.updateMatrixWorld(true);
 
   // Pivot-Weltpositionen A1-A6
