@@ -3045,8 +3045,7 @@ async function loadRobotFromLib(robot) {
 
     resetData(); state.mode = 'package';
 
-    // JSON
-    const jsonEntry = Object.keys(zip.files).find(n => !zip.files[n].dir && /\.json$/i.test(n));
+    // JSON (jsonEntry already found above)
     if (jsonEntry) {
       try {
         state.packageJson = JSON.parse(await zip.files[jsonEntry].async('string'));
