@@ -3015,7 +3015,7 @@ function renderRobotLibList(query) {
 let _lastLibRobot = null; // zuletzt geladener Library-Eintrag
 
 async function loadRobotFromLib(robot) {
-  _lastLibRobot = robot; // merken für Aktualisieren
+  _lastLibRobot = robot;
   const status = $('rl-lib-status');
   const bar    = $('rl-lib-bar');
   const prog   = $('rl-lib-progress');
@@ -3027,6 +3027,22 @@ async function loadRobotFromLib(robot) {
     bar.style.width = '40%';
     const zip = await JSZip.loadAsync(await res.arrayBuffer());
     bar.style.width = '65%';
+
+    // Check if this is a non-robot component (new format with config.json, or type field in JSON)
+    const jsonEntry = Object.keys(zip.files).find(n => !zip.files[n].dir && /\.json$/i.test(n));
+    if (jsonEntry) {
+      let cfg;
+      try { cfg = JSON.parse(await zip.files[jsonEntry].async('string')); } catch(e) {}
+      if (cfg?.type && cfg.type !== 'robot') {
+        // Redirect to component loader
+        await loadComponentFromZip(zip);
+        bar.style.width = '100%'; prog.style.display = 'none';
+        status.textContent = '✓ ' + robot.name + ' geladen';
+        setTimeout(() => { $('robotLibModal').style.display = 'none'; }, 600);
+        return;
+      }
+    }
+
     resetData(); state.mode = 'package';
 
     // JSON
