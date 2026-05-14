@@ -165,6 +165,33 @@
     </aside>
   </main>
 
+<!-- ── Rail-Parametrik Modal ─────────────────────────────────── -->
+<div id="railModal" class="rl-overlay" style="display:none">
+  <div class="rl-modal" style="width:min(380px,96vw)">
+    <div class="rl-modal-head">
+      <span>🛤️ Schiene definieren</span>
+      <button class="rl-close" id="railModalClose">✕</button>
+    </div>
+    <div class="rl-modal-body">
+      <div class="rl-grid">
+        <label class="rl-span2">Name<input id="rm-name" type="text" placeholder="Linear Track 3m"></label>
+        <label>Länge (mm)<input id="rm-length" type="number" value="2000" step="100"></label>
+        <label>Höhe (mm)<input id="rm-height" type="number" value="200" step="10"></label>
+        <label>Breite (mm)<input id="rm-width" type="number" value="400" step="10"></label>
+        <label class="rl-span2">Verfahrrichtung
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <button class="rm-axis-btn" data-ax="X+" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(37,99,235,.3);border:1px solid rgba(37,99,235,.6);color:#60a5fa">X+</button>
+            <button class="rm-axis-btn" data-ax="X-" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">X-</button>
+            <button class="rm-axis-btn" data-ax="Y+" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">Y+</button>
+            <button class="rm-axis-btn" data-ax="Y-" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">Y-</button>
+          </div>
+        </label>
+      </div>
+      <button id="rm-submit" class="rl-submit" style="margin-top:12px">Übernehmen</button>
+    </div>
+  </div>
+</div>
+
   <!-- ─── FOOTER / PARAMETER-TABELLE ──────────────────────────── -->
   <div style="background:var(--bg3);border-top:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;padding:2px 8px;flex-shrink:0">
     <span style="font-size:11px;font-weight:700;color:var(--txt3);letter-spacing:.5px;text-transform:uppercase">Parameter · Drehpunkte (Lokal CS)</span>
