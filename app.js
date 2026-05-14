@@ -1108,10 +1108,7 @@ function renderRows(){$('jointRows').innerHTML=state.joints.map((j,i)=>{
     <td><input data-j="${i}" data-f="max" value="${j.max??''}"></td>
     <td><select class="dirSel" data-j="${i}" data-f="rotationSign"><option value="1" ${(num(j.rotationSign)??1)>=0?'selected':''}>+</option><option value="-1" ${(num(j.rotationSign)??1)<0?'selected':''}>−</option></select></td>
     <td><label style="display:inline-block;width:26px;height:22px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden" title="Farbe ${ax}"><input type="color" data-axis-color="${ax}" value="${col}" style="opacity:0;width:1px;height:1px;position:absolute"></label></td>
-    <td style="max-width:80px">
-      <button data-axis-stl-label="${ax}" style="font-size:10px;padding:2px 5px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:#6a8fa8;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;width:100%" title="${stlName} — klicken zum Laden">${stlName}</button>
-      <input type="file" data-axis-stl-input="${ax}" accept=".stl,.stp,.step,.zip" style="display:none">
-    </td>
+
     <td><button class="simBtn" data-sim-axis="${i}">▶</button></td>
   </tr>`;}).join('');}
 
