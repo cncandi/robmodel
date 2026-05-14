@@ -791,6 +791,7 @@ function clearAll() {
   if(!confirm('Kompletten Viewport leeren?')) return;
   // Reset robot state
   resetData(); disableSave();
+  state.joints = []; // remove A1-A6 rows from table
   // Clear robot 3D groups
   clearGroup(robotGroup);
   clearGroup(toolGroup); toolGroup.add(tcpMarker);
