@@ -1595,10 +1595,48 @@ function rebuildRailMeshes() {
 }
 
 $('railAddBtn')?.addEventListener('click',()=>{
-  if(!state.schienen) state.schienen=[];
-  state.schienen.push({name:'Rail '+(state.schienen.length+1),length_mm:2000,height_mm:200,width_mm:400,axis:'X+'});
-  renderRailRows(); rebuildRailMeshes();
+  // Reset modal
+  $('rm-name').value='';
+  $('rm-length').value=2000;
+  $('rm-height').value=200;
+  $('rm-width').value=400;
+  _rmAxis='X+';
+  document.querySelectorAll('.rm-axis-btn').forEach(b=>{
+    const on=b.dataset.ax===_rmAxis;
+    b.style.background=on?'rgba(37,99,235,.3)':'rgba(255,255,255,.05)';
+    b.style.border=on?'1px solid rgba(37,99,235,.6)':'1px solid rgba(255,255,255,.15)';
+    b.style.color=on?'#60a5fa':'#6a8fa8';
+  });
+  $('railModal').style.display='flex';
 });
+
+let _rmAxis='X+';
+document.querySelectorAll('.rm-axis-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    _rmAxis=b.dataset.ax;
+    document.querySelectorAll('.rm-axis-btn').forEach(x=>{
+      const on=x.dataset.ax===_rmAxis;
+      x.style.background=on?'rgba(37,99,235,.3)':'rgba(255,255,255,.05)';
+      x.style.border=on?'1px solid rgba(37,99,235,.6)':'1px solid rgba(255,255,255,.15)';
+      x.style.color=on?'#60a5fa':'#6a8fa8';
+    });
+  });
+});
+
+$('rm-submit')?.addEventListener('click',()=>{
+  if(!state.schienen) state.schienen=[];
+  state.schienen.push({
+    name: $('rm-name').value||('Rail '+(state.schienen.length+1)),
+    length_mm: parseFloat($('rm-length').value)||2000,
+    height_mm: parseFloat($('rm-height').value)||200,
+    width_mm:  parseFloat($('rm-width').value)||400,
+    axis: _rmAxis
+  });
+  renderRailRows(); rebuildRailMeshes();
+  $('railModal').style.display='none';
+});
+
+$('railModalClose')?.addEventListener('click',()=>{ $('railModal').style.display='none'; });
 
 
 $('effAddBtn').addEventListener('click', () => {
