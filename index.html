@@ -180,7 +180,14 @@
             <option value="box">📦 Box</option>
           </select>
         </label>
-        <label>E-Achse Nr.<input id="pm-enum" type="number" value="2" min="1" max="99" step="1"></label>
+        <label>E-Achse Nr.
+          <select id="pm-enum" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%;margin-top:4px">
+            <option value="1">E1</option><option value="2" selected>E2</option><option value="3">E3</option>
+            <option value="4">E4</option><option value="5">E5</option><option value="6">E6</option>
+            <option value="7">E7</option><option value="8">E8</option><option value="9">E9</option>
+            <option value="10">E10</option>
+          </select>
+        </label>
         <div id="pm-box-fields" style="display:none;contents">
           <label>Länge (mm)<input id="pm-length" type="number" value="500" step="10"></label>
           <label>Breite (mm)<input id="pm-width"  type="number" value="500" step="10"></label>
