@@ -13,7 +13,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Deploy repository to FTP
+      - name: Deploy to FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER || secrets.FTP_HOST }}
@@ -23,7 +23,6 @@ jobs:
           protocol: ftp
           port: 21
           local-dir: ./
-          state-name: .ftp-deploy-sync-state-v2.json
           exclude: |
             **/.git*
             **/.git*/**
