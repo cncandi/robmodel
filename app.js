@@ -1544,43 +1544,26 @@ function renderUmfRows() {
 function renderRailRows() {
   const el = $('railRows'); if(!el) return;
   const badge = $('railBadge');
+  const btn = $('railAddBtn');
   const schienen = state.schienen || [];
   if(badge) badge.textContent = schienen.length||'0';
+  // Max 1 Rail: Button text ändern
+  if(btn) {
+    if(schienen.length) { btn.textContent='ändern'; btn.title='Schiene bearbeiten'; }
+    else { btn.textContent='+'; btn.title='Neue Schiene erstellen'; }
+  }
   if(!schienen.length){ el.innerHTML=''; return; }
-  const fs='background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:2px 5px;font-family:inherit;font-size:12px;color:#d8e8f0;width:100%;text-align:right;outline:none';
-  el.innerHTML = schienen.map((r,i)=>`
-    <div style="border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:8px;margin-bottom:6px">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-        <input data-ri="${i}" data-rf="name" type="text" value="${r.name||''}" placeholder="Name" style="${fs}">
-        <button data-rdel="${i}" style="min-width:28px;height:28px;cursor:pointer;background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:3px;font-size:12px">✕</button>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:6px">
-        <div><label style="font-size:10px;color:#6a8fa8;display:block;margin-bottom:2px">LÄNGE mm</label><input data-ri="${i}" data-rf="length_mm" type="number" step="100" value="${r.length_mm||2000}" style="${fs}"></div>
-        <div><label style="font-size:10px;color:#6a8fa8;display:block;margin-bottom:2px">HÖHE mm</label><input data-ri="${i}" data-rf="height_mm" type="number" step="10" value="${r.height_mm||200}" style="${fs}"></div>
-        <div><label style="font-size:10px;color:#6a8fa8;display:block;margin-bottom:2px">BREITE mm</label><input data-ri="${i}" data-rf="width_mm" type="number" step="10" value="${r.width_mm||400}" style="${fs}"></div>
-      </div>
-      <div style="display:flex;gap:4px">
-        ${['X+','X-','Y+','Y-'].map(ax=>`<button data-raxis="${i}" data-axval="${ax}" style="flex:1;padding:3px;font-family:monospace;font-size:11px;border-radius:3px;cursor:pointer;${r.axis===ax?'background:rgba(37,99,235,.3);border:1px solid rgba(37,99,235,.6);color:#60a5fa':'background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8'}">${ax}</button>`).join('')}
-      </div>
-    </div>`).join('');
-  el.querySelectorAll('[data-rdel]').forEach(btn=>{
-    btn.onclick=()=>{ state.schienen.splice(+btn.dataset.rdel,1); renderRailRows(); rebuildRailMeshes(); };
-  });
-  el.querySelectorAll('[data-ri][data-rf]').forEach(inp=>{
-    inp.addEventListener('input',()=>{
-      const i=+inp.dataset.ri,f=inp.dataset.rf;
-      if(!state.schienen[i])return;
-      state.schienen[i][f]=f==='name'?inp.value:(parseFloat(inp.value)||0);
-      rebuildRailMeshes();
-    });
-  });
-  el.querySelectorAll('[data-raxis]').forEach(btn=>{
-    btn.onclick=()=>{
-      const i=+btn.dataset.raxis;
-      if(!state.schienen[i])return;
-      state.schienen[i].axis=btn.dataset.axval;
-      renderRailRows(); rebuildRailMeshes();
-    };
+  const r=schienen[0];
+  el.innerHTML = `<div style="border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:8px">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+      <span style="flex:1;font-family:monospace;font-size:12px;color:var(--txt)">${r.name||'Rail'}</span>
+      <button id="railDelBtn" style="min-width:28px;height:28px;cursor:pointer;background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:3px;font-size:12px">✕</button>
+    </div>
+    <div style="font-size:11px;color:#6a8fa8;font-family:monospace">${r.length_mm} × ${r.width_mm} × ${r.height_mm} mm | ${r.axis}</div>
+  </div>`;
+  $('railDelBtn')?.addEventListener('click',()=>{
+    state.schienen=[];
+    renderRailRows(); rebuildRailMeshes();
   });
 }
 
@@ -1595,12 +1578,12 @@ function rebuildRailMeshes() {
 }
 
 $('railAddBtn')?.addEventListener('click',()=>{
-  // Reset modal
-  $('rm-name').value='';
-  $('rm-length').value=2000;
-  $('rm-height').value=200;
-  $('rm-width').value=400;
-  _rmAxis='X+';
+  const existing = (state.schienen||[])[0];
+  $('rm-name').value   = existing?.name       || '';
+  $('rm-length').value = existing?.length_mm  || 2000;
+  $('rm-height').value = existing?.height_mm  || 200;
+  $('rm-width').value  = existing?.width_mm   || 400;
+  _rmAxis = existing?.axis || 'X+';
   document.querySelectorAll('.rm-axis-btn').forEach(b=>{
     const on=b.dataset.ax===_rmAxis;
     b.style.background=on?'rgba(37,99,235,.3)':'rgba(255,255,255,.05)';
@@ -1625,13 +1608,14 @@ document.querySelectorAll('.rm-axis-btn').forEach(b=>{
 
 $('rm-submit')?.addEventListener('click',()=>{
   if(!state.schienen) state.schienen=[];
-  state.schienen.push({
-    name: $('rm-name').value||('Rail '+(state.schienen.length+1)),
+  const entry = {
+    name: $('rm-name').value||('Rail 1'),
     length_mm: parseFloat($('rm-length').value)||2000,
     height_mm: parseFloat($('rm-height').value)||200,
     width_mm:  parseFloat($('rm-width').value)||400,
     axis: _rmAxis
-  });
+  };
+  state.schienen[0] = entry; // max 1
   renderRailRows(); rebuildRailMeshes();
   $('railModal').style.display='none';
 });
