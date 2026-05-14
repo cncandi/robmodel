@@ -1123,7 +1123,7 @@ function renderRows(){
   if (_paramTab === 'e') {
     const positioners = state.positioners||[];
     if(!rail && !positioners.length){
-      $('jointRows').innerHTML=`<tr><td colspan="12" style="color:#4a6a8a;font-family:monospace;font-size:11px;padding:8px">Keine externen Achsen — Schiene oder Positionierer anlegen.</td></tr>`;
+      $('jointRows').innerHTML=`<tr><td colspan="12" style="color:#4a6a8a;font-family:monospace;font-size:11px;padding:8px">Keine externen Achsen definiert.</td></tr>`;
       return;
     }
     // Rail row (optional)
