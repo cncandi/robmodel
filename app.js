@@ -1700,8 +1700,11 @@ $('rm-submit')?.addEventListener('click',()=>{
     eMax:  parseFloat($('rm-max')?.value)  || 2000,
     ePos:  parseFloat($('rm-start')?.value)|| 0
   };
+  // Stop any running sim before replacing state
+  const old = state.schienen[0];
+  if(old?._simInterval){ clearInterval(old._simInterval); delete old._simInterval; }
   state.schienen[0] = entry; // max 1
-  renderRailRows(); rebuildRailMeshes();
+  renderRailRows(); rebuildRailMeshes(); renderRows();
   $('railModal').style.display='none';
 });
 
