@@ -1618,7 +1618,7 @@ function renderLibList(items) {
   const filtered = filterLibItems(items);
   const container = $('rl-lib-list');
   if (!container) return;
-  const TYPE_ICON = {robot:'🦾',endeffektor:'🔧',umfeld:'🏭',positioner:'🔄',object:'📦',station:'🏗️'};
+  const TYPE_ICON = {robot:'🦾',endeffektor:'🔧',umfeld:'🏭',positioner:'🔄',object:'📦',station:'🏗️',rail:'🛤️'};
   if (!filtered.length) {
     container.innerHTML = '<div style="padding:16px;font-family:monospace;font-size:11px;color:#4a6a8a">Keine Einträge.</div>';
     return;
@@ -1656,6 +1656,10 @@ function openRoblibModal() {
     set('rl-nutzlast',   r.nutzlast_kg);
     set('rl-gewicht',    r.gewicht_kg);
     set('rl-wdh',        r.wiederholgenauigkeit_mm);
+    set('rl-rail-length', r.length_mm || 2000);
+    set('rl-rail-height', r.height_mm || 200);
+    set('rl-rail-width',  r.width_mm  || 400);
+    if (r.axis && $('rl-rail-axis')) $('rl-rail-axis').value = r.axis;
     // Aktualisieren-Button anzeigen
     const btnU = $('rl-mode-update');
     if (btnU) btnU.style.display = '';
@@ -1687,14 +1691,16 @@ function openRoblibModal() {
 // Type change handler — show/hide robot-specific fields
 function rlTypeChanged() {
   const type = $('rl-type')?.value || 'robot';
-  const fields = $('rl-robot-fields');
-  if (fields) {
-    const labels = fields.querySelectorAll('label');
+  const robotFields = $('rl-robot-fields');
+  if (robotFields) {
+    const labels = robotFields.querySelectorAll('label');
     labels.forEach(l => l.style.display = type === 'robot' ? '' : 'none');
   }
+  const railFields = $('rl-rail-fields');
+  if (railFields) railFields.style.display = type === 'rail' ? 'contents' : 'none';
   const nameField = $('rl-name');
   if (nameField) {
-    const placeholders = {robot:'KR 8 R1420', endeffektor:'Greifer 2-Finger', umfeld:'Sicherheitszaun'};
+    const placeholders = {robot:'KR 8 R1420', endeffektor:'Greifer 2-Finger', umfeld:'Sicherheitszaun', rail:'Linear Track 3m'};
     nameField.placeholder = placeholders[type] || '';
   }
 }
@@ -1723,6 +1729,38 @@ async function updateRoblib() {
   if (!fields.id) { show('Keine ID vorhanden.', false); return; }
   btn.disabled = true; btn.textContent = 'Aktualisiere…';
   try {
+    // ── Rail ─────────────────────────────────────────────────────
+    if (type === 'rail') {
+      const railData = {
+        name: fields.name, type: 'rail',
+        length_mm: parseFloat($('rl-rail-length')?.value)||2000,
+        height_mm: parseFloat($('rl-rail-height')?.value)||200,
+        width_mm:  parseFloat($('rl-rail-width')?.value)||400,
+        axis: $('rl-rail-axis')?.value||'X+'
+      };
+      setProgress('Erstelle ZIP…', 5);
+      const zip2 = new JSZip();
+      const base2 = zipName(fields.name || 'rail');
+      zip2.file(base2+'.json', JSON.stringify(railData, null, 2));
+      const zipBlob2 = await zip2.generateAsync({type:'blob'}, m => setProgress('Komprimiere…', 5+m.percent*0.4));
+      setProgress('Lade hoch…', 45);
+      const fd2 = new FormData();
+      for (const [k,v] of Object.entries(fields)) fd2.append(k,v);
+      fd2.append('zip', zipBlob2, base2+'.zip');
+      const thumb2 = $('rl-thumb').files[0];
+      if (thumb2) fd2.append('thumb', thumb2, thumb2.name);
+      const res2 = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', ROBLIB_API + '?action=update');
+        xhr.upload.onprogress = e => { if(e.lengthComputable) setProgress('Lade hoch…', 45+(e.loaded/e.total)*50); };
+        xhr.onload = () => { try { resolve(JSON.parse(xhr.responseText)); } catch(e) { reject(new Error('Ungültige Serverantwort')); } };
+        xhr.onerror = () => reject(new Error('Verbindungsfehler'));
+        xhr.send(fd2);
+      });
+      if (res2.ok) { setProgress('Fertig!', 100); setTimeout(() => { show('✓ '+fields.name+' aktualisiert', true); btn.disabled=false; btn.textContent='Aktualisieren'; }, 600); }
+      else { show(res2.error||'Fehler.', false); btn.disabled=false; btn.textContent='Aktualisieren'; }
+      return;
+    }
     setProgress('Erstelle ZIP…', 5);
     const prevMode = toolMountMode;
     if (prevMode !== 'world') { detachToolFromA6(); scene.updateMatrixWorld(true); }
@@ -1800,6 +1838,38 @@ async function uploadToRoblib() {
 
   btn.disabled = true; btn.textContent = 'Lade…';
   try {
+    // ── Rail: nur JSON, kein STL ──────────────────────────────────
+    if (type === 'rail') {
+      const railData = {
+        name: fields.name, type: 'rail',
+        length_mm: parseFloat($('rl-rail-length')?.value)||2000,
+        height_mm: parseFloat($('rl-rail-height')?.value)||200,
+        width_mm:  parseFloat($('rl-rail-width')?.value)||400,
+        axis: $('rl-rail-axis')?.value||'X+'
+      };
+      setProgress('Erstelle ZIP…', 5);
+      const zip2 = new JSZip();
+      const base2 = zipName(fields.name || 'rail');
+      zip2.file(base2+'.json', JSON.stringify(railData, null, 2));
+      const zipBlob2 = await zip2.generateAsync({type:'blob'}, m => setProgress('Komprimiere…', 5+m.percent*0.4));
+      setProgress('Lade hoch…', 45);
+      const fd2 = new FormData();
+      for (const [k,v] of Object.entries(fields)) fd2.append(k,v);
+      fd2.append('zip', zipBlob2, base2+'.zip');
+      const thumb2 = $('rl-thumb').files[0];
+      if (thumb2) fd2.append('thumb', thumb2, thumb2.name);
+      const res2 = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', ROBLIB_API + '?action=upload');
+        xhr.upload.onprogress = e => { if(e.lengthComputable) setProgress('Lade hoch…', 45+(e.loaded/e.total)*50); };
+        xhr.onload = () => { try { resolve(JSON.parse(xhr.responseText)); } catch(e) { reject(new Error('Ungültige Serverantwort')); } };
+        xhr.onerror = () => reject(new Error('Verbindungsfehler'));
+        xhr.send(fd2);
+      });
+      if (res2.ok) { setProgress('Fertig!', 100); setTimeout(() => show('✓ Hochgeladen: '+res2.robot.name, true), 600); }
+      else show('Fehler: '+(res2.error||'Unbekannt'), false);
+      return;
+    }
     // 1. ZIP erstellen
     setProgress('Erstelle ZIP…', 5);
     const prevMode = toolMountMode;
@@ -2547,4 +2617,5 @@ $('ros-load').onclick = async function() {
     btn.disabled = false; btn.textContent = 'Laden & in RobModel öffnen';
   }
 };
+
 
