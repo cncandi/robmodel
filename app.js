@@ -1043,9 +1043,11 @@ function buildJson() {
   if (allUmf.length) result.umfeld = allUmf.map((u,i) => {
     const o = u.offset||{}; return { name: norm(u.stlFile?.name||u.name||('Umfeld '+(i+1))), stl: 'umfeld_'+(i+1)+'.stl', px:o.x||0, py:o.y||0, pz:o.z||0, rx:o.rx||0, ry:o.ry||0, rz:o.rz||0 };
   });
-  if ((state.schienen||[]).length) result.schienen = state.schienen.map(r=>({
-    name: r.name||'Rail', length_mm: r.length_mm||2000, height_mm: r.height_mm||200, width_mm: r.width_mm||400, axis: r.axis||'X+'
-  }));
+  if ((state.schienen||[]).length) result.schienen = state.schienen.map(r=>{
+    const eAx = 'E'+(r.eNumber||1);
+    const parts = (state.axisStlParts[eAx]||[]).map(p=>({name:norm(p.name),color:p.color||'#2563eb'}));
+    return { name:r.name||'Rail', length_mm:r.length_mm||2000, height_mm:r.height_mm||200, width_mm:r.width_mm||400, axis:r.axis||'X+', eNumber:r.eNumber||1, eMin:r.eMin??0, eMax:r.eMax??r.length_mm??2000, stlFiles: parts.length ? {[eAx]: parts} : undefined };
+  });
   return result;
 }
 
@@ -1099,24 +1101,61 @@ function simulateAxis(axisIndex){
 function renderAll(){renderAxisStlRows();renderRows();updateAxisPointVisuals();renderTcp();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';}
 
 
-function renderRows(){$('jointRows').innerHTML=state.joints.map((j,i)=>{
-  const ax=j.name||'A'+(i+1);
-  const parts=state.axisStlParts[ax]||[];
-  const col=(parts[0]?.color)||colors[ax]||'#999999';
-  return `<tr data-param-row="${i}" class="${i===state.selectedAxis?'sel':''}">
-    <td><b>${esc(j.name)}</b></td>
-    <td><input class="angleInput" data-joint-angle="${i}" type="number" step="0.1" value="${state.jointAngles?.[i]??0}"></td>
-    <td><span class="axisDir">${axisDirectionLabel(i)}</span></td>
-    <td><input data-j="${i}" data-f="x" value="${j.offset?.x??''}"></td>
-    <td><input data-j="${i}" data-f="y" value="${j.offset?.y??''}"></td>
-    <td><input data-j="${i}" data-f="z" value="${j.offset?.z??''}"></td>
-    <td><input data-j="${i}" data-f="min" value="${j.min??''}"></td>
-    <td><input data-j="${i}" data-f="max" value="${j.max??''}"></td>
-    <td><select class="dirSel" data-j="${i}" data-f="rotationSign"><option value="1" ${(num(j.rotationSign)??1)>=0?'selected':''}>+</option><option value="-1" ${(num(j.rotationSign)??1)<0?'selected':''}>−</option></select></td>
-    <td><label style="display:inline-block;width:26px;height:22px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden" title="Farbe ${ax}"><input type="color" data-axis-color="${ax}" value="${col}" style="opacity:0;width:1px;height:1px;position:absolute"></label></td>
-    <td><button class="axis-stl-btn" data-ax="${ax}" style="font-size:10px;padding:3px 7px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:${parts.length?'#d8e8f0':'#6a8fa8'};width:100%">${parts.length?parts.length+' Part'+(parts.length>1?'s':''):'+ STL'}</button></td>
-    <td><button class="simBtn" data-sim-axis="${i}">▶</button></td>
-  </tr>`;}).join('');}
+function renderRows(){
+  const rail = (state.schienen||[])[0];
+  const eAx  = rail ? 'E'+(rail.eNumber||1) : null;
+  const ePos = rail?.ePos || 0;
+  const robotRows = state.joints.map((j,i)=>{
+    const ax=j.name||'A'+(i+1);
+    const parts=state.axisStlParts[ax]||[];
+    const col=(parts[0]?.color)||colors[ax]||'#999999';
+    return `<tr data-param-row="${i}" class="${i===state.selectedAxis?'sel':''}">
+      <td><b>${esc(j.name)}</b></td>
+      <td><input class="angleInput" data-joint-angle="${i}" type="number" step="0.1" value="${state.jointAngles?.[i]??0}"></td>
+      <td><span class="axisDir">${axisDirectionLabel(i)}</span></td>
+      <td><input data-j="${i}" data-f="x" value="${j.offset?.x??''}"></td>
+      <td><input data-j="${i}" data-f="y" value="${j.offset?.y??''}"></td>
+      <td><input data-j="${i}" data-f="z" value="${j.offset?.z??''}"></td>
+      <td><input data-j="${i}" data-f="min" value="${j.min??''}"></td>
+      <td><input data-j="${i}" data-f="max" value="${j.max??''}"></td>
+      <td><select class="dirSel" data-j="${i}" data-f="rotationSign"><option value="1" ${(num(j.rotationSign)??1)>=0?'selected':''}>+</option><option value="-1" ${(num(j.rotationSign)??1)<0?'selected':''}>−</option></select></td>
+      <td><label style="display:inline-block;width:26px;height:22px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden" title="Farbe ${ax}"><input type="color" data-axis-color="${ax}" value="${col}" style="opacity:0;width:1px;height:1px;position:absolute"></label></td>
+      <td><button class="axis-stl-btn" data-ax="${ax}" style="font-size:10px;padding:3px 7px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:${parts.length?'#d8e8f0':'#6a8fa8'};width:100%">${parts.length?parts.length+' Part'+(parts.length>1?'s':''):'+ STL'}</button></td>
+      <td><button class="simBtn" data-sim-axis="${i}">▶</button></td>
+    </tr>`;}).join('');
+
+  let eRow = '';
+  if (eAx) {
+    const parts = state.axisStlParts[eAx]||[];
+    const col = (parts[0]?.color)||'#2563eb';
+    eRow = `<tr style="border-top:1px solid rgba(255,255,255,.15)">
+      <td><b>${eAx}</b></td>
+      <td><input data-e-pos type="number" step="1" value="${ePos}" min="0" max="${rail.length_mm||2000}" style="width:70px"></td>
+      <td><span class="axisDir">${rail.axis||'X+'}</span></td>
+      <td colspan="3" style="color:#4a6a8a;font-size:10px;text-align:center">—</td>
+      <td><input data-e-min type="number" step="1" value="${rail.eMin??0}"></td>
+      <td><input data-e-max type="number" step="1" value="${rail.eMax??rail.length_mm??2000}"></td>
+      <td style="color:#4a6a8a">—</td>
+      <td><label style="display:inline-block;width:26px;height:22px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden"><input type="color" data-axis-color="${eAx}" value="${col}" style="opacity:0;width:1px;height:1px;position:absolute"></label></td>
+      <td><button class="axis-stl-btn" data-ax="${eAx}" style="font-size:10px;padding:3px 7px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:${parts.length?'#d8e8f0':'#6a8fa8'};width:100%">${parts.length?parts.length+' Part'+(parts.length>1?'s':''):'+ STL'}</button></td>
+      <td>—</td>
+    </tr>`;
+  }
+
+  $('jointRows').innerHTML = robotRows + eRow;
+
+  // E-axis input bindings
+  const eposInp = $('jointRows').querySelector('[data-e-pos]');
+  if(eposInp) eposInp.addEventListener('input',()=>{
+    if(!state.schienen[0])return;
+    state.schienen[0].ePos = parseFloat(eposInp.value)||0;
+    rebuildRailMeshes();
+  });
+  const eminInp = $('jointRows').querySelector('[data-e-min]');
+  if(eminInp) eminInp.addEventListener('input',()=>{ if(state.schienen[0]) state.schienen[0].eMin=parseFloat(eminInp.value)||0; });
+  const emaxInp = $('jointRows').querySelector('[data-e-max]');
+  if(emaxInp) emaxInp.addEventListener('input',()=>{ if(state.schienen[0]) state.schienen[0].eMax=parseFloat(emaxInp.value)||0; });
+}
 
 function renderTcp(){qsa('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===state.activeTcp));const tcp=state.tcp[state.activeTcp];qsa('[data-tcp]').forEach(i=>i.value=tcp?.[i.dataset.tcp]??'');const x=num(tcp?.x),y=num(tcp?.y),z=num(tcp?.z);tcpMarker.visible=x!==null||y!==null||z!==null;tcpMarker.position.set(x||0,y||0,z||0);}
 
@@ -1142,7 +1181,10 @@ let _axisStlTarget = null;
 function renderAxisStlRows() {
   const el = $('axisStlRows');
   if (!el) return;
-  el.innerHTML = ['A1','A2','A3','A4','A5','A6'].map(ax => {
+  const rail = (state.schienen||[])[0];
+  const axes = ['A1','A2','A3','A4','A5','A6'];
+  if (rail) axes.push('E'+(rail.eNumber||1));
+  el.innerHTML = axes.map(ax => {
     const parts=state.axisStlParts[ax]||[];
     const hasFile=parts.length>0;
     const lbl=hasFile?`${parts.length} Part${parts.length>1?'s':''}`:'—';
@@ -1570,11 +1612,24 @@ function renderRailRows() {
 function rebuildRailMeshes() {
   if(!railGroup) return;
   clearGroup(railGroup);
-  (state.schienen||[]).forEach(r=>{
-    const L=r.length_mm||2000,H=r.height_mm||200,W=r.width_mm||400,ax=r.axis||'X+';
+  const r = (state.schienen||[])[0];
+  if(!r) return;
+  const L=r.length_mm||2000, H=r.height_mm||200, W=r.width_mm||400, ax=r.axis||'X+';
+  const eAx = 'E'+(r.eNumber||1);
+  const parts = state.axisStlParts[eAx]||[];
+
+  if (parts.length) {
+    // E-Achse STL verwenden
+    parts.forEach(p=>{
+      if(!p.buf) return;
+      const geo = loader.parse(p.buf.buffer||p.buf); geo.computeVertexNormals();
+      railGroup.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({color:p.color||0x2563eb,shininess:60})));
+    });
+  } else {
+    // Parametrische Box als Fallback
     const geo=(ax==='X+'||ax==='X-')?new THREE.BoxGeometry(L,H,W):new THREE.BoxGeometry(W,H,L);
-    railGroup.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:0x2563eb,transparent:true,opacity:0.3,side:THREE.DoubleSide})));
-  });
+    railGroup.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({color:0x2563eb,transparent:true,opacity:0.3,side:THREE.DoubleSide})));
+  }
 }
 
 $('railAddBtn')?.addEventListener('click',()=>{
@@ -1583,6 +1638,7 @@ $('railAddBtn')?.addEventListener('click',()=>{
   $('rm-length').value = existing?.length_mm  || 2000;
   $('rm-height').value = existing?.height_mm  || 200;
   $('rm-width').value  = existing?.width_mm   || 400;
+  if($('rm-enum')) $('rm-enum').value = existing?.eNumber || 1;
   _rmAxis = existing?.axis || 'X+';
   document.querySelectorAll('.rm-axis-btn').forEach(b=>{
     const on=b.dataset.ax===_rmAxis;
@@ -1613,7 +1669,8 @@ $('rm-submit')?.addEventListener('click',()=>{
     length_mm: parseFloat($('rm-length').value)||2000,
     height_mm: parseFloat($('rm-height').value)||200,
     width_mm:  parseFloat($('rm-width').value)||400,
-    axis: _rmAxis
+    axis: _rmAxis,
+    eNumber: parseInt($('rm-enum')?.value)||1
   };
   state.schienen[0] = entry; // max 1
   renderRailRows(); rebuildRailMeshes();
