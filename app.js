@@ -4156,3 +4156,167 @@ $('ros-load').onclick = async function() {
 
 
 
+
+// ── OnShape Import ─────────────────────────────────────────────
+const OS_PROXY = './onshape.php';
+const AXIS_OPTIONS = ['Ignorieren','Base','A1','A2','A3','A4','A5','A6','Tool'];
+
+function osGuessAxis(name) {
+  const s = name.toLowerCase().replace(/[^a-z0-9]/g,' ');
+  if (/\bbase\b/.test(s))              return 'Base';
+  if (/\btool\b|\btcp\b/.test(s))      return 'Tool';
+  const j = s.match(/(?:joint|link|a|axis)[_ ]?([1-6])/);
+  if (j) return 'A' + j[1];
+  return 'Ignorieren';
+}
+
+function osStatus(msg, col) {
+  const el = $('os-status');
+  if (el) { el.textContent = msg; el.style.color = col || '#6a8fa8'; }
+}
+
+function osOpen() {
+  // Restore saved keys
+  const ak = localStorage.getItem('os-ak') || '';
+  const sk = localStorage.getItem('os-sk') || '';
+  if ($('os-ak')) $('os-ak').value = ak;
+  if ($('os-sk')) $('os-sk').value = sk;
+  if ($('os-save-keys')) $('os-save-keys').checked = !!(ak || sk);
+  if ($('os-parts-wrap')) $('os-parts-wrap').style.display = 'none';
+  osStatus('');
+  $('onshapeModal').style.display = 'flex';
+}
+
+function osClose() { $('onshapeModal').style.display = 'none'; }
+
+async function osFetchParts() {
+  const url = $('os-url')?.value.trim();
+  const ak  = $('os-ak')?.value.trim()  || '';
+  const sk  = $('os-sk')?.value.trim()  || '';
+  if (!url) { osStatus('Bitte URL eingeben.', '#f87171'); return; }
+
+  // Save keys if requested
+  if ($('os-save-keys')?.checked) {
+    localStorage.setItem('os-ak', ak);
+    localStorage.setItem('os-sk', sk);
+  }
+
+  osStatus('Lade Teileliste…', '#6a8fa8');
+  $('os-fetch-btn').disabled = true;
+  try {
+    const params = new URLSearchParams({ action: 'parts', url, ak, sk });
+    const res = await fetch(OS_PROXY + '?' + params);
+    const data = await res.json();
+    if (data.error) {
+      const hint = data.error.includes('401') || data.error.toLowerCase().includes('api')
+        ? ' → API-Keys erforderlich (OnShape → Account → Developer Settings)'
+        : '';
+      osStatus('Fehler: ' + data.error + hint, '#f87171');
+      $('os-keys-details').open = true;
+      return;
+    }
+    if (!Array.isArray(data) || !data.length) {
+      osStatus('Keine Solid-Teile gefunden.', '#f87171'); return;
+    }
+    osStatus(data.length + ' Teil(e) gefunden.', '#4ade80');
+    osRenderParts(data);
+  } catch (e) {
+    osStatus('Netzwerkfehler: ' + e.message, '#f87171');
+  } finally {
+    $('os-fetch-btn').disabled = false;
+  }
+}
+
+function osRenderParts(parts) {
+  const tbody = $('os-parts-tbody');
+  tbody.innerHTML = parts.map((p, i) => {
+    const guess = osGuessAxis(p.name);
+    const opts = AXIS_OPTIONS.map(o =>
+      `<option value="${o}" ${o === guess ? 'selected' : ''}>${o}</option>`
+    ).join('');
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.06)">
+      <td style="padding:5px 6px;color:#d8e8f0">${p.name}</td>
+      <td style="padding:5px 6px">
+        <select data-os-pi="${i}" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:3px;padding:3px 6px;color:#d8e8f0;font-family:monospace;font-size:11px;outline:none">${opts}</select>
+      </td>
+    </tr>`;
+  }).join('');
+  // Store parts data on table element for import step
+  $('os-parts-table')._osParts = parts;
+  $('os-parts-wrap').style.display = 'block';
+}
+
+async function osImport() {
+  const parts = $('os-parts-table')._osParts;
+  if (!parts) return;
+  const ak  = $('os-ak')?.value.trim()  || '';
+  const sk  = $('os-sk')?.value.trim()  || '';
+  const url = $('os-url')?.value.trim();
+
+  // Read axis assignments
+  const assignments = [];
+  $('os-parts-tbody').querySelectorAll('[data-os-pi]').forEach(sel => {
+    const i   = +sel.dataset.osPi;
+    const ax  = sel.value;
+    if (ax !== 'Ignorieren') assignments.push({ part: parts[i], ax });
+  });
+  if (!assignments.length) { osStatus('Keine Teile zugewiesen.', '#f87171'); return; }
+
+  $('os-import-btn').style.display = 'none';
+  $('os-import-progress').style.display = 'block';
+  $('os-import-progress').textContent = '0 / ' + assignments.length;
+
+  let loaded = 0;
+  for (const { part, ax } of assignments) {
+    $('os-import-progress').textContent = `${loaded}/${assignments.length} — ${part.name}`;
+    try {
+      const p = new URLSearchParams({
+        action: 'stl', url, ak, sk,
+        partId: part.partId,
+        pdid:   part.documentId,
+        pwm:    part.wvmType,
+        pwmid:  part.wvmId,
+        peid:   part.elementId,
+        units:  'millimeter',
+      });
+      const res = await fetch(OS_PROXY + '?' + p);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const buf = await res.arrayBuffer();
+      const u8  = new Uint8Array(buf);
+
+      // Sanity check: binary STL starts with 80-byte header then uint32 triangle count
+      if (u8.byteLength < 84) throw new Error('STL zu klein');
+
+      const fname = ax.toLowerCase() + '.stl';
+      state.buffers.set(fname, u8);
+      if (!state.files.find(f => f.name === fname))
+        state.files.push({ path: fname, name: fname, size: u8.byteLength, type: 'STL' });
+      state.axisStlMap[ax] = fname;
+      if (!state.axisStlParts[ax]) state.axisStlParts[ax] = [];
+      state.axisStlParts[ax] = [{ name: fname, buf: u8, color: colors[ax] || '#888888' }];
+
+      loaded++;
+    } catch (e) {
+      osStatus(`Fehler bei ${part.name}: ${e.message}`, '#f87171');
+    }
+  }
+
+  // If no robot loaded yet, set default KR6 joints
+  if (!state.joints.length) setJointAnglesToReferencePose();
+
+  splitFiles();
+  await loadStls();
+  enableSave(); renderAll(); setView('iso');
+
+  $('os-import-progress').textContent = `✓ ${loaded}/${assignments.length} geladen`;
+  osStatus(`${loaded} Teil(e) importiert.`, '#4ade80');
+  $('os-import-btn').style.display = 'block';
+  $('os-import-progress').style.display = 'none';
+  setTimeout(() => osClose(), 1200);
+}
+
+// Event-Bindungen
+$('onshapeBtn')?.addEventListener('click', osOpen);
+$('onshapeClose')?.addEventListener('click', osClose);
+$('os-fetch-btn')?.addEventListener('click', osFetchParts);
+$('os-import-btn')?.addEventListener('click', osImport);
