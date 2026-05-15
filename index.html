@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<!-- v39 -->
 <html lang="de">
 <head>
   <meta charset="UTF-8"/>
@@ -31,6 +30,7 @@
       <input id="checkZip" type="file" accept=".zip,application/zip" style="display:none">
       <button id="themeBtn" title="Theme wechseln">◑</button>
       <button id="roblibBtn" title="In ROBLIB speichern">save roblib</button>
+      <button id="onshapeBtn" title="OnShape-Modell importieren" style="background:rgba(0,180,120,.15);border:1px solid rgba(0,180,120,.4);color:#00c87a;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">🔷 OnShape</button>
       <button id="downloadJson" style="display:none" disabled>⬇ JSON</button>
       <button id="downloadZip" style="display:none" disabled>💾 Save ZIP</button>
       <button id="newBtn" title="Beispiel-Kinematik laden" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.3);color:#ff8030;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">Example</button>
@@ -51,6 +51,7 @@
           <button id="gimbalToggle" title="Komponente anklicken und verschieben/rotieren" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">🎯 Gimbal</button>
           <button id="gimbalModeBtn" title="Wechsel Verschieben/Rotieren" style="display:none;background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">T</button>
           <button id="measureBtn" title="Messung: P1 → P2 anklicken" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">📏 Messen</button>
+          <button id="camModeBtn" title="Perspektive / Orthografisch wechseln" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">⬜ Ortho</button>
         </div>
       </div>
       <div class="viewHelp">LMB: Rotation &nbsp;|&nbsp; MMB: Pan &nbsp;|&nbsp; RMB: Rotation &nbsp;|&nbsp; Scroll: Zoom</div>
@@ -773,6 +774,68 @@
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button onclick="cancelAxisPartsModal()" style="padding:7px 20px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.2);border-radius:4px;color:#6a8fa8;cursor:pointer;font-family:monospace;font-size:13px">Abbrechen</button>
       <button onclick="saveAxisPartsModal()" style="padding:7px 24px;background:rgba(34,197,94,.2);border:1px solid rgba(34,197,94,.5);border-radius:4px;color:#4ade80;cursor:pointer;font-family:monospace;font-size:13px;font-weight:bold">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── OnShape Import Modal ──────────────────────────────────── -->
+<div id="onshapeModal" class="rl-overlay" style="display:none">
+  <div class="rl-dialog" style="width:min(600px,96vw);max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <span style="font-family:monospace;font-size:14px;color:#00c87a">🔷 OnShape Import</span>
+      <button class="rl-close" id="onshapeClose">✕</button>
+    </div>
+
+    <div style="font-size:11px;color:#6a8fa8;margin-bottom:10px">
+      OnShape URL (Part Studio oder Assembly):
+    </div>
+    <input id="os-url" type="text" placeholder="https://cad.onshape.com/documents/…" style="width:100%;box-sizing:border-box;background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:7px 10px;color:#d8e8f0;font-family:monospace;font-size:12px;outline:none;margin-bottom:10px">
+
+    <!-- API-Keys (einklappbar) -->
+    <details id="os-keys-details" style="margin-bottom:12px">
+      <summary style="font-size:11px;color:#6a8fa8;cursor:pointer;user-select:none">🔑 API-Keys (OnShape → Account → Developer Settings → API Keys)</summary>
+      <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <label style="font-size:11px;color:#6a8fa8">Access Key
+          <input id="os-ak" type="text" placeholder="Access Key" style="width:100%;box-sizing:border-box;margin-top:3px;background:#0f2030;border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:5px 8px;color:#d8e8f0;font-family:monospace;font-size:11px;outline:none">
+        </label>
+        <label style="font-size:11px;color:#6a8fa8">Secret Key
+          <input id="os-sk" type="password" placeholder="Secret Key" style="width:100%;box-sizing:border-box;margin-top:3px;background:#0f2030;border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:5px 8px;color:#d8e8f0;font-family:monospace;font-size:11px;outline:none">
+        </label>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6a8fa8;margin-top:6px">
+        <input type="checkbox" id="os-save-keys" style="accent-color:var(--acc)"> Keys im Browser speichern
+      </label>
+    </details>
+
+    <button id="os-fetch-btn" style="width:100%;padding:8px;background:rgba(0,180,120,.2);border:1px solid rgba(0,180,120,.4);color:#00c87a;border-radius:4px;cursor:pointer;font-family:monospace;font-size:12px;margin-bottom:12px">
+      Teile laden
+    </button>
+
+    <div id="os-status" style="font-size:11px;color:#6a8fa8;margin-bottom:8px;min-height:16px"></div>
+
+    <!-- Teileliste -->
+    <div id="os-parts-wrap" style="display:none">
+      <div style="font-size:11px;color:#6a8fa8;margin-bottom:6px">Teile → Achsen zuweisen:</div>
+      <div style="font-size:10px;color:#4a6a8a;margin-bottom:8px">
+        Tipp: RobModel erkennt Namen wie „Base", „Joint1"–„Joint6", „A1"–„A6", „Tool" automatisch.
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:monospace" id="os-parts-table">
+        <thead>
+          <tr style="color:#6a8fa8;border-bottom:1px solid rgba(255,255,255,.1)">
+            <th style="text-align:left;padding:4px 6px">Name</th>
+            <th style="text-align:left;padding:4px 6px">Achse</th>
+          </tr>
+        </thead>
+        <tbody id="os-parts-tbody"></tbody>
+      </table>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button id="os-import-btn" style="flex:1;padding:9px;background:rgba(0,180,120,.25);border:1px solid rgba(0,180,120,.5);color:#00c87a;border-radius:4px;cursor:pointer;font-family:monospace;font-size:13px">
+          ↓ Importieren
+        </button>
+        <button id="os-import-progress" style="flex:1;padding:9px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#6a8fa8;border-radius:4px;font-family:monospace;font-size:11px;display:none">
+          …
+        </button>
+      </div>
     </div>
   </div>
 </div>
