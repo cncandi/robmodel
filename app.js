@@ -410,6 +410,8 @@ function rebuildRobotKinematics() {
     } else { robotGroup.add(mesh); }
   }
   applyJointRotations();
+  // Re-attach a6-mounted labels to new A6 pivot
+  (state.objekte||[]).forEach((_,i)=>{ if(state.objekte[i]?.mountMode==='a6') rebuildObjektMesh(i); });
 }
 
 function applyJointRotations() {
@@ -1254,54 +1256,66 @@ function renderRows(){
   if (_paramTab === 'l') {
     const objekte = state.objekte||[];
     if(!objekte.length){$('jointRows').innerHTML=`<tr><td colspan="12" style="color:#4a6a8a;font-family:monospace;font-size:11px;padding:8px">Keine Objekte — über 📦 Bewegliche Objekte anlegen.</td></tr>`;return;}
-    $('jointRows').innerHTML = objekte.map((o,i)=>{
-      const lbl='Label'+(o.labelNum||i+1);
-      const parts=(state.axisStlParts[lbl]||[]);
-      const col=(parts[0]?.color)||o.color||'#4499cc';
-      return `<tr>
-        <td><b>${lbl}</b></td>
-        <td><input data-ol-pos data-oi="${i}" type="number" step="1" value="${o.ePos||0}" min="${o.eMin||0}" max="${o.eMax||1000}" style="width:70px"></td>
-        <td><span class="axisDir">${o.axis||'Y+'}</span></td>
-        <td colspan="3" style="color:#4a6a8a;font-size:10px;text-align:center">—</td>
-        <td><input data-ol-min data-oi="${i}" type="number" step="1" value="${o.eMin||0}" style="width:60px"></td>
-        <td><input data-ol-max data-oi="${i}" type="number" step="1" value="${o.eMax||1000}" style="width:60px"></td>
+    const groups=new Map();
+    objekte.forEach((o,i)=>{const k=o.labelNum||i+1;if(!groups.has(k))groups.set(k,[]);groups.get(k).push({o,i});});
+    let html='';
+    groups.forEach((members,key)=>{
+      const first=members[0].o;
+      const mountIcon=members.some(m=>m.o.mountMode==='a6')?'🦾':'🌍';
+      const axisStr=[...new Set(members.map(m=>m.o.axis||'Y+'))].join('/');
+      const nameStr=members.map(m=>m.o.name||'').filter(Boolean).join(', ');
+      const parts=state.axisStlParts['Label'+key]||[];
+      const col=(parts[0]?.color)||first.color||'#4499cc';
+      html+=`<tr>
+        <td><b>Label${key}</b> <span style="font-size:9px;color:#6a8fa8">${mountIcon}</span></td>
+        <td><input data-gl-pos data-gl-key="${key}" type="number" step="1" value="${first.ePos||0}" min="${first.eMin||0}" max="${first.eMax||1000}" style="width:70px"></td>
+        <td><span class="axisDir">${axisStr}</span></td>
+        <td colspan="3" style="color:#6a8fa8;font-size:10px">${nameStr}</td>
+        <td><input data-gl-min data-gl-key="${key}" type="number" step="1" value="${first.eMin||0}" style="width:60px"></td>
+        <td><input data-gl-max data-gl-key="${key}" type="number" step="1" value="${first.eMax||1000}" style="width:60px"></td>
         <td style="color:#4a6a8a">—</td>
-        <td><label style="display:inline-block;width:26px;height:22px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden"><input type="color" data-ol-color data-oi="${i}" value="${col}" style="opacity:0;width:1px;height:1px;position:absolute"></label></td>
-        <td><button data-ol-stl data-oi="${i}" style="font-size:10px;padding:3px 7px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:${parts.length?'#d8e8f0':'#6a8fa8'};width:100%">${parts.length?parts.length+' Part'+(parts.length>1?'s':''):'+ STL'}</button></td>
-        <td><button data-ol-sim data-oi="${i}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;padding:2px 7px;cursor:pointer;color:#9ab">▶</button></td>
+        <td><label style="display:inline-block;width:26px;height:22px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden"><input type="color" data-gl-color data-gl-key="${key}" value="${col}" style="opacity:0;width:1px;height:1px;position:absolute"></label></td>
+        <td><button data-gl-stl data-gl-key="${key}" style="font-size:10px;padding:3px 7px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:${parts.length?'#d8e8f0':'#6a8fa8'};width:100%">${parts.length?parts.length+' Part'+(parts.length>1?'s':''):'+ STL'}</button></td>
+        <td><button data-gl-sim data-gl-key="${key}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;padding:2px 7px;cursor:pointer;color:#9ab">▶</button></td>
       </tr>`;
-    }).join('');
-    $('jointRows').querySelectorAll('[data-ol-pos]').forEach(inp=>inp.addEventListener('input',e=>{
-      const i=+inp.dataset.oi; if(!state.objekte[i])return;
-      state.objekte[i].ePos=parseFloat(inp.value)||0; rebuildObjektMesh(i);
+    });
+    $('jointRows').innerHTML=html;
+    $('jointRows').querySelectorAll('[data-gl-pos]').forEach(inp=>inp.addEventListener('input',()=>{
+      const key=+inp.dataset.glKey,val=parseFloat(inp.value)||0;
+      objekte.forEach((o,i)=>{if((o.labelNum||i+1)===key){o.ePos=val;rebuildObjektMesh(i);}});
     }));
-    $('jointRows').querySelectorAll('[data-ol-min]').forEach(inp=>inp.addEventListener('input',e=>{
-      const i=+inp.dataset.oi; if(state.objekte[i]) state.objekte[i].eMin=parseFloat(inp.value)||0;
+    $('jointRows').querySelectorAll('[data-gl-min]').forEach(inp=>inp.addEventListener('input',()=>{
+      const key=+inp.dataset.glKey,val=parseFloat(inp.value)||0;
+      objekte.forEach((o,i)=>{if((o.labelNum||i+1)===key)o.eMin=val;});
     }));
-    $('jointRows').querySelectorAll('[data-ol-max]').forEach(inp=>inp.addEventListener('input',e=>{
-      const i=+inp.dataset.oi; if(state.objekte[i]) state.objekte[i].eMax=parseFloat(inp.value)||1000;
+    $('jointRows').querySelectorAll('[data-gl-max]').forEach(inp=>inp.addEventListener('input',()=>{
+      const key=+inp.dataset.glKey,val=parseFloat(inp.value)||1000;
+      objekte.forEach((o,i)=>{if((o.labelNum||i+1)===key)o.eMax=val;});
     }));
-    $('jointRows').querySelectorAll('[data-ol-color]').forEach(inp=>inp.addEventListener('change',e=>{
-      const i=+inp.dataset.oi; if(!state.objekte[i])return;
-      state.objekte[i].color=inp.value; rebuildObjektMesh(i); renderRows();
+    $('jointRows').querySelectorAll('[data-gl-color]').forEach(inp=>inp.addEventListener('change',()=>{
+      const key=+inp.dataset.glKey;
+      objekte.forEach((o,i)=>{if((o.labelNum||i+1)===key){o.color=inp.value;rebuildObjektMesh(i);}});
+      renderRows();
     }));
-    $('jointRows').querySelectorAll('[data-ol-stl]').forEach(btn=>btn.addEventListener('click',e=>{
-      const i=+btn.dataset.oi; const lbl='Label'+(state.objekte[i]?.labelNum||i+1);
-      openAxisPartsModal(lbl);
+    $('jointRows').querySelectorAll('[data-gl-stl]').forEach(btn=>btn.addEventListener('click',()=>{
+      openAxisPartsModal('Label'+btn.dataset.glKey);
     }));
-    $('jointRows').querySelectorAll('[data-ol-sim]').forEach(btn=>btn.addEventListener('click',e=>{
-      const i=+btn.dataset.oi; const o=state.objekte[i]; if(!o)return;
-      if(o._simInterval){clearInterval(o._simInterval);delete o._simInterval;return;}
-      const min=o.eMin||0, max=o.eMax||1000;
-      let pos=o.ePos||0, dir=1;
-      o._simInterval=setInterval(()=>{
+    $('jointRows').querySelectorAll('[data-gl-sim]').forEach(btn=>btn.addEventListener('click',()=>{
+      const key=+btn.dataset.glKey;
+      const members=objekte.map((o,i)=>({o,i})).filter(({o,i})=>(o.labelNum||i+1)===key);
+      const first=members[0]?.o; if(!first)return;
+      const simKey='_simGroup_'+key;
+      if(first[simKey]){clearInterval(first[simKey]);members.forEach(({o})=>delete o[simKey]);return;}
+      const min=first.eMin||0,max=first.eMax||1000;
+      let pos=first.ePos||0,dir=1;
+      const iv=setInterval(()=>{
         pos+=dir*(max-min)/60;
-        if(pos>=max){pos=max;dir=-1;} else if(pos<=min){pos=min;dir=1;}
-        o.ePos=pos;
-        const inp=$('jointRows').querySelector(`[data-ol-pos][data-oi="${i}"]`);
-        if(inp) inp.value=Math.round(pos);
-        rebuildObjektMesh(i);
+        if(pos>=max){pos=max;dir=-1;}else if(pos<=min){pos=min;dir=1;}
+        members.forEach(({o,i})=>{o.ePos=pos;rebuildObjektMesh(i);});
+        const inp=$('jointRows').querySelector(`[data-gl-pos][data-gl-key="${key}"]`);
+        if(inp)inp.value=Math.round(pos);
       },16);
+      members.forEach(({o})=>o[simKey]=iv);
     }));
     return;
   }
@@ -1359,8 +1373,11 @@ function renderObjRows() {
 
 function rebuildObjektMesh(i) {
   const o=state.objekte[i]; if(!o) return;
-  if(!objekteGroups[i]){ objekteGroups[i]=new THREE.Group(); scene.add(objekteGroups[i]); }
+  if(!objekteGroups[i]) objekteGroups[i]=new THREE.Group();
   const grp=objekteGroups[i];
+  // Correct parent: a6 → axisPivotGroups[5], else scene
+  const targetParent=(o.mountMode==='a6'&&axisPivotGroups[5])?axisPivotGroups[5]:scene;
+  if(grp.parent!==targetParent){ if(grp.parent) grp.parent.remove(grp); targetParent.add(grp); }
   while(grp.children.length) grp.remove(grp.children[0]);
   const lbl='Label'+(o.labelNum||i+1);
   const parts=state.axisStlParts[lbl]||[];
@@ -1384,6 +1401,7 @@ function openObjModal(editIdx) {
   $('om-name').value   = o?.name    || '';
   $('om-type').value   = o?.type    || 'box';
   $('om-num').value    = o?.labelNum||(state.objekte||[]).length+1;
+  if($('om-mount')) $('om-mount').value = o?.mountMode||'world';
   $('om-length').value = o?.length  || 500;
   $('om-width').value  = o?.width   || 500;
   $('om-height').value = o?.height  || 500;
@@ -1434,6 +1452,7 @@ $('om-submit')?.addEventListener('click',()=>{
     name:      $('om-name').value||('Objekt '+(state.objekte.length+1)),
     type:      $('om-type').value||'box',
     labelNum:  parseInt($('om-num').value)||1,
+    mountMode: $('om-mount')?.value||'world',
     length:    parseFloat($('om-length').value)||500,
     width:     parseFloat($('om-width').value)||500,
     height:    parseFloat($('om-height').value)||500,
@@ -2871,6 +2890,7 @@ function buildLabelJson(idx) {
   const lbl='Label'+(o.labelNum||idx+1);
   const parts=(state.axisStlParts[lbl]||[]).map(p=>({name:p.name||lbl+'.stl',color:p.color||o.color||'#4499cc'}));
   return { type:'label', name:o.name||'Label', objectType:o.type||'box', labelNum:o.labelNum||idx+1,
+    mountMode:o.mountMode||'world',
     length:o.length||500, width:o.width||500, height:o.height||500, radius:o.radius||200,
     axis:o.axis||'Y+', eMin:o.eMin||0, eMax:o.eMax||1000, ePos:o.ePos||0,
     showBox:o.showBox!==false, color:o.color||'#4499cc', boxOffset:o.boxOffset||{},
@@ -3398,7 +3418,8 @@ function applyLabelConfig(cfg, stlBufs) {
     name: cfg.name||'Label', type: cfg.objectType||'box', labelNum: cfg.labelNum||1,
     length: cfg.length||500, width: cfg.width||500, height: cfg.height||500, radius: cfg.radius||200,
     axis: cfg.axis||'Y+', eMin: cfg.eMin||0, eMax: cfg.eMax||1000, ePos: 0,
-    showBox: cfg.showBox!==false, color: cfg.color||'#4499cc', boxOffset: cfg.boxOffset||{}
+    showBox: cfg.showBox!==false, color: cfg.color||'#4499cc', boxOffset: cfg.boxOffset||{},
+    mountMode: cfg.mountMode||'world'
   };
   if (cfg.stlFiles?.[lbl]) {
     const parts = Array.isArray(cfg.stlFiles[lbl]) ? cfg.stlFiles[lbl] : [cfg.stlFiles[lbl]];
@@ -4083,5 +4104,6 @@ $('ros-load').onclick = async function() {
     btn.disabled = false; btn.textContent = 'Laden & in RobModel öffnen';
   }
 };
+
 
 
