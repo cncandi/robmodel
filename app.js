@@ -765,6 +765,7 @@ async function extractFromZip(file) {
 function partKey(n) {
   const s = norm(n);
   const a = s.match(/a([1-6])$/); if (a) return 'A' + a[1];
+  const j = s.match(/joint[_ \-]*([1-6])/i); if (j) return 'A' + j[1];
   if (/tool|tcp|meltio/.test(s)) return 'Tool';
   if (/podest|base/.test(s)) return 'Base';
   return 'A1';
@@ -880,7 +881,8 @@ async function loadSourceZip(file) {
   resetData(); state.mode='source';
   const z = await readZip(file); state.files=z.files; state.buffers=z.buffers;
   splitFiles();
-  state.robotTr=defaultRobotTr(); setInputs('r', state.robotTr);
+  const hasOsd=(state.stls||[]).some(f=>f.name&&/\.osd$/i.test(f.name));
+  state.robotTr=hasOsd?{x:0,y:0,z:0,rx:0,ry:0,rz:0}:defaultRobotTr(); setInputs('r', state.robotTr);
   state.toolTr=defaultToolTr();  setInputs('t', state.toolTr);
   if (state.xmls[0]) parseXml(new TextDecoder('utf-8').decode(state.buffers.get(state.xmls[0].path)));
   setJointAnglesToReferencePose();
@@ -1043,21 +1045,33 @@ function parseAxisPositions(xml) {
   let found=false;
   state.axisPoints=['A1','A2','A3','A4','A5','A6'].map(name=>({name,x:0,y:0,z:0,rx:0,ry:0,rz:0,source:'leer'}));
   const params=[...xml.querySelectorAll('ParameterName')];
+  const ad={};
   for(const p of params) {
     const name=p.getAttribute('DefaultValue')||''; const m=name.match(/^AxisA([1-6])Pos$/i); if(!m)continue;
     const xmlAxis=Number(m[1]); if(xmlAxis<2||xmlAxis>6)continue;
-    const idx=xmlAxis-2; let tx=0,ty=0,tz=0; let matrix=p.nextElementSibling;
+    let tx=0,ty=0,tz=0; let matrix=p.nextElementSibling;
     while(matrix&&matrix.tagName!=='Matrix')matrix=matrix.nextElementSibling;
     if(matrix)[...matrix.querySelectorAll('SCType')].forEach(sc=>{const type=sc.getAttribute('Type')||'';const v=num(sc.getAttribute('DefaultValue'))||0;if(type==='TTranslateX')tx+=v;if(type==='TTranslateY')ty+=v;if(type==='TTranslateZ')tz+=v;});
-    const point={name:'A'+(idx+1),x:0,y:0,z:0,rx:0,ry:0,rz:0,source:'XML '+name};
-    if(xmlAxis===2){point.x=tx;point.y=ty;point.z=tz;}
-    else if(xmlAxis===3){point.x=Math.abs(ty);}
-    else if(xmlAxis===4){point.z=Math.abs(ty);}
-    else if(xmlAxis===5){point.x=Math.abs(tz);}
-    else if(xmlAxis===6){point.x=Math.abs(tx);}
-    state.axisPoints[idx]=point; found=true;
+    ad[xmlAxis]={tx,ty,tz}; found=true;
   }
-  state.axisPoints[5]={name:'A6',x:0,y:0,z:0,rx:0,ry:0,rz:0,source:found?'Ende / 0':'leer'};
+  if(!found){syncJointsFromAxisPoints();return false;}
+  // A2: shoulder position directly from matrix translations
+  const a2=ad[2]||{}, a3=ad[3]||{}, a4=ad[4]||{}, a5=ad[5]||{}, a6=ad[6]||{};
+  const px2=a2.tx||0, py2=a2.ty||0, pz2=a2.tz||0;
+  // A3: extend from A2 along reach (ty=arm length)
+  const px3=px2+Math.abs(a3.ty||0), py3=py2+(a3.tx||0), pz3=pz2+(a3.tz||0);
+  // A4: small offset from A3
+  const px4=px3+Math.abs(a4.tx||0), py4=py3+Math.abs(a4.ty||0)*(a4.ty<0?-1:0), pz4=pz3-(Math.abs(a4.ty||0));
+  // A5: forearm extends from A4 (tz=arm length)
+  const px5=px4+Math.abs(a5.tz||0)+Math.abs(a5.ty||0), py5=py4, pz5=pz4+(a5.tx||0);
+  // A6: wrist
+  const px6=px5+Math.abs(a6.tx||0)+Math.abs(a6.ty||0), py6=py5, pz6=pz5;
+  state.axisPoints[0]={name:'A1',x:0,y:0,z:0,rx:0,ry:0,rz:0,source:'XML'};
+  state.axisPoints[1]={name:'A2',x:px2,y:py2,z:pz2,rx:0,ry:0,rz:0,source:'XML AxisA2Pos'};
+  state.axisPoints[2]={name:'A3',x:px3,y:py3,z:pz3,rx:0,ry:0,rz:0,source:'XML AxisA3Pos'};
+  state.axisPoints[3]={name:'A4',x:px4,y:py4,z:pz4,rx:0,ry:0,rz:0,source:'XML AxisA4Pos'};
+  state.axisPoints[4]={name:'A5',x:px5,y:py5,z:pz5,rx:0,ry:0,rz:0,source:'XML AxisA5Pos'};
+  state.axisPoints[5]={name:'A6',x:0,y:0,z:0,rx:0,ry:0,rz:0,source:'Ende / 0'};
   syncJointsFromAxisPoints(); return found;
 }
 
