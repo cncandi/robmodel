@@ -945,7 +945,7 @@ async function loadDemoKr8() {
   const BASE  = '../stl/';
   const FILES = ['podest.stl','a1.stl','a2.stl','a3.stl','a4.stl','a5.stl','a6.stl','tool1_tcp.stl'];
   resetData(); state.mode='source'; state.robotName='KR8';
-  const btn = $('demoBtn');
+  const btn = $('newBtn');
   if (btn) { btn.disabled=true; btn.textContent='Lade…'; }
   try {
     // Achsgrenzen aus KR8-JSON laden
@@ -3569,6 +3569,7 @@ $('rl-lib-refresh').addEventListener('click', () => { _libRobots = []; loadRobot
 $('rl-lib-search').addEventListener('input', e => renderRobotLibList(e.target.value));
 
 // demoBtn removed
+$('newBtn')?.addEventListener('click', () => loadDemoKr8().catch(err => alert(err.message)));
 // Endeffektor TCP-Offset Inputs
 ['eff-ox','eff-oy','eff-oz','eff-orx','eff-ory','eff-orz'].forEach(id => {
   const el = $(id); if (!el) return;
