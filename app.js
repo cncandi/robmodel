@@ -73,7 +73,7 @@ const state = {
 };
 
 // ── Three.js Variablen ────────────────────────────────────────────
-let scene, camera, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot, railGroup;
+let scene, camera, perspCamera, orthoCamera, isOrtho=false, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot, railGroup;
 let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup;
 var objekteGroups = [];
 var positionerGroups = [];
@@ -116,9 +116,13 @@ function init3d() {
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x050b14);
-  camera = new THREE.PerspectiveCamera(45, 1, 1, 100000);
-  camera.position.set(1600, -2200, 1300);
-  camera.up.set(0, 0, 1);
+  perspCamera = new THREE.PerspectiveCamera(45, 1, 1, 100000);
+  perspCamera.position.set(1600, -2200, 1300);
+  perspCamera.up.set(0, 0, 1);
+  orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 100000);
+  orthoCamera.position.set(1600, -2200, 1300);
+  orthoCamera.up.set(0, 0, 1);
+  camera = perspCamera;
   controls = new OrbitControls(camera, canvas);
   controls.enablePan = true;
   controls.screenSpacePanning = true;
@@ -248,8 +252,57 @@ function resize() {
   const w = r.width || window.innerWidth;
   const h = r.height || window.innerHeight;
   renderer.setSize(w, h, false);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
+  if (isOrtho) {
+    _orthoUpdateFrustum(w / h);
+  } else {
+    perspCamera.aspect = w / h;
+    perspCamera.updateProjectionMatrix();
+  }
+}
+function _orthoUpdateFrustum(aspect) {
+  const dist = orthoCamera.position.distanceTo(controls.target);
+  const fovRad = THREE.MathUtils.degToRad(perspCamera.fov / 2);
+  const h2 = Math.tan(fovRad) * dist * orthoCamera.zoom;
+  orthoCamera.left   = -h2 * aspect;
+  orthoCamera.right  =  h2 * aspect;
+  orthoCamera.top    =  h2;
+  orthoCamera.bottom = -h2;
+  orthoCamera.updateProjectionMatrix();
+}
+function toggleCameraMode() {
+  const w = renderer.domElement.width;
+  const h = renderer.domElement.height;
+  const aspect = w / h;
+  if (isOrtho) {
+    // → Perspektive
+    perspCamera.position.copy(orthoCamera.position);
+    perspCamera.quaternion.copy(orthoCamera.quaternion);
+    perspCamera.up.copy(orthoCamera.up);
+    camera = perspCamera;
+    controls.object = camera;
+    transformControls.camera = camera;
+    perspCamera.aspect = aspect;
+    perspCamera.updateProjectionMatrix();
+  } else {
+    // → Orthografisch: Frustum so setzen dass Sichtgröße identisch bleibt
+    orthoCamera.position.copy(perspCamera.position);
+    orthoCamera.quaternion.copy(perspCamera.quaternion);
+    orthoCamera.up.copy(perspCamera.up);
+    orthoCamera.zoom = 1;
+    camera = orthoCamera;
+    controls.object = camera;
+    transformControls.camera = camera;
+    _orthoUpdateFrustum(aspect);
+  }
+  isOrtho = !isOrtho;
+  controls.update();
+  const btn = $('camModeBtn');
+  if (btn) {
+    btn.textContent = isOrtho ? '🔲 Perspektive' : '⬜ Ortho';
+    btn.style.background = isOrtho ? 'rgba(37,99,235,.2)' : 'rgba(255,255,255,.05)';
+    btn.style.borderColor = isOrtho ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.15)';
+    btn.style.color = isOrtho ? '#60a5fa' : '#6a8fa8';
+  }
 }
 
 function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
@@ -3638,6 +3691,7 @@ $('applyStlRotBtn').onclick = () => {
   loadStls().then(() => { renderRows(); });
 };
 $('toggleGrid').onclick   = () => grid.visible = !grid.visible;
+$('camModeBtn')?.addEventListener('click', toggleCameraMode);
 initAxisStlEvents();
 // Theme laden + Button
 try { const saved = localStorage.getItem('robmodel_theme'); if(saved !== null) applyTheme(parseInt(saved)); } catch(e){}
