@@ -694,14 +694,68 @@ function stepToGeometry(arrayBuffer) {
     return geo;
   });
 }
+
+// ── OSD → Binary STL ─────────────────────────────────────────────
+function osdToBinaryStl(arrayBuffer) {
+  const data = new Uint8Array(arrayBuffer);
+  const view = new DataView(arrayBuffer);
+  if (!data.length) return new ArrayBuffer(84);
+  const hdr = new TextDecoder('utf-8',{fatal:false}).decode(data.slice(0,100));
+  const isV2 = hdr.includes('+SprutCAM: OpenGL stream file (version 2.00)');
+  const headerSize = isV2 ? 105 : 165;
+  const CMD = [4,0,12,12,12,isV2?1:0,64,128,48,72,104];
+  const LINE = new Set([1,2,3]);
+  const prims = [];
+  let cur = null, snx=0,sny=0,snz=0;
+  for (let i=headerSize; i<data.length; ) {
+    const code=data[i], ls=i+1, cs=CMD[code]??0;
+    i += 1 + cs;
+    switch(code) {
+      case 0: { const t=view.getInt32(ls,true); if(t<10){cur={t,vx:[],vy:[],vz:[],nx:[],ny:[],nz:[]};prims.push(cur);} break; }
+      case 1: {
+        if(cur){ for(let j=0;j<cur.vx.length;j++){const x=cur.vx[j],y=cur.vy[j],z=cur.vz[j];cur.vx[j]=-z;cur.vy[j]=x;cur.vz[j]=y;} for(let j=0;j<cur.nx.length;j++){const x=cur.nx[j],y=cur.ny[j],z=cur.nz[j];cur.nx[j]=-z;cur.ny[j]=x;cur.nz[j]=y;} }
+        cur=null; break;
+      }
+      case 2: { snx=view.getFloat32(ls,true);sny=view.getFloat32(ls+4,true);snz=view.getFloat32(ls+8,true); if(cur){cur.nx.push(snx);cur.ny.push(sny);cur.nz.push(snz);} break; }
+      case 3: { if(cur){cur.vx.push(view.getFloat32(ls,true));cur.vy.push(view.getFloat32(ls+4,true));cur.vz.push(view.getFloat32(ls+8,true));if(cur.nx.length<cur.vx.length){cur.nx.push(snx);cur.ny.push(sny);cur.nz.push(snz);}} break; }
+    }
+  }
+  const tris=[];
+  const cn=(ax,ay,az,bx,by,bz,cx,cy,cz)=>{const ux=bx-ax,uy=by-ay,uz=bz-az,vx=cx-ax,vy=cy-ay,vz=cz-az;const nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const l=Math.sqrt(nx*nx+ny*ny+nz*nz);return l>1e-10?[nx/l,ny/l,nz/l]:[0,0,1];};
+  for(const p of prims){
+    if(LINE.has(p.t)) continue;
+    const n=p.vx.length; if(n<3) continue;
+    let idx;
+    if(p.t===5){idx=[];for(let i=0;i<n-2;i++){if(i%2===0){idx.push(i,i+1,i+2);}else{idx.push(i+1,i,i+2);}}}
+    else if(p.t===6){idx=[];for(let i=1;i<n-1;i++)idx.push(0,i,i+1);}
+    else{idx=Array.from({length:n},(_,i)=>i);}
+    for(let i=0;i+2<idx.length;i+=3){
+      const ia=idx[i],ib=idx[i+1],ic=idx[i+2];
+      const ax=p.vx[ia],ay=p.vy[ia],az=p.vz[ia];
+      const bx=p.vx[ib],by=p.vy[ib],bz=p.vz[ib];
+      const cx=p.vx[ic],cy=p.vy[ic],cz=p.vz[ic];
+      let fn=p.nx.length===n?[p.nx[ia],p.ny[ia],p.nz[ia]]:null;
+      if(fn){const l=Math.sqrt(fn[0]*fn[0]+fn[1]*fn[1]+fn[2]*fn[2]);if(l>1e-10){fn=[fn[0]/l,fn[1]/l,fn[2]/l];}else fn=cn(ax,ay,az,bx,by,bz,cx,cy,cz);}else fn=cn(ax,ay,az,bx,by,bz,cx,cy,cz);
+      tris.push(fn[0],fn[1],fn[2],ax,ay,az,bx,by,bz,cx,cy,cz);
+      tris.push(-fn[0],-fn[1],-fn[2],ax,ay,az,cx,cy,cz,bx,by,bz);
+    }
+  }
+  const tc=tris.length/12, out=new ArrayBuffer(84+tc*50), dv=new DataView(out);
+  dv.setUint32(80,tc,true);
+  let off=84;
+  for(let i=0;i<tris.length;i+=12){for(let j=0;j<12;j++){dv.setFloat32(off,tris[i+j],true);off+=4;}dv.setUint16(off,0,true);off+=2;}
+  return out;
+}
+
 async function parseGeometry(arrayBuffer, fileName) {
   const ext = (fileName || '').split('.').pop().toLowerCase();
   if (ext === 'stp' || ext === 'step') return stepToGeometry(arrayBuffer);
+  if (ext === 'osd') return loader.parse(osdToBinaryStl(arrayBuffer));
   return loader.parse(arrayBuffer);
 }
 async function extractFromZip(file) {
   const zip = await JSZip.loadAsync(file);
-  const entries = Object.values(zip.files).filter(f => !f.dir && /\.(stp|step|stl)$/i.test(f.name));
+  const entries = Object.values(zip.files).filter(f => !f.dir && /\.(stp|step|stl|osd)$/i.test(f.name));
   if (!entries.length) throw new Error('Keine STL/STEP-Datei im ZIP gefunden');
   const first = entries[0];
   return { buf: await first.async('arraybuffer'), name: first.name.split('/').pop() };
@@ -749,7 +803,7 @@ async function loadStls() {
 }
 
 // ── ZIP / JSON ─────────────────────────────────────────────────────
-const typeOf = n => /\.stl$/i.test(n)?'STL':/\.xml$/i.test(n)?'XML':/\.json$/i.test(n)?'JSON':'Datei';
+const typeOf = n => /\.(stl|osd)$/i.test(n)?'STL':/\.xml$/i.test(n)?'XML':/\.json$/i.test(n)?'JSON':'Datei';
 function splitFiles() { state.stls=state.files.filter(f=>f.type==='STL'); state.xmls=state.files.filter(f=>f.type==='XML'); state.jsons=state.files.filter(f=>f.type==='JSON'); }
 
 async function readZip(file) {
@@ -1721,8 +1775,10 @@ function _wireModalStl(prefix, getBufVar, setBufVar) {
   clear?.addEventListener('click',()=>{ setBufVar(null); if(disp){disp.textContent='';} });
   input?.addEventListener('change',async e=>{
     const f=e.target.files[0]; if(!f) return;
-    setBufVar(new Uint8Array(await f.arrayBuffer()));
-    if(disp){disp.textContent=f.name; disp.style.color='#4499cc';}
+    let _mbuf = await f.arrayBuffer();
+    if(/\.osd$/i.test(f.name)) _mbuf = osdToBinaryStl(_mbuf);
+    setBufVar(new Uint8Array(_mbuf));
+    if(disp){disp.textContent=f.name.replace(/\.osd$/i,'.stl'); disp.style.color='#4499cc';}
     e.target.value='';
   });
 }
@@ -2130,8 +2186,8 @@ async function _loadPartFile(file, ax) {
   let geom;
   try { geom = await parseGeometry(rawBuf, fname); geom.computeVertexNormals(); } catch(er){alert('Fehler: '+er.message);return;}
   const u8 = new Uint8Array(rawBuf);
-  const stlBuf = /\.(stp|step)$/i.test(fname) ? new Uint8Array(stlFromGeometry(geom)) : u8;
-  const displayName = fname.replace(/\.(stp|step)$/i, '.stl');
+  const stlBuf = /\.(stp|step)$/i.test(fname) ? new Uint8Array(stlFromGeometry(geom)) : /\.osd$/i.test(fname) ? new Uint8Array(osdToBinaryStl(rawBuf)) : u8;
+  const displayName = fname.replace(/\.(stp|step|osd)$/i, '.stl');
   if (!state.axisStlParts[ax]) state.axisStlParts[ax] = [];
   if (!state.axisStlParts[ax].find(p => norm(p.name)===norm(displayName)))
     state.axisStlParts[ax].push({name:displayName, color:'#e8a020', buf:stlBuf});
@@ -2190,8 +2246,8 @@ function initAxisStlEvents() {
     try { geom = await parseGeometry(rawBuf, fname); geom.computeVertexNormals(); }
     catch(er) { alert('Fehler beim Laden: ' + er.message); e.target.value=''; return; }
     const u8 = new Uint8Array(rawBuf);
-    const stlBuf = /\.(stp|step)$/i.test(fname) ? new Uint8Array(stlFromGeometry(geom)) : u8;
-    const displayName = fname.replace(/\.(stp|step)$/i, '.stl');
+    const stlBuf = /\.(stp|step)$/i.test(fname) ? new Uint8Array(stlFromGeometry(geom)) : /\.osd$/i.test(fname) ? new Uint8Array(osdToBinaryStl(rawBuf)) : u8;
+    const displayName = fname.replace(/\.(stp|step|osd)$/i, '.stl');
     const ax = _axisPartsTarget||_axisStlTarget;
     if (!state.axisStlParts[ax]) state.axisStlParts[ax]=[];
     if (!state.axisStlParts[ax].find(p=>norm(p.name)===norm(displayName)))
