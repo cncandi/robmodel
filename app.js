@@ -1050,6 +1050,26 @@ function zeroAllTransforms() {
 }
 
 // ── XML-Parser ─────────────────────────────────────────────────────
+function parseMachineStateParameters(xml) {
+  const msp = xml.querySelector('MachineStateParameters');
+  if (!msp) return;
+  for (let i = 1; i <= 6; i++) {
+    const node = msp.querySelector('AxisA' + i + 'Pos');
+    if (!node) continue;
+    const minEl = node.querySelector('Min');
+    const maxEl = node.querySelector('Max');
+    const initEl = node.querySelector('InitialValue');
+    const mn = minEl ? parseFloat(minEl.getAttribute('DefaultValue')) : null;
+    const mx = maxEl ? parseFloat(maxEl.getAttribute('DefaultValue')) : null;
+    const iv = initEl ? parseFloat(initEl.getAttribute('DefaultValue')) : null;
+    const j = state.joints[i - 1];
+    if (!j) continue;
+    if (mn !== null && !isNaN(mn)) j.min = mn;
+    if (mx !== null && !isNaN(mx)) j.max = mx;
+    if (iv !== null && !isNaN(iv)) state.jointAngles[i - 1] = iv;
+  }
+}
+
 function parseXml(text) {
   const xml = new DOMParser().parseFromString(text,'application/xml');
   state.robotName = state.xmls[0]?.name?.replace(/\.xml$/i,'') || 'Robot';
@@ -1058,6 +1078,7 @@ function parseXml(text) {
     const mins=[-180,-90,-180,-179,-125,-179], maxs=[180,150,75,179,120,179];
     state.joints.forEach((j,i)=>{j.min=mins[i];j.max=maxs[i];if(!gotAxis){j.offset=defOffset(i);state.axisPoints[i]={...state.axisPoints[i],...defOffset(i),source:'KR8 Zielwert'}}j.status=gotAxis?'XML AxisPos':'vorgeschlagen'});
   }
+  parseMachineStateParameters(xml);
   parseTools(xml); syncJointsFromAxisPoints(); normalizeKnownOffsets(); updateAxisPointVisuals();
 }
 
