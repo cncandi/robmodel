@@ -636,6 +636,7 @@ function makeAxisLabel(text, pos) {
   ctx.fillStyle = '#ffffff'; ctx.font = 'bold 42px Arial'; ctx.fillText(text, 42, 54);
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false }));
   sp.scale.set(180, 90, 1); sp.renderOrder = 999; sp.position.copy(pos);
+  sp.userData.isAxisLabel = true;
   return sp;
 }
 
@@ -3926,6 +3927,18 @@ $('applyStlRotBtn').onclick = () => {
 };
 $('toggleGrid').onclick   = () => grid.visible = !grid.visible;
 $('camModeBtn')?.addEventListener('click', toggleCameraMode);
+
+let _axisLabelsVisible = true;
+$('axisLabelBtn')?.addEventListener('click', () => {
+  _axisLabelsVisible = !_axisLabelsVisible;
+  axisPointGroup.traverse(o => { if (o.userData.isAxisLabel) o.visible = _axisLabelsVisible; });
+  const btn = $('axisLabelBtn');
+  if (btn) {
+    btn.style.background = _axisLabelsVisible ? 'rgba(37,99,235,.2)' : 'rgba(255,255,255,.05)';
+    btn.style.borderColor = _axisLabelsVisible ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.15)';
+    btn.style.color = _axisLabelsVisible ? '#60a5fa' : '#6a8fa8';
+  }
+});
 initAxisStlEvents();
 // Theme laden + Button
 try { const saved = localStorage.getItem('robmodel_theme'); if(saved !== null) applyTheme(parseInt(saved)); } catch(e){}
