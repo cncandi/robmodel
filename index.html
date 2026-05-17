@@ -224,6 +224,67 @@
 </div>
 
 <!-- ── Endeffektor Modal ──────────────────────────────────────── -->
+<!-- ── Teil / Backe Modal ──────────────────────────────────────── -->
+<div id="teilModal" class="rl-overlay" style="display:none">
+  <div class="rl-modal" style="width:min(400px,96vw)">
+    <div class="rl-modal-head">
+      <span>🔩 Backe / Teil definieren</span>
+      <button class="rl-close" id="teilModalClose">✕</button>
+    </div>
+    <div class="rl-modal-body">
+      <div class="rl-grid">
+        <label class="rl-span2">Name<input id="te-name" type="text" placeholder="Backe 1"></label>
+        <label>Typ
+          <select id="te-type" onchange="teTypeChanged()" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%;margin-top:4px">
+            <option value="box">📦 Box</option>
+            <option value="cylinder">🔵 Zylinder</option>
+            <option value="stl">📁 STL-Datei</option>
+          </select>
+        </label>
+        <label>Farbe<input id="te-color" type="color" value="#607080" style="width:100%;height:36px;margin-top:4px;cursor:pointer;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:#0f2030"></label>
+        <div id="te-box-fields" style="display:contents">
+          <label>Länge (mm)<input id="te-length" type="number" value="100" step="1"></label>
+          <label>Breite (mm)<input id="te-width"  type="number" value="50"  step="1"></label>
+        </div>
+        <div id="te-cyl-fields" style="display:none;contents">
+          <label>Radius (mm)<input id="te-radius" type="number" value="25" step="1"></label>
+        </div>
+        <label>Höhe (mm)<input id="te-height" type="number" value="50" step="1"></label>
+        <label>Min (mm)<input id="te-min" type="number" value="0" step="1"></label>
+        <label>Max (mm)<input id="te-max" type="number" value="50" step="1"></label>
+        <label class="rl-span2">Verfahrrichtung
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <button class="te-axis-btn" data-ax="X+" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">X+</button>
+            <button class="te-axis-btn" data-ax="X-" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">X-</button>
+            <button class="te-axis-btn" data-ax="Y+" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(37,99,235,.3);border:1px solid rgba(37,99,235,.6);color:#60a5fa">Y+</button>
+            <button class="te-axis-btn" data-ax="Y-" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">Y-</button>
+            <button class="te-axis-btn" data-ax="Z+" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">Z+</button>
+            <button class="te-axis-btn" data-ax="Z-" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">Z-</button>
+          </div>
+        </label>
+        <label class="rl-span2" style="font-size:11px;color:#6a8fa8;letter-spacing:.05em">VERSCHIEBUNG (Offset im Greifer)
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px">
+            <label style="font-size:10px;color:#6a8fa8">X mm<input id="te-ox"  type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Y mm<input id="te-oy"  type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Z mm<input id="te-oz"  type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rx °<input id="te-orx" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Ry °<input id="te-ory" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rz °<input id="te-orz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+          </div>
+        </label>
+        <div id="te-stl-field" style="display:none;grid-column:1/-1">
+          <div id="te-stl-name" style="font-family:monospace;font-size:11px;color:#6a8fa8;margin-bottom:6px">Keine STL gewählt</div>
+          <button id="te-stl-btn" style="width:100%;padding:7px;background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:4px;cursor:pointer;font-family:monospace;font-size:12px">📁 STL laden…</button>
+          <input id="te-stl-input" type="file" accept=".osd,.stl,.zip" style="display:none">
+        </div>
+      </div>
+      <input type="hidden" id="te-edit-eff-idx" value="-1">
+      <input type="hidden" id="te-edit-teil-idx" value="-1">
+      <button id="te-submit" class="rl-submit" style="margin-top:12px">Übernehmen</button>
+    </div>
+  </div>
+</div>
+
 <div id="effModal" class="rl-overlay" style="display:none">
   <div class="rl-modal" style="width:min(390px,96vw)">
     <div class="rl-modal-head">
