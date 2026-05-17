@@ -2390,11 +2390,16 @@ function renderEffRow() {
     <div style="border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:8px;margin-bottom:6px">
       <div style="display:flex;align-items:center;gap:6px">
         <span style="flex:1;font-family:monospace;font-size:12px;color:var(--txt)">🔧 ${e.name||'Endeffektor '+(i+1)}</span>
+        <button data-eff-stl="${i}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:${e.stlFile?'#4499cc':'#6a8fa8'};border-radius:3px;padding:1px 6px;cursor:pointer;font-size:11px" title="STL laden">📁</button>
         <button data-eff-edit="${i}" style="background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:11px">✏️</button>
         <button data-eff-del="${i}" style="background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:12px">✕</button>
       </div>
-      <div style="font-size:10px;color:#6a8fa8;font-family:monospace;margin-top:2px">${e.objectType||e.typ||'box'} | X:${e.offset?.x||0} Y:${e.offset?.y||0} Z:${e.offset?.z||0}</div>
+      <div style="font-size:10px;color:#6a8fa8;font-family:monospace;margin-top:2px">${e.stlFile?'STL: '+e.stlFile.name:(e.objectType||e.typ||'box')} | X:${e.offset?.x||0} Y:${e.offset?.y||0} Z:${e.offset?.z||0}</div>
     </div>`).join('');
+  el.querySelectorAll('[data-eff-stl]').forEach(btn=>btn.addEventListener('click',()=>{
+    const inp=$('effStlInput'); if(!inp) return;
+    inp.dataset.effIdx=btn.dataset.effStl; inp.click();
+  }));
   el.querySelectorAll('[data-eff-del]').forEach(btn=>btn.addEventListener('click',()=>{
     state.effektoren.splice(+btn.dataset.effDel,1);
     renderEffRow(); rebuildRobotKinematics(); applyTransforms();
@@ -2468,10 +2473,15 @@ function renderUmfRows() {
     <div style="border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:8px;margin-bottom:6px">
       <div style="display:flex;align-items:center;gap:6px">
         <span style="flex:1;font-family:monospace;font-size:12px;color:var(--txt)">🏭 ${u.name||'Umgebung '+(i+1)}</span>
+        <button data-umf-stl="${i}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:${u.stlFile?'#4499cc':'#6a8fa8'};border-radius:3px;padding:1px 6px;cursor:pointer;font-size:11px" title="STL laden">📁</button>
         <button data-umf-edit="${i}" style="background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:11px">✏️</button>
         <button data-umf-del="${i}" style="background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:12px">✕</button>
       </div>
     </div>`).join('');
+  el.querySelectorAll('[data-umf-stl]').forEach(btn=>btn.addEventListener('click',()=>{
+    const inp=$('umfStlInput'); if(!inp) return;
+    inp.dataset.umfIdx=btn.dataset.umfStl; inp.click();
+  }));
   el.querySelectorAll('[data-umf-del]').forEach(btn=>btn.addEventListener('click',()=>{
     state.umfElemente.splice(+btn.dataset.umfDel,1);
     renderUmfRows(); rebuildRobotKinematics(); applyTransforms();
