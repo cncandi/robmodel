@@ -818,6 +818,16 @@ async function extractFromZip(file) {
   return { buf: await first.async('arraybuffer'), name: first.name.split('/').pop() };
 }
 
+// Liest eine STL/OSD/ZIP-Datei und gibt {buf: Uint8Array, name: string} zurück
+async function readStlFile(file) {
+  let rawBuf, fname;
+  if (/\.zip$/i.test(file.name)) {
+    const r = await extractFromZip(file); rawBuf = r.buf; fname = r.name;
+  } else { rawBuf = await file.arrayBuffer(); fname = file.name; }
+  if (/\.osd$/i.test(fname)) { rawBuf = osdToBinaryStl(rawBuf); fname = fname.replace(/\.osd$/i, '.stl'); }
+  return { buf: new Uint8Array(rawBuf), name: fname };
+}
+
 // ── STL laden ──────────────────────────────────────────────────────
 function partKey(n) {
   const s = norm(n);
@@ -1956,10 +1966,11 @@ function _wireModalStl(prefix, getBufVar, setBufVar) {
   clear?.addEventListener('click',()=>{ setBufVar(null); if(disp){disp.textContent='';} });
   input?.addEventListener('change',async e=>{
     const f=e.target.files[0]; if(!f) return;
-    let _mbuf = await f.arrayBuffer();
-    if(/\.osd$/i.test(f.name)) _mbuf = osdToBinaryStl(_mbuf);
-    setBufVar(new Uint8Array(_mbuf));
-    if(disp){disp.textContent=f.name.replace(/\.osd$/i,'.stl'); disp.style.color='#4499cc';}
+    try {
+      const { buf, name } = await readStlFile(f);
+      setBufVar(buf);
+      if(disp){ disp.textContent=name; disp.style.color='#4499cc'; }
+    } catch(er) { alert('Fehler: '+er.message); }
     e.target.value='';
   });
 }
@@ -2602,8 +2613,8 @@ document.querySelectorAll('.te-axis-btn').forEach(b=>b.addEventListener('click',
 $('te-stl-btn')?.addEventListener('click',()=>$('te-stl-input')?.click());
 $('te-stl-input')?.addEventListener('change',async e=>{
   const f=e.target.files[0]; if(!f) return;
-  _teStlBuf=new Uint8Array(await f.arrayBuffer());
-  $('te-stl-name').textContent=f.name; $('te-stl-name').style.color='#4499cc';
+  try { const r=await readStlFile(f); _teStlBuf=r.buf; $('te-stl-name').textContent=r.name; $('te-stl-name').style.color='#4499cc'; }
+  catch(er){ alert('Fehler: '+er.message); }
   e.target.value='';
 });
 $('teilModalClose')?.addEventListener('click',()=>{ $('teilModal').style.display='none'; });
@@ -2662,8 +2673,9 @@ window.effTypeChanged=effTypeChanged;
 $('eff-stl-btn')?.addEventListener('click',()=>$('eff-stl-input')?.click());
 $('eff-stl-input')?.addEventListener('change',async e=>{
   const f=e.target.files[0]; if(!f) return;
-  _effStlBuf=new Uint8Array(await f.arrayBuffer());
-  $('eff-stl-name').textContent=f.name; $('eff-stl-name').style.color='#4499cc';
+  try { const r=await readStlFile(f); _effStlBuf=r.buf; $('eff-stl-name').textContent=r.name; $('eff-stl-name').style.color='#4499cc'; }
+  catch(er){ alert('Fehler: '+er.message); }
+  e.target.value='';
 });
 $('effModalClose')?.addEventListener('click',()=>{ $('effModal').style.display='none'; });
 $('eff-submit')?.addEventListener('click',()=>{
@@ -2746,8 +2758,9 @@ window.umfTypeChanged=umfTypeChanged;
 $('umf-stl-btn')?.addEventListener('click',()=>$('umf-stl-input')?.click());
 $('umf-stl-input')?.addEventListener('change',async e=>{
   const f=e.target.files[0]; if(!f) return;
-  _umfStlBuf=new Uint8Array(await f.arrayBuffer());
-  $('umf-stl-name').textContent=f.name; $('umf-stl-name').style.color='#4499cc';
+  try { const r=await readStlFile(f); _umfStlBuf=r.buf; $('umf-stl-name').textContent=r.name; $('umf-stl-name').style.color='#4499cc'; }
+  catch(er){ alert('Fehler: '+er.message); }
+  e.target.value='';
 });
 $('umfModalClose')?.addEventListener('click',()=>{ $('umfModal').style.display='none'; });
 $('umf-submit')?.addEventListener('click',()=>{
@@ -2998,17 +3011,18 @@ $('umfAddBtn')?.addEventListener('click', () => openUmfModal(-1));
 // Legacy effStlInput (hidden, kept for compat)
 $('effStlInput')?.addEventListener('change', async e => {
   let file = e.target.files[0]; if (!file) return;
-  let rawBuf = await file.arrayBuffer(), fname = file.name;
-  const buf = new Uint8Array(rawBuf);
-  const effIdx = parseInt($('effStlInput').dataset.effIdx ?? state.activeEff ?? '0');
-  const teilIdx = $('effStlInput').dataset.teilIdx !== '' ? parseInt($('effStlInput').dataset.teilIdx) : NaN;
-  if (!isNaN(teilIdx) && teilIdx >= 0) {
-    const t = (state.effektoren[effIdx]?.teile||[])[teilIdx];
-    if (t) { t.stlFile = { path: fname, name: fname, buf }; rebuildEffMesh(effIdx); applyTransforms(); }
-  } else if (effIdx >= 0 && effIdx < (state.effektoren||[]).length) {
-    state.effektoren[effIdx].stlFile = { path: fname, name: fname, buf };
-    rebuildEffMesh(effIdx); applyTransforms();
-  }
+  try {
+    const { buf, name: fname } = await readStlFile(file);
+    const effIdx = parseInt($('effStlInput').dataset.effIdx ?? state.activeEff ?? '0');
+    const teilIdx = $('effStlInput').dataset.teilIdx !== '' ? parseInt($('effStlInput').dataset.teilIdx) : NaN;
+    if (!isNaN(teilIdx) && teilIdx >= 0) {
+      const t = (state.effektoren[effIdx]?.teile||[])[teilIdx];
+      if (t) { t.stlFile = { path: fname, name: fname, buf }; rebuildEffMesh(effIdx); applyTransforms(); }
+    } else if (effIdx >= 0 && effIdx < (state.effektoren||[]).length) {
+      state.effektoren[effIdx].stlFile = { path: fname, name: fname, buf };
+      rebuildEffMesh(effIdx); applyTransforms();
+    }
+  } catch(er) { alert('Fehler: '+er.message); }
   renderEffRow(); e.target.value = '';
 });
 
@@ -3017,13 +3031,15 @@ $('umfStlInput')?.addEventListener('change', async e => {
   const rawFiles = Array.from(e.target.files);
   if (!state.umfElemente) state.umfElemente = [];
   for (const file of rawFiles) {
-    const buf = new Uint8Array(await file.arrayBuffer());
-    const umfIdx = parseInt($('umfStlInput').dataset.umfIdx ?? '-1');
-    if (umfIdx >= 0 && umfIdx < state.umfElemente.length) {
-      state.umfElemente[umfIdx].stlFile = { path: file.name, name: file.name, buf };
-    } else {
-      state.umfElemente.push({ stlFile:{path:file.name,name:file.name,buf}, offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0} });
-    }
+    try {
+      const { buf, name: fname } = await readStlFile(file);
+      const umfIdx = parseInt($('umfStlInput').dataset.umfIdx ?? '-1');
+      if (umfIdx >= 0 && umfIdx < state.umfElemente.length) {
+        state.umfElemente[umfIdx].stlFile = { path: fname, name: fname, buf };
+      } else {
+        state.umfElemente.push({ stlFile:{path:fname,name:fname,buf}, offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0} });
+      }
+    } catch(er) { alert('Fehler: '+er.message); }
   }
   renderUmfRows(); e.target.value = '';
 });
