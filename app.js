@@ -1002,9 +1002,9 @@ function loadExampleGreifer() {
   state.effektoren.push({
     name: 'Greifer',
     objectType: 'box',
-    color: '#506070',
-    length: 80, width: 80, height: 30,
-    offset: { x: 0, y: 0, z: 15, rx: 0, ry: 0, rz: 0 },
+    color: '#607080',
+    length: 120, width: 120, height: 40,
+    offset: { x: 0, y: 0, z: 20, rx: 0, ry: 0, rz: 0 },
     teile: []
   });
   effektorGroups.push(null);
@@ -1015,12 +1015,12 @@ function loadExampleGreifer() {
     type: 'box',
     labelNum: 1,
     mountMode: 'a6',
-    length: 20, width: 20, height: 60,
+    length: 50, width: 30, height: 80,
     axis: 'Y+',
-    eMin: 0, eMax: 35, ePos: 0,
+    eMin: 0, eMax: 50, ePos: 0,
     showBox: true,
-    color: '#2266aa',
-    boxOffset: { x: 0, y: 20, z: 60, rx: 0, ry: 0, rz: 0 }
+    color: '#2288cc',
+    boxOffset: { x: 0, y: 25, z: 80, rx: 0, ry: 0, rz: 0 }
   });
   objekteGroups.push(null);
 
@@ -1030,12 +1030,12 @@ function loadExampleGreifer() {
     type: 'box',
     labelNum: 1,
     mountMode: 'a6',
-    length: 20, width: 20, height: 60,
+    length: 50, width: 30, height: 80,
     axis: 'Y-',
-    eMin: 0, eMax: 35, ePos: 0,
+    eMin: 0, eMax: 50, ePos: 0,
     showBox: true,
-    color: '#2266aa',
-    boxOffset: { x: 0, y: -20, z: 60, rx: 0, ry: 0, rz: 0 }
+    color: '#2288cc',
+    boxOffset: { x: 0, y: -25, z: 80, rx: 0, ry: 0, rz: 0 }
   });
   objekteGroups.push(null);
 
@@ -1486,6 +1486,7 @@ function renderRows(){
         pos+=dir*(max-min)/60;
         if(pos>=max){pos=max;dir=-1;}else if(pos<=min){pos=min;dir=1;}
         members.forEach(({o,i})=>{o.ePos=pos;rebuildObjektMesh(i);});
+        applyTransforms();
         const inp=$('jointRows').querySelector(`[data-gl-pos][data-gl-key="${key}"]`);
         if(inp)inp.value=Math.round(pos);
       },16);
@@ -1560,7 +1561,7 @@ function rebuildObjektMesh(i) {
   } else if(o.showBox!==false){
     const L=o.length||500,H=o.height||500,W=o.width||500,R=o.radius||200;
     const geo=o.type==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
-    grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:o.color||0x4499cc,transparent:true,opacity:0.4,side:THREE.DoubleSide})));
+    grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:o.color||0x4499cc,shininess:60,transparent:true,opacity:0.85,side:THREE.DoubleSide})));
   }
   // Position: base offset + movement along axis
   const p=o.ePos||0, ax=o.axis||'Y+', bo=o.boxOffset||{}, deg=Math.PI/180;
