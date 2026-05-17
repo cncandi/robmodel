@@ -3279,7 +3279,8 @@ function buildFixtureJson(idx) {
   return { type:'fixture', name:o.name||'Objekt', objectType:o.type||'box',
     length:o.length||500, width:o.width||500, height:o.height||500, radius:o.radius||200,
     color:o.color||'#607080', x:o.x||0, y:o.y||0, z:o.z||0,
-    rx:o.rx||0, ry:o.ry||0, rz:o.rz||0, showBox:o.showBox!==false };
+    rx:o.rx||0, ry:o.ry||0, rz:o.rz||0, showBox:o.showBox!==false,
+    stlFile: o.stlFile ? `stl/fix_${idx}.stl` : undefined };
 }
 
 function buildEffectorJson(idx) {
@@ -3312,7 +3313,7 @@ async function buildComponentZip(type, idx) {
     const all=(state.objekte||[]).map((o,i)=>{ const j=buildLabelJson(i); if(j) _addStlsToZip(zip,['Label'+(o.labelNum||i+1)]); return j; }).filter(Boolean);
     cfg = all.length===1 ? all[0] : {type:'label', items:all};
   } else if(type==='fixture'){
-    const all=(state.festeObjekte||[]).map((_,i)=>buildFixtureJson(i)).filter(Boolean);
+    const all=(state.festeObjekte||[]).map((_,i)=>{ const j=buildFixtureJson(i); if(j&&state.festeObjekte[i]?.stlFile?.buf) zip.file(`stl/fix_${i}.stl`,state.festeObjekte[i].stlFile.buf); return j; }).filter(Boolean);
     cfg = all.length===1 ? all[0] : {type:'fixture', items:all};
   } else if(type==='endeffektor'){
     const all=(state.effektoren||[]).map((e,i)=>{ const j=buildEffectorJson(i); if(j&&e?.stlFile?.buf) zip.file(`stl/eff_${i}.stl`,e.stlFile.buf); return j; }).filter(Boolean);
@@ -3670,16 +3671,23 @@ async function loadComponentFromZip(zip) {
   } else {
     // Fallback: find any *.json file (old format)
     const jsonKey = Object.keys(zip.files).find(n => !zip.files[n].dir && /\.json$/i.test(n));
-    if (!jsonKey) throw new Error('Keine JSON-Konfiguration in ZIP gefunden');
-    cfg = JSON.parse(await zip.files[jsonKey].async('string'));
-    // Old rail format had no explicit type field — detect by content
-    if (!cfg.type) {
-      if (cfg.length_mm !== undefined || cfg.axis !== undefined) cfg.type = 'rail';
-      else if (cfg.joints?.length) cfg.type = 'robot';  // only real robot if has joints
-      else cfg.type = 'fixture'; // fallback: treat structureless JSON as fixture (won't show much)
+    if (jsonKey) {
+      cfg = JSON.parse(await zip.files[jsonKey].async('string'));
+      // Old rail format had no explicit type field — detect by content
+      if (!cfg.type) {
+        if (cfg.length_mm !== undefined || cfg.axis !== undefined) cfg.type = 'rail';
+        else if (cfg.joints?.length) cfg.type = 'robot';
+        else cfg.type = 'fixture';
+      }
+      if (cfg.type === 'object') cfg.type = 'fixture';
+    } else {
+      // No JSON at all — check if there's a bare STL → treat as fixture
+      const stlKey = Object.keys(zip.files).find(n => !zip.files[n].dir && /\.stl$/i.test(n));
+      if (!stlKey) throw new Error('Keine JSON-Konfiguration in ZIP gefunden');
+      const fname = stlKey.split('/').pop().replace(/\.stl$/i,'');
+      cfg = { type: 'fixture', name: fname, objectType: 'stl', showBox: false,
+              x:0, y:0, z:0, rx:0, ry:0, rz:0, stlFile: stlKey };
     }
-    // Alias: server stores old "object" type
-    if (cfg.type === 'object') cfg.type = 'fixture';
   }
 
   // Collect all STL buffers: stl/XX.stl or XX.stl → key without extension
@@ -3713,7 +3721,7 @@ async function loadComponentFromZip(zip) {
   }
   else if (type === 'fixture')     {
     const items = cfg.items || [cfg];
-    items.forEach(f => applyFixtureConfig(f));
+    items.forEach(f => applyFixtureConfig(f, stlBufs));
   }
   else if (type === 'endeffektor') {
     const items = cfg.items || [cfg];
@@ -3806,14 +3814,18 @@ function applyLabelConfig(cfg, stlBufs) {
   renderObjRows(); renderRows();
 }
 
-function applyFixtureConfig(cfg) {
+function applyFixtureConfig(cfg, stlBufs) {
+  // STL-Buffer: aus explizitem stlFile-Pfad oder erstem verfügbaren Buffer
+  const stlKey = cfg.stlFile ? cfg.stlFile.split('/').pop().replace(/\.stl$/i,'') : null;
+  const buf = (stlKey && stlBufs[stlKey]) || stlBufs['fix_0'] || (Object.keys(stlBufs).length===1 ? Object.values(stlBufs)[0] : null);
   const entry = {
     name: cfg.name||'Objekt', type: cfg.objectType||'box',
     length: cfg.length||500, width: cfg.width||500, height: cfg.height||500, radius: cfg.radius||200,
     color: cfg.color||'#607080',
     x: cfg.x||0, y: cfg.y||0, z: cfg.z||0,
     rx: cfg.rx||0, ry: cfg.ry||0, rz: cfg.rz||0,
-    showBox: cfg.showBox!==false
+    showBox: cfg.showBox!==false,
+    stlFile: buf ? { name: (cfg.name||'objekt')+'.stl', buf } : null
   };
   state.festeObjekte.push(entry);
   festeGrps.push(null);
