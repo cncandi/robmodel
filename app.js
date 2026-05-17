@@ -76,6 +76,7 @@ const state = {
 let scene, camera, perspCamera, orthoCamera, isOrtho=false, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot, railGroup;
 let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup;
 var objekteGroups = [];
+var effektorGroups = [];
 var positionerGroups = [];
 var festeGrps = []; // [{containerGrp, pivotGrp, meshGrp, pivotSphere}]
 const meshes = new Map();
@@ -465,6 +466,8 @@ function rebuildRobotKinematics() {
   applyJointRotations();
   // Re-attach a6-mounted labels to new A6 pivot
   (state.objekte||[]).forEach((_,i)=>{ if(state.objekte[i]?.mountMode==='a6') rebuildObjektMesh(i); });
+  // Re-attach Endeffektoren to new A6 pivot
+  (state.effektoren||[]).forEach((_,i)=>rebuildEffMesh(i));
 }
 
 function applyJointRotations() {
@@ -1516,6 +1519,49 @@ function rebuildObjektMesh(i) {
   grp.rotation.set((bo.rx||0)*deg,(bo.ry||0)*deg,(bo.rz||0)*deg,'XYZ');
 }
 
+function rebuildEffMesh(effIdx) {
+  const eff=state.effektoren[effIdx]; if(!eff) return;
+  if(!effektorGroups[effIdx]) effektorGroups[effIdx]=new THREE.Group();
+  const grp=effektorGroups[effIdx];
+  const targetParent=(axisPivotGroups[5])||scene;
+  if(grp.parent!==targetParent){if(grp.parent)grp.parent.remove(grp);targetParent.add(grp);}
+  while(grp.children.length)grp.remove(grp.children[0]);
+  const o=eff.offset||{}, deg2=Math.PI/180;
+  grp.position.set(o.x||0,o.y||0,o.z||0);
+  grp.rotation.set((o.rx||0)*deg2,(o.ry||0)*deg2,(o.rz||0)*deg2,'XYZ');
+  const teile=eff.teile||[];
+  const ePos=eff.ePos||0;
+  if(teile.length){
+    teile.forEach(t=>{
+      const tGrp=new THREE.Group(); grp.add(tGrp);
+      if(t.stlFile?.buf){
+        const geo=loader.parse(t.stlFile.buf.buffer||t.stlFile.buf); geo.computeVertexNormals();
+        tGrp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:t.color||0x607080,shininess:60})));
+      } else {
+        const L=t.length||100,W=t.width||50,H=t.height||50,R=t.radius||25;
+        const geo=t.objectType==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
+        tGrp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:t.color||0x607080,shininess:60,transparent:true,opacity:.85})));
+      }
+      const bo=t.offset||{}, ax=t.axis||'Y+';
+      const p=Math.min(Math.max(ePos,t.eMin||0),t.eMax??ePos);
+      let cx=0,cy=0,cz=0;
+      if(ax==='X+')cx=p;else if(ax==='X-')cx=-p;else if(ax==='Y+')cy=p;else if(ax==='Y-')cy=-p;else if(ax==='Z+')cz=p;else cz=-p;
+      tGrp.position.set((bo.x||0)+cx,(bo.y||0)+cy,(bo.z||0)+cz);
+      tGrp.rotation.set((bo.rx||0)*deg2,(bo.ry||0)*deg2,(bo.rz||0)*deg2,'XYZ');
+    });
+  } else {
+    // Backward compat: single geometry on eff itself
+    if(eff.stlFile?.buf){
+      const geo=loader.parse(eff.stlFile.buf.buffer||eff.stlFile.buf); geo.computeVertexNormals();
+      grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:eff.color||0x607080,shininess:60})));
+    } else if(eff.objectType&&eff.objectType!=='stl'){
+      const L=eff.length||200,W=eff.width||200,H=eff.height||300,R=eff.radius||80;
+      const geo=eff.objectType==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
+      grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:eff.color||0x607080,shininess:60,transparent:true,opacity:.85})));
+    }
+  }
+}
+
 function openObjModal(editIdx) {
   const o = editIdx>=0 ? (state.objekte||[])[editIdx] : null;
   $('om-name').value   = o?.name    || '';
@@ -2386,26 +2432,144 @@ function renderEffRow() {
   const effs=state.effektoren||[];
   if(badge) badge.textContent=effs.length||'0';
   if(!effs.length){el.innerHTML='';return;}
-  el.innerHTML=effs.map((e,i)=>`
+  el.innerHTML=effs.map((e,i)=>{
+    const teile=e.teile||[];
+    const allMin=teile.length?Math.min(...teile.map(t=>t.eMin||0)):0;
+    const allMax=teile.length?Math.max(...teile.map(t=>t.eMax??50)):50;
+    const sliderHtml=teile.length?`
+      <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+        <span style="font-size:10px;color:#6a8fa8;font-family:monospace;min-width:28px">${allMin}</span>
+        <input type="range" data-eff-slider="${i}" min="${allMin}" max="${allMax}" step="0.5" value="${e.ePos||0}" style="flex:1;accent-color:var(--acc)">
+        <span style="font-size:10px;color:#6a8fa8;font-family:monospace;min-width:28px">${allMax}</span>
+        <span data-eff-pos-label="${i}" style="font-size:10px;color:#60a5fa;font-family:monospace;min-width:36px">${(e.ePos||0).toFixed(1)}</span>
+      </div>`:''  ;
+    const teileHtml=teile.map((t,j)=>`
+      <div style="display:flex;align-items:center;gap:4px;margin-top:4px;padding:3px 4px;background:rgba(255,255,255,.03);border-radius:3px">
+        <span style="flex:1;font-family:monospace;font-size:11px;color:#aac">${t.name||'Teil '+(j+1)} <span style="color:#6a8fa8">${t.axis||'Y+'} ${t.eMin||0}…${t.eMax??50}mm</span></span>
+        <button data-teil-stl="${i}-${j}" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:${t.stlFile?'#4499cc':'#6a8fa8'};border-radius:3px;padding:0 5px;cursor:pointer;font-size:11px" title="STL laden">📁</button>
+        <button data-teil-edit="${i}-${j}" style="background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.3);color:#60a5fa;border-radius:3px;padding:0 5px;cursor:pointer;font-size:11px">✏️</button>
+        <button data-teil-del="${i}-${j}" style="background:rgba(204,51,51,.12);border:1px solid rgba(204,51,51,.25);color:#f87171;border-radius:3px;padding:0 5px;cursor:pointer;font-size:11px">✕</button>
+      </div>`).join('');
+    return `
     <div style="border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:8px;margin-bottom:6px">
       <div style="display:flex;align-items:center;gap:6px">
         <span style="flex:1;font-family:monospace;font-size:12px;color:var(--txt)">🔧 ${e.name||'Endeffektor '+(i+1)}</span>
-        <button data-eff-stl="${i}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:${e.stlFile?'#4499cc':'#6a8fa8'};border-radius:3px;padding:1px 6px;cursor:pointer;font-size:11px" title="STL laden">📁</button>
+        <button data-eff-stl="${i}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:${e.stlFile?'#4499cc':'#6a8fa8'};border-radius:3px;padding:1px 6px;cursor:pointer;font-size:11px" title="Basis-STL laden">📁</button>
+        <button data-teil-add="${i}" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#4ade80;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:11px" title="Backe / Teil hinzufügen">+ Teil</button>
         <button data-eff-edit="${i}" style="background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:11px">✏️</button>
         <button data-eff-del="${i}" style="background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:12px">✕</button>
       </div>
-      <div style="font-size:10px;color:#6a8fa8;font-family:monospace;margin-top:2px">${e.stlFile?'STL: '+e.stlFile.name:(e.objectType||e.typ||'box')} | X:${e.offset?.x||0} Y:${e.offset?.y||0} Z:${e.offset?.z||0}</div>
-    </div>`).join('');
+      ${teileHtml}
+      ${sliderHtml}
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-eff-slider]').forEach(sl=>sl.addEventListener('input',()=>{
+    const i=+sl.dataset.effSlider;
+    state.effektoren[i].ePos=parseFloat(sl.value);
+    const lbl=el.querySelector(`[data-eff-pos-label="${i}"]`);
+    if(lbl) lbl.textContent=parseFloat(sl.value).toFixed(1);
+    rebuildEffMesh(i); applyTransforms();
+  }));
   el.querySelectorAll('[data-eff-stl]').forEach(btn=>btn.addEventListener('click',()=>{
     const inp=$('effStlInput'); if(!inp) return;
-    inp.dataset.effIdx=btn.dataset.effStl; inp.click();
+    inp.dataset.effIdx=btn.dataset.effStl; inp.dataset.teilIdx=''; inp.click();
+  }));
+  el.querySelectorAll('[data-teil-add]').forEach(btn=>btn.addEventListener('click',()=>openTeilModal(+btn.dataset.teilAdd,-1)));
+  el.querySelectorAll('[data-teil-stl]').forEach(btn=>btn.addEventListener('click',()=>{
+    const [ei,ti]=btn.dataset.teilStl.split('-').map(Number);
+    const inp=$('effStlInput'); if(!inp) return;
+    inp.dataset.effIdx=ei; inp.dataset.teilIdx=ti; inp.click();
+  }));
+  el.querySelectorAll('[data-teil-edit]').forEach(btn=>btn.addEventListener('click',()=>{
+    const [ei,ti]=btn.dataset.teilEdit.split('-').map(Number); openTeilModal(ei,ti);
+  }));
+  el.querySelectorAll('[data-teil-del]').forEach(btn=>btn.addEventListener('click',()=>{
+    const [ei,ti]=btn.dataset.teilDel.split('-').map(Number);
+    (state.effektoren[ei].teile||[]).splice(ti,1);
+    renderEffRow(); rebuildEffMesh(ei); applyTransforms();
   }));
   el.querySelectorAll('[data-eff-del]').forEach(btn=>btn.addEventListener('click',()=>{
-    state.effektoren.splice(+btn.dataset.effDel,1);
-    renderEffRow(); rebuildRobotKinematics(); applyTransforms();
+    const i=+btn.dataset.effDel;
+    if(effektorGroups[i]?.parent) effektorGroups[i].parent.remove(effektorGroups[i]);
+    effektorGroups.splice(i,1); state.effektoren.splice(i,1);
+    renderEffRow(); applyTransforms();
   }));
   el.querySelectorAll('[data-eff-edit]').forEach(btn=>btn.addEventListener('click',()=>openEffModal(+btn.dataset.effEdit)));
 }
+
+var _teAxis='Y+', _teStlBuf=null;
+function openTeilModal(effIdx, teilIdx) {
+  _teStlBuf=null; _teAxis='Y+';
+  const t=(teilIdx>=0)?(state.effektoren[effIdx]?.teile||[])[teilIdx]:null;
+  $('te-name').value=t?.name||'';
+  $('te-type').value=t?.objectType||'box';
+  $('te-color').value=t?.color||'#607080';
+  $('te-length').value=t?.length||100; $('te-width').value=t?.width||50;
+  $('te-height').value=t?.height||50; $('te-radius').value=t?.radius||25;
+  $('te-min').value=t?.eMin??0; $('te-max').value=t?.eMax??50;
+  const bo=t?.offset||{};
+  $('te-ox').value=bo.x||0;$('te-oy').value=bo.y||0;$('te-oz').value=bo.z||0;
+  $('te-orx').value=bo.rx||0;$('te-ory').value=bo.ry||0;$('te-orz').value=bo.rz||0;
+  $('te-stl-name').textContent=t?.stlFile?.name||'Keine STL';
+  if(t?.stlFile?.buf) _teStlBuf=t.stlFile.buf;
+  _teAxis=t?.axis||'Y+';
+  document.querySelectorAll('.te-axis-btn').forEach(b=>{
+    const on=b.dataset.ax===_teAxis;
+    b.style.background=on?'rgba(37,99,235,.3)':'rgba(255,255,255,.05)';
+    b.style.border=on?'1px solid rgba(37,99,235,.6)':'1px solid rgba(255,255,255,.15)';
+    b.style.color=on?'#60a5fa':'#6a8fa8';
+  });
+  $('te-edit-eff-idx').value=effIdx; $('te-edit-teil-idx').value=teilIdx;
+  teTypeChanged();
+  $('teilModal').style.display='flex';
+}
+window.openTeilModal=openTeilModal;
+function teTypeChanged(){
+  const t=$('te-type')?.value||'box';
+  const bf=$('te-box-fields'),cf=$('te-cyl-fields'),sf=$('te-stl-field');
+  if(bf)bf.style.display=t==='box'?'contents':'none';
+  if(cf)cf.style.display=t==='cylinder'?'contents':'none';
+  if(sf)sf.style.display=t==='stl'?'':'none';
+}
+window.teTypeChanged=teTypeChanged;
+document.querySelectorAll('.te-axis-btn').forEach(b=>b.addEventListener('click',()=>{
+  _teAxis=b.dataset.ax;
+  document.querySelectorAll('.te-axis-btn').forEach(x=>{
+    const on=x.dataset.ax===_teAxis;
+    x.style.background=on?'rgba(37,99,235,.3)':'rgba(255,255,255,.05)';
+    x.style.border=on?'1px solid rgba(37,99,235,.6)':'1px solid rgba(255,255,255,.15)';
+    x.style.color=on?'#60a5fa':'#6a8fa8';
+  });
+}));
+$('te-stl-btn')?.addEventListener('click',()=>$('te-stl-input')?.click());
+$('te-stl-input')?.addEventListener('change',async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  _teStlBuf=new Uint8Array(await f.arrayBuffer());
+  $('te-stl-name').textContent=f.name; $('te-stl-name').style.color='#4499cc';
+  e.target.value='';
+});
+$('teilModalClose')?.addEventListener('click',()=>{ $('teilModal').style.display='none'; });
+$('te-submit')?.addEventListener('click',()=>{
+  const effIdx=parseInt($('te-edit-eff-idx').value);
+  const teilIdx=parseInt($('te-edit-teil-idx').value);
+  const eff=state.effektoren[effIdx]; if(!eff) return;
+  if(!eff.teile) eff.teile=[];
+  const t2=$('te-type')?.value||'box';
+  const entry={
+    name:$('te-name').value||('Teil '+(eff.teile.length+1)),
+    objectType:t2, color:$('te-color').value||'#607080',
+    length:parseFloat($('te-length').value)||100, width:parseFloat($('te-width').value)||50,
+    height:parseFloat($('te-height').value)||50, radius:parseFloat($('te-radius').value)||25,
+    eMin:parseFloat($('te-min').value)||0, eMax:parseFloat($('te-max').value)??50,
+    axis:_teAxis,
+    stlFile:_teStlBuf?{name:($('te-name').value||'teil')+'.stl',buf:_teStlBuf}:(teilIdx>=0?eff.teile[teilIdx]?.stlFile:null),
+    offset:{x:parseFloat($('te-ox').value)||0,y:parseFloat($('te-oy').value)||0,z:parseFloat($('te-oz').value)||0,
+      rx:parseFloat($('te-orx').value)||0,ry:parseFloat($('te-ory').value)||0,rz:parseFloat($('te-orz').value)||0}
+  };
+  if(teilIdx>=0) eff.teile[teilIdx]=entry; else eff.teile.push(entry);
+  renderEffRow(); rebuildEffMesh(effIdx); applyTransforms();
+  $('teilModal').style.display='none';
+});
 
 function openEffModal(editIdx) {
   _effStlBuf=null;
@@ -2777,8 +2941,13 @@ $('effStlInput')?.addEventListener('change', async e => {
   let rawBuf = await file.arrayBuffer(), fname = file.name;
   const buf = new Uint8Array(rawBuf);
   const effIdx = parseInt($('effStlInput').dataset.effIdx ?? state.activeEff ?? '0');
-  if (effIdx >= 0 && effIdx < (state.effektoren||[]).length) {
+  const teilIdx = $('effStlInput').dataset.teilIdx !== '' ? parseInt($('effStlInput').dataset.teilIdx) : NaN;
+  if (!isNaN(teilIdx) && teilIdx >= 0) {
+    const t = (state.effektoren[effIdx]?.teile||[])[teilIdx];
+    if (t) { t.stlFile = { path: fname, name: fname, buf }; rebuildEffMesh(effIdx); applyTransforms(); }
+  } else if (effIdx >= 0 && effIdx < (state.effektoren||[]).length) {
     state.effektoren[effIdx].stlFile = { path: fname, name: fname, buf };
+    rebuildEffMesh(effIdx); applyTransforms();
   }
   renderEffRow(); e.target.value = '';
 });
