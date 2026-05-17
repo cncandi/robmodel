@@ -998,49 +998,31 @@ function syncTcpFromActiveEff() {
 function syncTcpFromEffOffset() { syncTcpFromActiveEff(); }
 
 function loadExampleGreifer() {
-  // Endeffektor: Greifer-Gehäuse (statisch, an A6)
   state.effektoren.push({
     name: 'Greifer',
     objectType: 'box',
     color: '#607080',
     length: 120, width: 120, height: 40,
     offset: { x: 0, y: 0, z: 20, rx: 0, ry: 0, rz: 0 },
-    teile: []
+    ePos: 0,
+    teile: [
+      {
+        name: 'Backe 1', objectType: 'box', color: '#2288cc',
+        length: 50, width: 30, height: 80,
+        axis: 'Y+', eMin: 0, eMax: 50,
+        offset: { x: 0, y: 25, z: 80, rx: 0, ry: 0, rz: 0 }
+      },
+      {
+        name: 'Backe 2', objectType: 'box', color: '#2288cc',
+        length: 50, width: 30, height: 80,
+        axis: 'Y-', eMin: 0, eMax: 50,
+        offset: { x: 0, y: -25, z: 80, rx: 0, ry: 0, rz: 0 }
+      }
+    ]
   });
   effektorGroups.push(null);
-
-  // Backe 1: Y+ Richtung
-  state.objekte.push({
-    name: 'Backe 1',
-    type: 'box',
-    labelNum: 1,
-    mountMode: 'a6',
-    length: 50, width: 30, height: 80,
-    axis: 'Y+',
-    eMin: 0, eMax: 50, ePos: 0,
-    showBox: true,
-    color: '#2288cc',
-    boxOffset: { x: 0, y: 25, z: 80, rx: 0, ry: 0, rz: 0 }
-  });
-  objekteGroups.push(null);
-
-  // Backe 2: Y- Richtung (synchron über labelNum=1)
-  state.objekte.push({
-    name: 'Backe 2',
-    type: 'box',
-    labelNum: 1,
-    mountMode: 'a6',
-    length: 50, width: 30, height: 80,
-    axis: 'Y-',
-    eMin: 0, eMax: 50, ePos: 0,
-    showBox: true,
-    color: '#2288cc',
-    boxOffset: { x: 0, y: -25, z: 80, rx: 0, ry: 0, rz: 0 }
-  });
-  objekteGroups.push(null);
-
   rebuildRobotKinematics(); applyTransforms();
-  renderEffRow(); renderObjRows(); renderRows();
+  renderEffRow(); renderAll();
   enableSave?.();
 }
 $('exGreiferBtn')?.addEventListener('click', loadExampleGreifer);
