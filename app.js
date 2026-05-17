@@ -3066,15 +3066,18 @@ function renderLibList(items) {
     container.innerHTML = '<div style="padding:16px;font-family:monospace;font-size:11px;color:#4a6a8a">Keine Einträge.</div>';
     return;
   }
-  container.innerHTML = filtered.map((r) => `
-    <div data-lib-ri="${items.indexOf(r)}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer" class="lib-row">
-      <span style="font-size:16px">${TYPE_ICON[r.type||'robot']||'📦'}</span>
+  container.innerHTML = filtered.map((r) => {
+    const thumb = r.thumb_url ? `<img src="${r.thumb_url}" style="width:44px;height:44px;object-fit:cover;border-radius:4px;flex-shrink:0;background:#0f1e2e" onerror="this.style.display='none'">` : `<span style="font-size:20px;width:44px;text-align:center;flex-shrink:0">${TYPE_ICON[r.type||'robot']||'📦'}</span>`;
+    return `
+    <div data-lib-ri="${items.indexOf(r)}" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer" class="lib-row">
+      ${thumb}
       <div style="flex:1;min-width:0">
         <div style="font-family:monospace;font-size:12px;color:#d8e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
         <div style="font-size:10px;color:#4a6a8a">${r.marke||''} ${r.modell||''} <span style="color:#2a5a7a">${r.type||'robot'}</span></div>
       </div>
       <button data-lib-load="${items.indexOf(r)}" style="font-size:10px;padding:2px 8px;background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;cursor:pointer;font-family:monospace">Laden</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   container.querySelectorAll('[data-lib-load]').forEach(btn => {
     btn.onclick = e => { e.stopPropagation(); loadFromLib(items[+btn.dataset.libLoad]); };
   });
