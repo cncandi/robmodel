@@ -999,27 +999,23 @@ function syncTcpFromActiveEff() {
 function syncTcpFromEffOffset() { syncTcpFromActiveEff(); }
 
 function loadExampleGreifer() {
+  const N=4, R=35, eMax=30, h=70, w=20, d=15;
+  const teile=[];
+  for(let i=0;i<N;i++){
+    const angleDeg=i*(360/N);
+    const rad=angleDeg*Math.PI/180;
+    teile.push({
+      name:'Backe '+(i+1), objectType:'box', color:'#2288cc',
+      length:d, width:w, height:h,
+      moveAngle:angleDeg, eMin:0, eMax:eMax, ePos:0, labelNum:1,
+      offset:{ x:Math.cos(rad)*R, y:Math.sin(rad)*R, z:70, rx:0, ry:0, rz:angleDeg }
+    });
+  }
   state.effektoren.push({
-    name: 'Greifer',
-    objectType: 'box',
-    color: '#607080',
-    length: 120, width: 120, height: 40,
-    offset: { x: 0, y: 0, z: 20, rx: 0, ry: 0, rz: 0 },
-    ePos: 0,
-    teile: [
-      {
-        name: 'Backe 1', objectType: 'box', color: '#2288cc',
-        length: 50, width: 30, height: 80,
-        axis: 'Y+', eMin: 0, eMax: 50, ePos: 0, labelNum: 1,
-        offset: { x: 0, y: 25, z: 80, rx: 0, ry: 0, rz: 0 }
-      },
-      {
-        name: 'Backe 2', objectType: 'box', color: '#2288cc',
-        length: 50, width: 30, height: 80,
-        axis: 'Y-', eMin: 0, eMax: 50, ePos: 0, labelNum: 1,
-        offset: { x: 0, y: -25, z: 80, rx: 0, ry: 0, rz: 0 }
-      }
-    ]
+    name:'Greifer 4-Backen', objectType:'box', color:'#607080',
+    length:80, width:80, height:30,
+    offset:{x:0,y:0,z:15,rx:0,ry:0,rz:0},
+    ePos:0, teile
   });
   effektorGroups.push(null);
   rebuildRobotKinematics(); applyTransforms();
@@ -1610,7 +1606,12 @@ function rebuildEffMesh(effIdx) {
       const eMax=t.eMax??t.ePos??0;
       const p=Math.min(Math.max(t.ePos||0,t.eMin||0),eMax);
       let cx=0,cy=0,cz=0;
-      if(ax==='X+')cx=p;else if(ax==='X-')cx=-p;else if(ax==='Y+')cy=p;else if(ax==='Y-')cy=-p;else if(ax==='Z+')cz=p;else cz=-p;
+      if(t.moveAngle!=null){
+        const rad=t.moveAngle*Math.PI/180;
+        cx=Math.cos(rad)*p; cy=Math.sin(rad)*p;
+      } else {
+        if(ax==='X+')cx=p;else if(ax==='X-')cx=-p;else if(ax==='Y+')cy=p;else if(ax==='Y-')cy=-p;else if(ax==='Z+')cz=p;else cz=-p;
+      }
       tGrp.position.set((bo.x||0)+cx,(bo.y||0)+cy,(bo.z||0)+cz);
       tGrp.rotation.set((bo.rx||0)*deg2,(bo.ry||0)*deg2,(bo.rz||0)*deg2,'XYZ');
     });
@@ -2564,6 +2565,7 @@ function openTeilModal(effIdx, teilIdx) {
   $('te-ox').value=bo.x||0;$('te-oy').value=bo.y||0;$('te-oz').value=bo.z||0;
   $('te-orx').value=bo.rx||0;$('te-ory').value=bo.ry||0;$('te-orz').value=bo.rz||0;
   $('te-stl-name').textContent=t?.stlFile?.name||'Keine STL';
+  if($('te-moveangle')) $('te-moveangle').value=t?.moveAngle??'';
   if(t?.stlFile?.buf) _teStlBuf=t.stlFile.buf;
   _teAxis=t?.axis||'Y+';
   document.querySelectorAll('.te-axis-btn').forEach(b=>{
@@ -2611,6 +2613,7 @@ $('te-submit')?.addEventListener('click',()=>{
   const entry={
     name:$('te-name').value||('Teil '+(eff.teile.length+1)),
     labelNum: parseInt($('te-labelnum')?.value)||null,
+    moveAngle: $('te-moveangle')?.value!=='' ? parseFloat($('te-moveangle').value) : null,
     objectType:t2, color:$('te-color').value||'#607080',
     length:parseFloat($('te-length').value)||100, width:parseFloat($('te-width').value)||50,
     height:parseFloat($('te-height').value)||50, radius:parseFloat($('te-radius').value)||25,
