@@ -3313,8 +3313,12 @@ async function buildComponentZip(type, idx) {
     const all=(state.objekte||[]).map((o,i)=>{ const j=buildLabelJson(i); if(j) _addStlsToZip(zip,['Label'+(o.labelNum||i+1)]); return j; }).filter(Boolean);
     cfg = all.length===1 ? all[0] : {type:'label', items:all};
   } else if(type==='fixture'){
-    const all=(state.festeObjekte||[]).map((_,i)=>{ const j=buildFixtureJson(i); if(j&&state.festeObjekte[i]?.stlFile?.buf) zip.file(`stl/fix_${i}.stl`,state.festeObjekte[i].stlFile.buf); return j; }).filter(Boolean);
-    cfg = all.length===1 ? all[0] : {type:'fixture', items:all};
+    const o=state.festeObjekte[idx]; if(!o) return null;
+    const j=buildFixtureJson(idx);
+    if(j && o.stlFile?.buf) zip.file('stl/fix_0.stl', o.stlFile.buf);
+    // Pfad normalisieren: immer fix_0 im ZIP, egal welcher Index
+    if(j && j.stlFile) j.stlFile = 'stl/fix_0.stl';
+    cfg = j;
   } else if(type==='endeffektor'){
     const all=(state.effektoren||[]).map((e,i)=>{ const j=buildEffectorJson(i); if(j&&e?.stlFile?.buf) zip.file(`stl/eff_${i}.stl`,e.stlFile.buf); return j; }).filter(Boolean);
     cfg = all.length===1 ? all[0] : {type:'endeffektor', items:all};
