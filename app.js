@@ -1607,7 +1607,8 @@ function rebuildEffMesh(effIdx) {
         tGrp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:t.color||0x607080,shininess:60,transparent:true,opacity:.85})));
       }
       const bo=t.offset||{}, ax=t.axis||'Y+';
-      const p=Math.min(Math.max(t.ePos||0,t.eMin||0),t.eMax??t.ePos||0);
+      const eMax=t.eMax??t.ePos??0;
+      const p=Math.min(Math.max(t.ePos||0,t.eMin||0),eMax);
       let cx=0,cy=0,cz=0;
       if(ax==='X+')cx=p;else if(ax==='X-')cx=-p;else if(ax==='Y+')cy=p;else if(ax==='Y-')cy=-p;else if(ax==='Z+')cz=p;else cz=-p;
       tGrp.position.set((bo.x||0)+cx,(bo.y||0)+cy,(bo.z||0)+cz);
