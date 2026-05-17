@@ -2501,15 +2501,7 @@ function renderEffRow() {
     const teile=e.teile||[];
     const allMin=teile.length?Math.min(...teile.map(t=>t.eMin||0)):0;
     const allMax=teile.length?Math.max(...teile.map(t=>t.eMax??50)):50;
-    const sliderHtml=teile.length?`
-      <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
-        <span style="font-size:10px;color:#aac;font-family:monospace;min-width:60px;white-space:nowrap">↔ ${e.name||'Greifer'}</span>
-        <span style="font-size:10px;color:#6a8fa8;font-family:monospace;min-width:24px">${allMin}</span>
-        <input type="range" data-eff-slider="${i}" min="${allMin}" max="${allMax}" step="0.5" value="${e.ePos||0}" style="flex:1;accent-color:var(--acc)">
-        <span style="font-size:10px;color:#6a8fa8;font-family:monospace;min-width:24px">${allMax}</span>
-        <span data-eff-pos-label="${i}" style="font-size:10px;color:#60a5fa;font-family:monospace;min-width:36px">${(e.ePos||0).toFixed(1)}</span>
-        <button data-eff-sim="${i}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;padding:2px 7px;cursor:pointer;color:#9ab;font-size:11px">▶</button>
-      </div>`:''  ;
+    const sliderHtml='';
     const teileHtml=teile.map((t,j)=>`
       <div style="display:flex;align-items:center;gap:4px;margin-top:4px;padding:3px 4px;background:rgba(255,255,255,.03);border-radius:3px">
         <span style="flex:1;font-family:monospace;font-size:11px;color:#aac">${t.name||'Teil '+(j+1)} <span style="color:#6a8fa8">${t.axis||'Y+'} ${t.eMin||0}…${t.eMax??50}mm</span></span>
@@ -2530,29 +2522,6 @@ function renderEffRow() {
       ${sliderHtml}
     </div>`;
   }).join('');
-  el.querySelectorAll('[data-eff-slider]').forEach(sl=>sl.addEventListener('input',()=>{
-    const i=+sl.dataset.effSlider;
-    state.effektoren[i].ePos=parseFloat(sl.value);
-    const lbl=el.querySelector(`[data-eff-pos-label="${i}"]`);
-    if(lbl) lbl.textContent=parseFloat(sl.value).toFixed(1);
-    rebuildEffMesh(i); applyTransforms();
-  }));
-  el.querySelectorAll('[data-eff-sim]').forEach(btn=>btn.addEventListener('click',()=>{
-    const i=+btn.dataset.effSim; const eff=state.effektoren[i]; if(!eff||!eff.teile?.length) return;
-    const simKey='_effSim_'+i;
-    if(eff[simKey]){ clearInterval(eff[simKey]); delete eff[simKey]; btn.textContent='▶'; btn.style.color='#9ab'; return; }
-    const allMin=Math.min(...eff.teile.map(t=>t.eMin||0));
-    const allMax=Math.max(...eff.teile.map(t=>t.eMax??50));
-    let pos=eff.ePos||0, dir=1;
-    eff[simKey]=setInterval(()=>{
-      pos+=dir*(allMax-allMin)/60; if(pos>=allMax){pos=allMax;dir=-1;}else if(pos<=allMin){pos=allMin;dir=1;}
-      eff.ePos=pos; rebuildEffMesh(i); applyTransforms();
-      const sl=el.querySelector(`[data-eff-slider="${i}"]`);
-      const lb=el.querySelector(`[data-eff-pos-label="${i}"]`);
-      if(sl)sl.value=pos; if(lb)lb.textContent=pos.toFixed(1);
-    },16);
-    btn.textContent='⏹'; btn.style.color='#f87171';
-  }));
   el.querySelectorAll('[data-eff-stl]').forEach(btn=>btn.addEventListener('click',()=>{
     const inp=$('effStlInput'); if(!inp) return;
     inp.dataset.effIdx=btn.dataset.effStl; inp.dataset.teilIdx=''; inp.click();
