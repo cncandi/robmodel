@@ -1309,6 +1309,9 @@ function setParamTab(tab) {
 window.setParamTab = setParamTab;
 
 function renderRows(){
+  const ph=$('colPosHeader'), dh=$('colDirHeader');
+  if(_paramTab==='l'){if(ph)ph.textContent='mm';if(dh)dh.textContent='Richtung';}
+  else{if(ph)ph.textContent='Winkel °';if(dh)dh.textContent='Dreht';}
   const rail = (state.schienen||[])[0];
 
   if (_paramTab === 'e') {
