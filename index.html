@@ -237,6 +237,7 @@
       <div class="rl-grid">
         <label class="rl-span2">Name<input id="te-name" type="text" placeholder="Backe 1"></label>
         <label>Label Nr.<input id="te-labelnum" type="number" value="1" min="1" max="99" step="1" title="Teile mit gleicher Nummer werden synchron gesteuert"></label>
+        <label title="Verfahrwinkel im XY-Kreis (0°=+X, 90°=+Y). Wenn gesetzt, werden Achsbuttons ignoriert.">Verfahrwinkel °<input id="te-moveangle" type="number" step="1" placeholder="leer = Achsbutton"></label>
         <label>Typ
           <select id="te-type" onchange="teTypeChanged()" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 8px;color:#d8e8f0;font-family:monospace;font-size:13px;outline:none;width:100%;margin-top:4px">
             <option value="box">📦 Box</option>
