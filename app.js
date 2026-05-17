@@ -3420,17 +3420,12 @@ async function updateRoblib() {
       return;
     }
     setProgress('Erstelle ZIP…', 5);
-    const prevMode = toolMountMode;
-    if (prevMode !== 'world') { detachToolFromA6(); scene.updateMatrixWorld(true); }
-    const zip = new JSZip();
-    const base = zipName(state.robotName || 'robot');
-    zip.file(base + '.json', JSON.stringify(buildJson(), null, 2));
-    for (const [, mesh] of meshes) zip.file(mesh.name, exportBinaryStl(mesh));
-    state.effektoren.forEach((eff, i) => { if (eff.stlFile?.buf) zip.file('endeffektor_'+(i+1)+'.stl', eff.stlFile.buf); });
-    const allUmfZip = [...(state.umfElemente||[]), ...(state.umfStls||[]).map(u=>({stlFile:u}))];
-    allUmfZip.forEach((u, i) => { const buf = u.stlFile?.buf; if(buf) zip.file('umfeld_'+(i+1)+'.stl', buf); });
-    const zipBlob = await zip.generateAsync({type:'blob'}, m => setProgress('Komprimiere…', 5+m.percent*0.4));
-    if (prevMode !== 'world') attachToolToA6();
+    const idx = parseInt($('rl-comp-idx')?.value)||0;
+    const zip = await buildComponentZip(type, idx);
+    if (!zip) { show('Keine Daten für diesen Typ.', false); btn.disabled=false; btn.textContent='Aktualisieren'; return; }
+    setProgress('Komprimiere…', 20);
+    const base = zipName(fields.name || type);
+    const zipBlob = await zip.generateAsync({type:'blob'}, m => setProgress('Komprimiere…', 20+m.percent*0.25));
     setProgress('Lade hoch…', 45);
     const fd = new FormData();
     for (const [k,v] of Object.entries(fields)) fd.append(k, v);
