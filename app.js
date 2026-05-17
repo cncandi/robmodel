@@ -1010,13 +1010,13 @@ function loadExampleGreifer() {
       {
         name: 'Backe 1', objectType: 'box', color: '#2288cc',
         length: 50, width: 30, height: 80,
-        axis: 'Y+', eMin: 0, eMax: 50,
+        axis: 'Y+', eMin: 0, eMax: 50, ePos: 0, labelNum: 1,
         offset: { x: 0, y: 25, z: 80, rx: 0, ry: 0, rz: 0 }
       },
       {
         name: 'Backe 2', objectType: 'box', color: '#2288cc',
         length: 50, width: 30, height: 80,
-        axis: 'Y-', eMin: 0, eMax: 50,
+        axis: 'Y-', eMin: 0, eMax: 50, ePos: 0, labelNum: 1,
         offset: { x: 0, y: -25, z: 80, rx: 0, ry: 0, rz: 0 }
       }
     ]
@@ -1412,24 +1412,42 @@ function renderRows(){
 
   if (_paramTab === 'l') {
     const objekte = state.objekte||[];
-    if(!objekte.length){$('jointRows').innerHTML=`<tr><td colspan="12" style="color:#4a6a8a;font-family:monospace;font-size:11px;padding:8px">Keine Objekte — über 📦 Bewegliche Objekte anlegen.</td></tr>`;return;}
+    // Collect all labeled members: objekte + endeffektor teile
     const groups=new Map();
-    objekte.forEach((o,i)=>{const k=o.labelNum||i+1;if(!groups.has(k))groups.set(k,[]);groups.get(k).push({o,i});});
+    objekte.forEach((o,i)=>{
+      const k=o.labelNum||i+1;
+      if(!groups.has(k))groups.set(k,{objekte:[],teile:[]});
+      groups.get(k).objekte.push({o,i});
+    });
+    (state.effektoren||[]).forEach((eff,ei)=>{
+      (eff.teile||[]).forEach((t,ti)=>{
+        if(t.labelNum==null) return;
+        const k=t.labelNum;
+        if(!groups.has(k))groups.set(k,{objekte:[],teile:[]});
+        groups.get(k).teile.push({t,ei,ti,eff});
+      });
+    });
+    if(!groups.size){$('jointRows').innerHTML=`<tr><td colspan="12" style="color:#4a6a8a;font-family:monospace;font-size:11px;padding:8px">Keine Labels — über 📦 Bewegliche Objekte oder Endeffektor-Teile anlegen.</td></tr>`;return;}
     let html='';
     groups.forEach((members,key)=>{
-      const first=members[0].o;
-      const mountIcon=members.some(m=>m.o.mountMode==='a6')?'🦾':'🌍';
-      const axisStr=[...new Set(members.map(m=>m.o.axis||'Y+'))].join('/');
-      const nameStr=members.map(m=>m.o.name||'').filter(Boolean).join(', ');
+      const firstObj=members.objekte[0]?.o;
+      const firstTeil=members.teile[0]?.t;
+      const first=firstObj||firstTeil;
+      const mountIcon=(members.objekte.some(m=>m.o.mountMode==='a6')||members.teile.length)?'🦾':'🌍';
+      const axisStr=[...new Set([...members.objekte.map(m=>m.o.axis||'Y+'),...members.teile.map(m=>m.t.axis||'Y+')])].join('/');
+      const nameStr=[...members.objekte.map(m=>m.o.name||''),...members.teile.map(m=>m.t.name||'')].filter(Boolean).join(', ');
       const parts=state.axisStlParts['Label'+key]||[];
       const col=(parts[0]?.color)||first.color||'#4499cc';
+      const curPos=first.ePos||0;
+      const minVal=first.eMin||0;
+      const maxVal=first.eMax??1000;
       html+=`<tr>
         <td><b>Label${key}</b> <span style="font-size:9px;color:#6a8fa8">${mountIcon}</span></td>
-        <td><input data-gl-pos data-gl-key="${key}" type="number" step="1" value="${first.ePos||0}" min="${first.eMin||0}" max="${first.eMax||1000}" style="width:70px"></td>
+        <td><input data-gl-pos data-gl-key="${key}" type="number" step="1" value="${curPos}" min="${minVal}" max="${maxVal}" style="width:70px"></td>
         <td><span class="axisDir">${axisStr}</span></td>
         <td colspan="3" style="color:#6a8fa8;font-size:10px">${nameStr}</td>
-        <td><input data-gl-min data-gl-key="${key}" type="number" step="1" value="${first.eMin||0}" style="width:60px"></td>
-        <td><input data-gl-max data-gl-key="${key}" type="number" step="1" value="${first.eMax||1000}" style="width:60px"></td>
+        <td><input data-gl-min data-gl-key="${key}" type="number" step="1" value="${minVal}" style="width:60px"></td>
+        <td><input data-gl-max data-gl-key="${key}" type="number" step="1" value="${maxVal}" style="width:60px"></td>
         <td style="color:#4a6a8a">—</td>
         <td><label style="display:inline-block;width:26px;height:22px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden"><input type="color" data-gl-color data-gl-key="${key}" value="${col}" style="opacity:0;width:1px;height:1px;position:absolute"></label></td>
         <td><button data-gl-stl data-gl-key="${key}" style="font-size:10px;padding:3px 7px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:${parts.length?'#d8e8f0':'#6a8fa8'};width:100%">${parts.length?parts.length+' Part'+(parts.length>1?'s':''):'+ STL'}</button></td>
@@ -1437,21 +1455,33 @@ function renderRows(){
       </tr>`;
     });
     $('jointRows').innerHTML=html;
+
+    // Helper: update all members for a key
+    function applyLabelPos(key,val) {
+      const m=groups.get(key); if(!m) return;
+      m.objekte.forEach(({o,i})=>{o.ePos=val;rebuildObjektMesh(i);});
+      m.teile.forEach(({t,ei})=>{t.ePos=val;rebuildEffMesh(ei);});
+      applyTransforms();
+    }
+
     $('jointRows').querySelectorAll('[data-gl-pos]').forEach(inp=>inp.addEventListener('input',()=>{
-      const key=+inp.dataset.glKey,val=parseFloat(inp.value)||0;
-      objekte.forEach((o,i)=>{if((o.labelNum||i+1)===key){o.ePos=val;rebuildObjektMesh(i);}});
+      applyLabelPos(+inp.dataset.glKey, parseFloat(inp.value)||0);
     }));
     $('jointRows').querySelectorAll('[data-gl-min]').forEach(inp=>inp.addEventListener('input',()=>{
       const key=+inp.dataset.glKey,val=parseFloat(inp.value)||0;
-      objekte.forEach((o,i)=>{if((o.labelNum||i+1)===key)o.eMin=val;});
+      const m=groups.get(key); if(!m) return;
+      m.objekte.forEach(({o})=>o.eMin=val); m.teile.forEach(({t})=>t.eMin=val);
     }));
     $('jointRows').querySelectorAll('[data-gl-max]').forEach(inp=>inp.addEventListener('input',()=>{
       const key=+inp.dataset.glKey,val=parseFloat(inp.value)||1000;
-      objekte.forEach((o,i)=>{if((o.labelNum||i+1)===key)o.eMax=val;});
+      const m=groups.get(key); if(!m) return;
+      m.objekte.forEach(({o})=>o.eMax=val); m.teile.forEach(({t})=>t.eMax=val);
     }));
     $('jointRows').querySelectorAll('[data-gl-color]').forEach(inp=>inp.addEventListener('change',()=>{
       const key=+inp.dataset.glKey;
-      objekte.forEach((o,i)=>{if((o.labelNum||i+1)===key){o.color=inp.value;rebuildObjektMesh(i);}});
+      const m=groups.get(key); if(!m) return;
+      m.objekte.forEach(({o,i})=>{o.color=inp.value;rebuildObjektMesh(i);});
+      m.teile.forEach(({t,ei})=>{t.color=inp.value;rebuildEffMesh(ei);});
       renderRows();
     }));
     $('jointRows').querySelectorAll('[data-gl-stl]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -1459,21 +1489,20 @@ function renderRows(){
     }));
     $('jointRows').querySelectorAll('[data-gl-sim]').forEach(btn=>btn.addEventListener('click',()=>{
       const key=+btn.dataset.glKey;
-      const members=objekte.map((o,i)=>({o,i})).filter(({o,i})=>(o.labelNum||i+1)===key);
-      const first=members[0]?.o; if(!first)return;
+      const m=groups.get(key); if(!m) return;
+      const first=(m.objekte[0]?.o)||(m.teile[0]?.t); if(!first) return;
       const simKey='_simGroup_'+key;
-      if(first[simKey]){clearInterval(first[simKey]);members.forEach(({o})=>delete o[simKey]);return;}
-      const min=first.eMin||0,max=first.eMax||1000;
-      let pos=first.ePos||0,dir=1;
+      if(first[simKey]){clearInterval(first[simKey]);[...m.objekte.map(x=>x.o),...m.teile.map(x=>x.t)].forEach(o=>delete o[simKey]);return;}
+      const min=first.eMin||0, max=first.eMax||1000;
+      let pos=first.ePos||0, dir=1;
       const iv=setInterval(()=>{
         pos+=dir*(max-min)/60;
         if(pos>=max){pos=max;dir=-1;}else if(pos<=min){pos=min;dir=1;}
-        members.forEach(({o,i})=>{o.ePos=pos;rebuildObjektMesh(i);});
-        applyTransforms();
+        applyLabelPos(key,pos);
         const inp=$('jointRows').querySelector(`[data-gl-pos][data-gl-key="${key}"]`);
         if(inp)inp.value=Math.round(pos);
       },16);
-      members.forEach(({o})=>o[simKey]=iv);
+      [...m.objekte.map(x=>x.o),...m.teile.map(x=>x.t)].forEach(o=>o[simKey]=iv);
     }));
     return;
   }
@@ -1578,7 +1607,7 @@ function rebuildEffMesh(effIdx) {
         tGrp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:t.color||0x607080,shininess:60,transparent:true,opacity:.85})));
       }
       const bo=t.offset||{}, ax=t.axis||'Y+';
-      const p=Math.min(Math.max(ePos,t.eMin||0),t.eMax??ePos);
+      const p=Math.min(Math.max(t.ePos||0,t.eMin||0),t.eMax??t.ePos||0);
       let cx=0,cy=0,cz=0;
       if(ax==='X+')cx=p;else if(ax==='X-')cx=-p;else if(ax==='Y+')cy=p;else if(ax==='Y-')cy=-p;else if(ax==='Z+')cz=p;else cz=-p;
       tGrp.position.set((bo.x||0)+cx,(bo.y||0)+cy,(bo.z||0)+cz);
@@ -2555,6 +2584,7 @@ function openTeilModal(effIdx, teilIdx) {
   _teStlBuf=null; _teAxis='Y+';
   const t=(teilIdx>=0)?(state.effektoren[effIdx]?.teile||[])[teilIdx]:null;
   $('te-name').value=t?.name||'';
+  if($('te-labelnum')) $('te-labelnum').value=t?.labelNum??1;
   $('te-type').value=t?.objectType||'box';
   $('te-color').value=t?.color||'#607080';
   $('te-length').value=t?.length||100; $('te-width').value=t?.width||50;
@@ -2610,6 +2640,7 @@ $('te-submit')?.addEventListener('click',()=>{
   const t2=$('te-type')?.value||'box';
   const entry={
     name:$('te-name').value||('Teil '+(eff.teile.length+1)),
+    labelNum: parseInt($('te-labelnum')?.value)||null,
     objectType:t2, color:$('te-color').value||'#607080',
     length:parseFloat($('te-length').value)||100, width:parseFloat($('te-width').value)||50,
     height:parseFloat($('te-height').value)||50, radius:parseFloat($('te-radius').value)||25,
