@@ -1008,7 +1008,7 @@ function loadExampleGreifer() {
       name:'Backe '+(i+1), objectType:'box', color:'#2288cc',
       length:d, width:w, height:h,
       moveAngle:angleDeg, eMin:0, eMax:eMax, ePos:0, labelNum:1,
-      offset:{ x:Math.cos(rad)*R, y:Math.sin(rad)*R, z:70, rx:0, ry:0, rz:angleDeg }
+      offset:{ x:Math.cos(rad)*R, y:Math.sin(rad)*R, z:70, rx:0, ry:90, rz:angleDeg }
     });
   }
   state.effektoren.push({
