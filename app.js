@@ -1574,7 +1574,8 @@ function rebuildObjektMesh(i) {
   // Position: base offset + movement along axis
   const p=o.ePos||0, ax=o.axis||'Y+', bo=o.boxOffset||{}, deg=Math.PI/180;
   var cx=0,cy=0,cz=0;
-  if(ax==='X+')cx=p; else if(ax==='X-')cx=-p; else if(ax==='Y+')cy=p; else if(ax==='Y-')cy=-p; else if(ax==='Z+')cz=p; else cz=-p;
+  if(o.moveAngle!=null){const rad=o.moveAngle*deg;cx=Math.cos(rad)*p;cy=Math.sin(rad)*p;}
+  else if(ax==='X+')cx=p; else if(ax==='X-')cx=-p; else if(ax==='Y+')cy=p; else if(ax==='Y-')cy=-p; else if(ax==='Z+')cz=p; else cz=-p;
   grp.position.set((bo.x||0)+cx,(bo.y||0)+cy,(bo.z||0)+cz);
   grp.rotation.set((bo.rx||0)*deg,(bo.ry||0)*deg,(bo.rz||0)*deg,'XYZ');
 }
@@ -1641,6 +1642,7 @@ function openObjModal(editIdx) {
   $('om-min').value    = o?.eMin    ?? 0;
   $('om-max').value    = o?.eMax    ?? 1000;
   $('om-start').value  = o?.ePos    ?? 0;
+  if($('om-moveangle')) $('om-moveangle').value = o?.moveAngle??'';
   $('om-show').checked = o?.showBox !== false;
   $('om-edit-idx').value = editIdx >= 0 ? editIdx : -1;
   const bo=o?.boxOffset||{};
@@ -1693,6 +1695,7 @@ $('om-submit')?.addEventListener('click',()=>{
     eMin:      parseFloat($('om-min').value)||0,
     eMax:      parseFloat($('om-max').value)||1000,
     ePos:      parseFloat($('om-start').value)||0,
+    moveAngle: $('om-moveangle')?.value!=='' ? parseFloat($('om-moveangle').value) : null,
     showBox:   $('om-show').checked===true,
     color:     '#4499cc',
     boxOffset: {
