@@ -972,6 +972,7 @@ async function loadSourceZip(file) {
   state.toolTr=defaultToolTr();  setInputs('t', state.toolTr);
   if (state.xmls[0]) parseXml(new TextDecoder('utf-8').decode(state.buffers.get(state.xmls[0].path)));
   setJointAnglesToReferencePose();
+  ['rRx','rRy','rRz'].forEach(function(id,i){ const el=document.getElementById(id); if(el) el.value=[90,0,-90][i]; });
   await loadStls(); enableSave(); renderAll(); setView('iso');
 }
 
