@@ -613,6 +613,7 @@ function updateAxisPointVisuals() {
     hit.position.copy(p);
     hit.userData.axisIndex = i;
     hit.name = label;
+    hit.layers.set(2);  // Eigenes Layer für Raycast-Isolation
     axisPointGroup.add(hit);
     axisMeshes.push(hit);
 
@@ -655,15 +656,13 @@ function pickAxisPoint(event) {
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
+  var _prevLayers = raycaster.layers.mask;
+  raycaster.layers.set(2);  // Nur Hit-Spheres (Layer 2) — Roboter-Meshes ignorieren
   const hit = raycaster.intersectObjects(axisMeshes, false)[0];
+  raycaster.layers.mask = _prevLayers;
   if (hit) {
     state.selectedAxis = hit.object.userData.axisIndex;
-    updateAxisPointVisuals();
-    // Punkt direkt verschiebbar (nicht A1 = Ursprung)
-    if (state.selectedAxis > 0) {
-      const sel = axisMeshes[state.selectedAxis];
-      if (sel) { transformControls.attach(sel); transformControls.visible = true; }
-    }
+    selectAxisPoint(state.selectedAxis);
     event.preventDefault();
   }
 }
@@ -727,6 +726,15 @@ function selectAxisPoint(i) {
   state.selectedAxis = Math.max(0, Math.min(5, Number(i) || 0));
   updateAxisPointVisuals();
   updateCSHelper();
+  // Aktive Zeile in Tabelle hervorheben
+  if (typeof renderRows === 'function') renderRows();
+  // TransformControls direkt aktivieren (außer A1)
+  if (state.selectedAxis > 0 && axisMeshes[state.selectedAxis]) {
+    transformControls.attach(axisMeshes[state.selectedAxis]);
+    transformControls.visible = true;
+  } else {
+    transformControls.detach();
+  }
 }
 
 // ── STEP / OCCT Import ─────────────────────────────────────────────
