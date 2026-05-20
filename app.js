@@ -971,6 +971,45 @@ async function loadSourceZip(file) {
   await loadStls(); enableSave(); renderAll(); setView('iso');
 }
 
+
+async function loadSourceFolder(files) {
+  if (!files || !files.length) return;
+  resetData(); state.mode = 'source';
+  const buffers = new Map();
+  const fileList = [];
+
+  for (const file of files) {
+    const data = await file.arrayBuffer();
+    const u8 = new Uint8Array(data);
+    // webkitRelativePath = "OrdnerName/unterordner/datei.stl" → Pfad ab zweitem Segment
+    const relPath = file.webkitRelativePath || file.name;
+    const parts = relPath.split('/');
+    // Ordnername oben abschneiden → nur Unterstruktur
+    const path = parts.length > 1 ? parts.slice(1).join('/') : parts[0];
+    const name = parts[parts.length - 1];
+    if (!name || /^\./.test(name)) continue;  // versteckte Dateien ignorieren
+    buffers.set(path, u8);
+    fileList.push({ path, name, size: u8.byteLength, type: typeOf(name) });
+  }
+
+  state.files = fileList;
+  state.buffers = buffers;
+  splitFiles();
+
+  const hasOsd = (state.stls||[]).some(f => /\.osd$/i.test(f.name));
+  state.robotTr = hasOsd ? {x:0,y:0,z:0,rx:0,ry:0,rz:0} : defaultRobotTr();
+  setInputs('r', state.robotTr);
+  state.toolTr = defaultToolTr(); setInputs('t', state.toolTr);
+
+  if (state.xmls[0]) parseXml(new TextDecoder('utf-8').decode(state.buffers.get(state.xmls[0].path)));
+  setJointAnglesToReferencePose();
+
+  // Rotation vor loadStls setzen
+  ['rRx','rRy','rRz'].forEach(function(id,i){ const el=document.getElementById(id); if(el) el.value=[90,0,-90][i]; });
+
+  await loadStls(); enableSave(); renderAll(); setView('iso');
+}
+
 async function loadPackageZip(file) {
   const z = await readZip(file);
   // Check for config.json (new component format)
@@ -4053,6 +4092,10 @@ $('sourceZip').addEventListener('change', e => {
 // Ctrl+Click on the Load ZIP label triggers demo
 document.querySelector('label[for="sourceZip"]').addEventListener('click', e => {
   if (e.ctrlKey) { e.preventDefault(); loadDemoKr8().catch(err => alert(err.message)); }
+});
+$('sourceFolder').addEventListener('change', e => {
+  if (!e.target.files.length) return;
+  loadSourceFolder(e.target.files).catch(err => alert(err.message));
 });
 $('checkZip').addEventListener('change',  e => e.target.files[0] && loadPackageZip(e.target.files[0]).catch(err=>alert(err.message)));
 $('jsonInput').addEventListener('change',  e => e.target.files[0] && loadJsonFile(e.target.files[0]));
