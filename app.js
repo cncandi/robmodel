@@ -3991,6 +3991,18 @@ $('toggleGrid').onclick   = () => grid.visible = !grid.visible;
 $('camModeBtn')?.addEventListener('click', toggleCameraMode);
 
 let _axisLabelsVisible = true;
+$('robotVisBtn')?.addEventListener('click', () => {
+  if (!robotGroup) return;
+  robotGroup.visible = !robotGroup.visible;
+  const btn = $('robotVisBtn');
+  if (btn) {
+    const vis = robotGroup.visible;
+    btn.style.background = vis ? 'rgba(37,99,235,.2)' : 'rgba(255,255,255,.05)';
+    btn.style.borderColor = vis ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.15)';
+    btn.style.color       = vis ? '#60a5fa' : '#6a8fa8';
+  }
+});
+
 $('axisLabelBtn')?.addEventListener('click', () => {
   _axisLabelsVisible = !_axisLabelsVisible;
   axisPointGroup.traverse(o => { if (o.userData.isAxisLabel) o.visible = _axisLabelsVisible; });
