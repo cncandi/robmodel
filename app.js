@@ -4080,28 +4080,56 @@ $('toggleGrid').onclick   = () => grid.visible = !grid.visible;
 $('camModeBtn')?.addEventListener('click', toggleCameraMode);
 
 let _axisLabelsVisible = true;
+// Robot-Visibility: 0=sichtbar, 1=durchsichtig, 2=unsichtbar
+var _robotVisState = 0;
+
 $('robotVisBtn')?.addEventListener('click', () => {
-  // Sichtbarkeit aller Robot-Objekte (Achsen, Portal, Extruder) toggling
-  var isVis = robotGroup ? robotGroup.visible : true;
-  var newVis = !isVis;
-  // Roboterkörper + Kinematik
-  if (robotGroup)      robotGroup.visible      = newVis;
-  if (kinematicsRoot)  kinematicsRoot.visible   = newVis;
-  // axisPointGroup (Skelett) bleibt immer sichtbar
-  // Werkzeug / Endeffektor / Extruder
-  if (toolGroup)       toolGroup.visible        = newVis;
-  (effektorGroups||[]).forEach(function(g){ if(g) g.visible = newVis; });
-  // Portal / Schiene
-  if (railGroup)       railGroup.visible        = newVis;
-  // Positionierer
-  (positionerGroups||[]).forEach(function(g){ if(g?.containerGrp) g.containerGrp.visible = newVis; });
+  _robotVisState = (_robotVisState + 1) % 3;
+
+  var groups = [];
+  if (robotGroup)     groups.push(robotGroup);
+  if (kinematicsRoot) groups.push(kinematicsRoot);
+  if (toolGroup)      groups.push(toolGroup);
+  (effektorGroups||[]).forEach(function(g){ if(g) groups.push(g); });
+  if (railGroup)      groups.push(railGroup);
+  (positionerGroups||[]).forEach(function(g){ if(g?.containerGrp) groups.push(g.containerGrp); });
+
+  groups.forEach(function(grp) {
+    if (_robotVisState === 2) {
+      grp.visible = false;
+    } else {
+      grp.visible = true;
+      grp.traverse(function(obj) {
+        if (obj.isMesh && obj.material) {
+          if (_robotVisState === 1) {
+            // Durchsichtig
+            obj.material.transparent = true;
+            obj.material.opacity = 0.25;
+          } else {
+            // Voll sichtbar
+            obj.material.transparent = false;
+            obj.material.opacity = 1.0;
+          }
+        }
+      });
+    }
+  });
+
   // Button-Style
   var btn = $('robotVisBtn');
   if (btn) {
-    btn.style.background  = newVis ? 'rgba(37,99,235,.2)' : 'rgba(255,255,255,.05)';
-    btn.style.borderColor = newVis ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.15)';
-    btn.style.color       = newVis ? '#60a5fa' : '#6a8fa8';
-    btn.title = newVis ? 'Roboter ausblenden' : 'Roboter einblenden';
+    var styles = [
+      {bg:'rgba(37,99,235,.2)', bc:'rgba(37,99,235,.4)', col:'#60a5fa', title:'Roboter einblenden (Klick: durchsichtig)'},
+      {bg:'rgba(255,165,0,.2)',  bc:'rgba(255,165,0,.4)',  col:'#fbbf24', title:'Roboter einblenden (Klick: ausblenden)'},
+      {bg:'rgba(255,255,255,.05)',bc:'rgba(255,255,255,.15)',col:'#6a8fa8',title:'Roboter einblenden'},
+    ];
+    // Zeige den NÄCHSTEN Zustand als Tooltip-Hinweis
+    var s = styles[_robotVisState];
+    btn.style.background  = s.bg;
+    btn.style.borderColor = s.bc;
+    btn.style.color       = s.col;
+    btn.title             = s.title;
+    btn.textContent       = _robotVisState===0?'🤖 Roboter':_robotVisState===1?'👻 Roboter':'⬜ Roboter';
   }
 });
 
