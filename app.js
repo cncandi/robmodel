@@ -83,7 +83,9 @@ const meshes = new Map();
 const axisMeshes = [];
 const axisPivotGroups = [];
 const skeletonCyls = []; const skeletonSphs = [];
-const LINK_R=[28,20,16,12,8,6]; const JOINT_R=[40,38,30,24,20,16];
+const LINK_R=[28,20,16,12,8,6];
+let _jointSizeScale = 1.0;  // Skalierungsfaktor für Knotenpunkte
+function JOINT_R_at(i) { const base=[40,38,30,24,20,16]; return Math.round((base[i]||10)*_jointSizeScale); }
 const LINK_COLOR=0xcc4400; const JOINT_COLOR=0xe8a020;
 const loader = new STLLoader();
 
@@ -540,7 +542,7 @@ function rebuildSkeletonMeshes(pts) {
     const mat = new THREE.MeshPhongMaterial({
       color: JOINT_COLOR, shininess: 120, specular: 0x666666
     });
-    const sph = new THREE.Mesh(new THREE.SphereGeometry(JOINT_R[i-1] || 10, 12, 8), mat);
+    const sph = new THREE.Mesh(new THREE.SphereGeometry(JOINT_R_at(i-1) || 10, 12, 8), mat);
     sph.position.copy(pts[i]);
     sph.userData.isSkelSph = true;
     axisPointGroup.add(sph); skeletonSphs.push(sph);
@@ -568,7 +570,7 @@ function updateSkeletonPositions() {
     const p = pivotPts[idx];
     if (!p) return;
     if (child.isSprite) {
-      child.position.copy(p).add(new THREE.Vector3(0, 0, (JOINT_R[idx]||10)*2+20));
+      child.position.copy(p).add(new THREE.Vector3(0, 0, (JOINT_R_at(idx)||10)*2+20));
     } else {
       child.position.copy(p);
     }
@@ -603,7 +605,7 @@ function updateAxisPointVisuals() {
   // Labels + unsichtbare Raycaster-Kugeln: A1-A6 an den Pivot-Positionen
   pivotPts.forEach((p, i) => {
     const label = 'A' + (i + 1);
-    const hitGeo = new THREE.SphereGeometry(JOINT_R[i] || 10, 8, 6);
+    const hitGeo = new THREE.SphereGeometry(JOINT_R_at(i) || 10, 8, 6);
     const hitMat = new THREE.MeshBasicMaterial({ visible: false });
     const hit = new THREE.Mesh(hitGeo, hitMat);
     hit.position.copy(p);
@@ -612,7 +614,7 @@ function updateAxisPointVisuals() {
     axisPointGroup.add(hit);
     axisMeshes.push(hit);
 
-    const lbl = makeAxisLabel(label, p.clone().add(new THREE.Vector3(0, 0, (JOINT_R[i] || 10) * 2 + 20)));
+    const lbl = makeAxisLabel(label, p.clone().add(new THREE.Vector3(0, 0, (JOINT_R_at(i) || 10) * 2 + 20)));
     lbl.userData.skeletonIdx = i;
     axisPointGroup.add(lbl);
   });
@@ -647,7 +649,17 @@ function pickAxisPoint(event) {
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
   const hit = raycaster.intersectObjects(axisMeshes, false)[0];
-  if (hit) { state.selectedAxis = hit.object.userData.axisIndex; updateAxisPointVisuals(); event.preventDefault(); }
+  if (hit) {
+    state.selectedAxis = hit.object.userData.axisIndex;
+    updateAxisPointVisuals();
+    // Direkt TransformControls aktivieren — Punkt ist sofort verschiebbar
+    const sel = axisMeshes[state.selectedAxis];
+    if (sel && state.selectedAxis > 0) {
+      transformControls.attach(sel);
+      transformControls.visible = true;
+    }
+    event.preventDefault();
+  }
 }
 
 function onAxisObjectMoved() {
@@ -4547,3 +4559,24 @@ $('ros-load').onclick = async function() {
 
 
 
+
+// ── Knotenpunkt-Größen-Schieberegler ───────────────────────────────
+const _jSlider = document.getElementById('jointSizeSlider');
+const _jVal    = document.getElementById('jointSizeVal');
+if (_jSlider) {
+  _jSlider.addEventListener('input', function() {
+    _jointSizeScale = parseInt(this.value) / 30;  // 30 = Basiswert
+    if (_jVal) _jVal.textContent = this.value;
+    updateAxisPointVisuals();  // Kugeln neu bauen mit neuer Größe
+  });
+}
+
+// ── ESC: TransformControls für Achspunkte deaktivieren ─────────────
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    if (transformControls && transformControls.object &&
+        transformControls.object.userData && transformControls.object.userData.axisIndex !== undefined) {
+      transformControls.detach();
+    }
+  }
+});
