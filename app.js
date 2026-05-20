@@ -4040,9 +4040,13 @@ $('clearAllBtn')?.addEventListener('click', function(e) {
   if (e.ctrlKey) {
     // STRG+Neu: alles außer Skelett (joints + axisPoints) löschen
     if (!confirm('Alles außer Skelett leeren?')) return;
-    // Joints und axisPoints sichern
-    const savedJoints = JSON.parse(JSON.stringify(state.joints || []));
-    const savedAxisPoints = JSON.parse(JSON.stringify(state.axisPoints || []));
+    // Joints und axisPoints sichern — falls leer: Standardskelett erzeugen
+    var savedJoints = (state.joints && state.joints.length)
+      ? JSON.parse(JSON.stringify(state.joints))
+      : ['A1','A2','A3','A4','A5','A6'].map(function(n,i){return {name:n,axis:fixedAxisType(i),offset:defOffset(i),min:null,max:null,rotationSign:1,status:'Standard'};});
+    var savedAxisPoints = (state.axisPoints && state.axisPoints.length)
+      ? JSON.parse(JSON.stringify(state.axisPoints))
+      : savedJoints.map(function(j,i){return Object.assign({name:'A'+(i+1),rx:0,ry:0,rz:0,source:'Standard'},defOffset(i));});
     clearAll._inner(false);
     // Skelett wiederherstellen
     state.joints = savedJoints;
