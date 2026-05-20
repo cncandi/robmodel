@@ -934,9 +934,12 @@ function disableSave() { $('downloadJson').disabled=true;  $('downloadZip').disa
 
 function clearAll() {
   if(!confirm('Kompletten Viewport leeren?')) return;
+  clearAll._inner(true);
+}
+clearAll._inner = function(clearSkeleton) {
   // Reset robot state
   resetData(); disableSave();
-  state.joints = []; // remove A1-A6 rows from table
+  if (clearSkeleton) state.joints = []; // Achszeilen aus Tabelle entfernen
   // Clear robot 3D groups
   clearGroup(robotGroup);
   clearGroup(toolGroup); toolGroup.add(tcpMarker);
@@ -4033,7 +4036,27 @@ window.setRlMode = setRlMode;
 
 // ── Event-Listener ─────────────────────────────────────────────────
 $('newBtn').onclick     = () => { resetData(); disableSave(); renderAll(); setView('iso'); };
-$('clearAllBtn')?.addEventListener('click', clearAll);
+$('clearAllBtn')?.addEventListener('click', function(e) {
+  if (e.ctrlKey) {
+    // STRG+Neu: alles außer Skelett (joints + axisPoints) löschen
+    if (!confirm('Alles außer Skelett leeren?')) return;
+    // Joints und axisPoints sichern
+    const savedJoints = JSON.parse(JSON.stringify(state.joints || []));
+    const savedAxisPoints = JSON.parse(JSON.stringify(state.axisPoints || []));
+    clearAll._inner(false);
+    // Skelett wiederherstellen
+    state.joints = savedJoints;
+    state.axisPoints = savedAxisPoints;
+    // Skelett neu aufbauen
+    syncJointsFromAxisPoints();
+    rebuildRobotKinematics();
+    applyTransforms();
+    updateAxisPointVisuals();
+    renderRows();
+  } else {
+    clearAll();
+  }
+});
 $('downloadJson').onclick = downloadJson;
 $('downloadZip').onclick  = downloadZip;
 $('toggleParam').onclick = () => {
