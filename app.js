@@ -368,11 +368,13 @@ function applyTransforms() {
   const _rx = deg(state.robotTr.rx), _ry = deg(state.robotTr.ry), _rz = deg(state.robotTr.rz);
   robotGroup.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
   robotGroup.rotation.set(0, 0, 0);
+  // Rotation auf kinematicsRoot anwenden — Pivot-Weltpositionen drehen mit
+  kinematicsRoot.rotation.set(_rx, _ry, _rz);
   kinematicsRoot.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
   toolGroup.position.set(state.toolTr.x, state.toolTr.y, state.toolTr.z);
-  toolGroup.rotation.set(0, 0, 0);
-  // STL-Korrektur auf ALLE Meshes gleichmäßig anwenden (Roboter, Podest, Tool)
-  for (const [, mesh] of meshes) mesh.rotation.set(_rx, _ry, _rz);
+  toolGroup.rotation.set(_rx, _ry, _rz);
+  // Mesh-Rotation auf 0 — Rotation liegt bereits auf kinematicsRoot
+  for (const [, mesh] of meshes) mesh.rotation.set(0, 0, 0);
   if (axisPointGroup) { axisPointGroup.position.set(0,0,0); axisPointGroup.rotation.set(0,0,0); axisPointGroup.scale.set(1,1,1); }
   applyJointRotations();
   scene.updateMatrixWorld(true);
@@ -879,16 +881,12 @@ async function loadStls() {
     try {
       const u8 = state.buffers.get(f.path);
       const g = await parseGeometry(u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength), f.name);
-      if (rotMatrix) g.applyMatrix4(rotMatrix); // Rotation direkt in Geometrie einbrennen
+      // Rotation NICHT einbrennen — wird über kinematicsRoot/robotGroup angewendet
       g.computeVertexNormals();
       const mat = new THREE.MeshStandardMaterial({ color: colors[partKey(f.name)], roughness: .62, metalness: .08 });
       const mesh = new THREE.Mesh(g, mat); mesh.name = f.name;
       meshes.set(f.path, mesh);
     } catch (e) { console.warn(e); }
-  }
-  // Nach dem Einbrennen: Rotationsfelder auf 0 → applyTransforms dreht nicht nochmal
-  if (hasRot) {
-    ['rRx','rRy','rRz'].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=0; });
   }
   rebuildRobotKinematics(); applyTransforms(); fitCamera();
 }
