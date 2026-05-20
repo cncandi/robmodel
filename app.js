@@ -1112,7 +1112,8 @@ function parseMachineStateParameters(xml) {
 function parseXml(text) {
   const xml = new DOMParser().parseFromString(text,'application/xml');
   state.robotName = state.xmls[0]?.name?.replace(/\.xml$/i,'') || 'Robot';
-  const gotAxis = parseAxisPositions(xml);
+  const gotAxis = false; // Achsendpunkte aus XML ignorieren — Skelett bleibt wie es ist
+  // parseAxisPositions(xml);  ← deaktiviert
   if (/irb\s*4600|4600-40-2_55/i.test(text)) {
     const mins=[-180,-90,-180,-179,-125,-179], maxs=[180,150,75,179,120,179];
     state.joints.forEach((j,i)=>{j.min=mins[i];j.max=maxs[i];if(!gotAxis){j.offset=defOffset(i);state.axisPoints[i]={...state.axisPoints[i],...defOffset(i),source:'KR8 Zielwert'}}j.status=gotAxis?'XML AxisPos':'vorgeschlagen'});
@@ -3740,9 +3741,10 @@ async function loadComponentFromZip(zip) {
   else if (type === 'station')     applyStationConfig(cfg, stlBufs);
   else if (type === 'robot')       {
     applyJsonToState(cfg);
+    // Rotation VOR loadStlBufsIntoState setzen — loadStls() liest rRx/rRy/rRz am Anfang
+    const _setV = function(id,v){var el=document.getElementById(id);if(el)el.value=v;};
+    _setV('rRx',90); _setV('rRy',0); _setV('rRz',-90);
     await loadStlBufsIntoState(stlBufs);
-    // Nach Archiv-Import immer Rx=90 Ry=0 Rz=-90 setzen
-    ['rRx','rRy','rRz'].forEach(function(id,i){var el=document.getElementById(id);if(el)el.value=[90,0,-90][i];});
     rebuildRobotKinematics(); applyTransforms(); enableSave();
   }
   else throw new Error('Unbekannter Typ: ' + type);
