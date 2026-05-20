@@ -653,10 +653,13 @@ function pickAxisPoint(event) {
 function onAxisObjectMoved() {
   const mesh = transformControls.object; if (!mesh) return;
   const idx = mesh.userData.axisIndex;
+  if (idx === 0) return;  // A1 ist immer an Ursprung — nicht verschiebbar
   const pts = cumulativeAxisPositions();
-  const prev = idx > 0 ? pts[idx-1] : new THREE.Vector3(0,0,0);
+  const prev = pts[idx - 1] || new THREE.Vector3(0,0,0);
   const local = mesh.position.clone().sub(prev);
-  const p = state.axisPoints[idx];
+  // Kugel A(idx+1) liegt an pts[idx], bestimmt durch axisPoints[idx-1]
+  const p = state.axisPoints[idx - 1];
+  if (!p) return;
   p.x = Number(local.x.toFixed(3)); p.y = Number(local.y.toFixed(3)); p.z = Number(local.z.toFixed(3)); p.source = 'manuell';
   syncJointsFromAxisPoints(); rebuildRobotKinematics(); applyTransforms(); renderRows(); 
 }
