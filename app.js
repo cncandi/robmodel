@@ -882,6 +882,10 @@ async function loadStls() {
       meshes.set(f.path, mesh);
     } catch (e) { console.warn(e); }
   }
+  // Nach dem Einbrennen: Rotationsfelder auf 0 → applyTransforms dreht nicht nochmal
+  if (hasRot) {
+    ['rRx','rRy','rRz'].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=0; });
+  }
   rebuildRobotKinematics(); applyTransforms(); fitCamera();
 }
 
