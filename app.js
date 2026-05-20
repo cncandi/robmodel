@@ -3998,7 +3998,7 @@ $('robotVisBtn')?.addEventListener('click', () => {
   // Roboterkörper + Kinematik
   if (robotGroup)      robotGroup.visible      = newVis;
   if (kinematicsRoot)  kinematicsRoot.visible   = newVis;
-  if (axisPointGroup)  axisPointGroup.visible   = newVis;
+  // axisPointGroup (Skelett) bleibt immer sichtbar
   // Werkzeug / Endeffektor / Extruder
   if (toolGroup)       toolGroup.visible        = newVis;
   (effektorGroups||[]).forEach(function(g){ if(g) g.visible = newVis; });
