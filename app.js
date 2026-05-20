@@ -84,7 +84,7 @@ const axisMeshes = [];
 const axisPivotGroups = [];
 const skeletonCyls = []; const skeletonSphs = [];
 const LINK_R=[28,20,16,12,8,6];
-let _jointSizeScale = 1.0;  // Skalierungsfaktor für Knotenpunkte
+let _jointSizeScale = 50/30;  // Skalierungsfaktor für Knotenpunkte (Standard=50)
 function JOINT_R_at(i) { const base=[40,38,30,24,20,16]; return Math.round((base[i]||10)*_jointSizeScale); }
 const LINK_COLOR=0xcc4400; const JOINT_COLOR=0xe8a020;
 const loader = new STLLoader();
@@ -644,6 +644,11 @@ function makeAxisLabel(text, pos) {
 
 function pickAxisPoint(event) {
   if (!axisMeshes.length) return;
+  // Kein Pick während laufendem Drag
+  if (transformControls && transformControls.dragging) return;
+  // TransformControls vorher lösen damit er den Klick nicht schluckt
+  if (transformControls) transformControls.detach();
+
   const rect = renderer.domElement.getBoundingClientRect();
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -652,11 +657,10 @@ function pickAxisPoint(event) {
   if (hit) {
     state.selectedAxis = hit.object.userData.axisIndex;
     updateAxisPointVisuals();
-    // Direkt TransformControls aktivieren — Punkt ist sofort verschiebbar
-    const sel = axisMeshes[state.selectedAxis];
-    if (sel && state.selectedAxis > 0) {
-      transformControls.attach(sel);
-      transformControls.visible = true;
+    // Punkt direkt verschiebbar (nicht A1 = Ursprung)
+    if (state.selectedAxis > 0) {
+      const sel = axisMeshes[state.selectedAxis];
+      if (sel) { transformControls.attach(sel); transformControls.visible = true; }
     }
     event.preventDefault();
   }
