@@ -1104,8 +1104,7 @@ function parseMachineStateParameters(xml) {
     const iv = initEl ? parseFloat(initEl.getAttribute('DefaultValue')) : null;
     const j = state.joints[i - 1];
     if (!j) continue;
-    if (mn !== null && !isNaN(mn)) j.min = mn;
-    if (mx !== null && !isNaN(mx)) j.max = mx;
+    // Min/Max aus XML ignorieren — Skelett bleibt unverändert
     if (iv !== null && !isNaN(iv)) state.jointAngles[i - 1] = iv;
   }
 }
@@ -3739,7 +3738,13 @@ async function loadComponentFromZip(zip) {
     items.forEach(u => applyEnvironmentConfig(u, stlBufs));
   }
   else if (type === 'station')     applyStationConfig(cfg, stlBufs);
-  else if (type === 'robot')       { applyJsonToState(cfg); await loadStlBufsIntoState(stlBufs); rebuildRobotKinematics(); applyTransforms(); enableSave(); }
+  else if (type === 'robot')       {
+    applyJsonToState(cfg);
+    await loadStlBufsIntoState(stlBufs);
+    // Nach Archiv-Import immer Rx=90 Ry=0 Rz=-90 setzen
+    ['rRx','rRy','rRz'].forEach(function(id,i){var el=document.getElementById(id);if(el)el.value=[90,0,-90][i];});
+    rebuildRobotKinematics(); applyTransforms(); enableSave();
+  }
   else throw new Error('Unbekannter Typ: ' + type);
   renderAll(); setView('iso');
 }
