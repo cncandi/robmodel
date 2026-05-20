@@ -3992,14 +3992,27 @@ $('camModeBtn')?.addEventListener('click', toggleCameraMode);
 
 let _axisLabelsVisible = true;
 $('robotVisBtn')?.addEventListener('click', () => {
-  if (!robotGroup) return;
-  robotGroup.visible = !robotGroup.visible;
-  const btn = $('robotVisBtn');
+  // Sichtbarkeit aller Robot-Objekte (Achsen, Portal, Extruder) toggling
+  var isVis = robotGroup ? robotGroup.visible : true;
+  var newVis = !isVis;
+  // Roboterkörper + Kinematik
+  if (robotGroup)      robotGroup.visible      = newVis;
+  if (kinematicsRoot)  kinematicsRoot.visible   = newVis;
+  if (axisPointGroup)  axisPointGroup.visible   = newVis;
+  // Werkzeug / Endeffektor / Extruder
+  if (toolGroup)       toolGroup.visible        = newVis;
+  (effektorGroups||[]).forEach(function(g){ if(g) g.visible = newVis; });
+  // Portal / Schiene
+  if (railGroup)       railGroup.visible        = newVis;
+  // Positionierer
+  (positionerGroups||[]).forEach(function(g){ if(g?.containerGrp) g.containerGrp.visible = newVis; });
+  // Button-Style
+  var btn = $('robotVisBtn');
   if (btn) {
-    const vis = robotGroup.visible;
-    btn.style.background = vis ? 'rgba(37,99,235,.2)' : 'rgba(255,255,255,.05)';
-    btn.style.borderColor = vis ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.15)';
-    btn.style.color       = vis ? '#60a5fa' : '#6a8fa8';
+    btn.style.background  = newVis ? 'rgba(37,99,235,.2)' : 'rgba(255,255,255,.05)';
+    btn.style.borderColor = newVis ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.15)';
+    btn.style.color       = newVis ? '#60a5fa' : '#6a8fa8';
+    btn.title = newVis ? 'Roboter ausblenden' : 'Roboter einblenden';
   }
 });
 
