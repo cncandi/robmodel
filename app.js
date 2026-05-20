@@ -4083,6 +4083,28 @@ let _axisLabelsVisible = true;
 // Robot-Visibility: 0=sichtbar, 1=durchsichtig, 2=unsichtbar
 var _robotVisState = 0;
 
+function _setRobotOpacity(grp, opacity) {
+  grp.traverse(function(obj) {
+    if (!obj.isMesh || !obj.material) return;
+    // Material klonen falls noch nicht getan, um andere Objekte nicht zu beeinflussen
+    if (!obj._origMaterial) obj._origMaterial = obj.material;
+    if (opacity < 1.0) {
+      if (obj.material === obj._origMaterial) obj.material = obj._origMaterial.clone();
+      obj.material.transparent = true;
+      obj.material.opacity     = opacity;
+      obj.material.depthWrite  = false;
+      obj.material.needsUpdate = true;
+    } else {
+      // Original-Material wiederherstellen
+      if (obj._origMaterial) { obj.material = obj._origMaterial; obj._origMaterial = undefined; }
+      obj.material.transparent = false;
+      obj.material.opacity     = 1.0;
+      obj.material.depthWrite  = true;
+      obj.material.needsUpdate = true;
+    }
+  });
+}
+
 $('robotVisBtn')?.addEventListener('click', () => {
   _robotVisState = (_robotVisState + 1) % 3;
 
@@ -4099,37 +4121,23 @@ $('robotVisBtn')?.addEventListener('click', () => {
       grp.visible = false;
     } else {
       grp.visible = true;
-      grp.traverse(function(obj) {
-        if (obj.isMesh && obj.material) {
-          if (_robotVisState === 1) {
-            // Durchsichtig
-            obj.material.transparent = true;
-            obj.material.opacity = 0.25;
-          } else {
-            // Voll sichtbar
-            obj.material.transparent = false;
-            obj.material.opacity = 1.0;
-          }
-        }
-      });
+      _setRobotOpacity(grp, _robotVisState === 1 ? 0.25 : 1.0);
     }
   });
 
   // Button-Style
   var btn = $('robotVisBtn');
   if (btn) {
-    var styles = [
-      {bg:'rgba(37,99,235,.2)', bc:'rgba(37,99,235,.4)', col:'#60a5fa', title:'Roboter einblenden (Klick: durchsichtig)'},
-      {bg:'rgba(255,165,0,.2)',  bc:'rgba(255,165,0,.4)',  col:'#fbbf24', title:'Roboter einblenden (Klick: ausblenden)'},
-      {bg:'rgba(255,255,255,.05)',bc:'rgba(255,255,255,.15)',col:'#6a8fa8',title:'Roboter einblenden'},
-    ];
-    // Zeige den NÄCHSTEN Zustand als Tooltip-Hinweis
-    var s = styles[_robotVisState];
-    btn.style.background  = s.bg;
-    btn.style.borderColor = s.bc;
-    btn.style.color       = s.col;
-    btn.title             = s.title;
-    btn.textContent       = _robotVisState===0?'🤖 Roboter':_robotVisState===1?'👻 Roboter':'⬜ Roboter';
+    var labels = ['🤖 Roboter','👻 Roboter','⬜ Roboter'];
+    var bgs    = ['rgba(37,99,235,.2)','rgba(255,165,0,.2)','rgba(255,255,255,.05)'];
+    var bcs    = ['rgba(37,99,235,.4)','rgba(255,165,0,.4)','rgba(255,255,255,.15)'];
+    var cols   = ['#60a5fa','#fbbf24','#6a8fa8'];
+    var tips   = ['Klick: durchsichtig','Klick: ausblenden','Klick: einblenden'];
+    btn.textContent   = labels[_robotVisState];
+    btn.style.background  = bgs[_robotVisState];
+    btn.style.borderColor = bcs[_robotVisState];
+    btn.style.color       = cols[_robotVisState];
+    btn.title             = tips[_robotVisState];
   }
 });
 
