@@ -957,6 +957,9 @@ function clearAll() {
   // Reset feste Objekte
   (festeGrps||[]).forEach(g=>{ if(g?.parent) g.parent.remove(g); });
   festeGrps.length=0; state.festeObjekte=[];
+  // File-Inputs leeren damit gleiche Dateien/Ordner erneut geladen werden können
+  const _si=$('sourceZip'); if(_si) _si.value='';
+  const _sf=$('sourceFolder'); if(_sf) _sf.value='';
   // Render minimal
   renderRailRows(); renderObjRows(); renderPosRows(); renderFixRows();
   renderAxisStlRows(); renderRows(); renderTcp();
@@ -4092,7 +4095,9 @@ $('themeBtn').onclick = () => applyTheme(_themeIdx + 1);
 // Load ZIP: normal = load, Ctrl+Click label = demo
 $('sourceZip').addEventListener('change', e => {
   if (!e.target.files[0]) return;
-  loadSourceZip(e.target.files[0]).catch(err => alert(err.message));
+  const file = e.target.files[0];
+  e.target.value = '';
+  loadSourceZip(file).catch(err => alert(err.message));
 });
 // Ctrl+Click on the Load ZIP label triggers demo
 document.querySelector('label[for="sourceZip"]').addEventListener('click', e => {
@@ -4100,7 +4105,9 @@ document.querySelector('label[for="sourceZip"]').addEventListener('click', e => 
 });
 $('sourceFolder').addEventListener('change', e => {
   if (!e.target.files.length) return;
-  loadSourceFolder(e.target.files).catch(err => alert(err.message));
+  const files = Array.from(e.target.files);
+  e.target.value = '';  // Reset damit gleicher Ordner erneut geladen werden kann
+  loadSourceFolder(files).catch(err => alert(err.message));
 });
 $('checkZip').addEventListener('change',  e => e.target.files[0] && loadPackageZip(e.target.files[0]).catch(err=>alert(err.message)));
 $('jsonInput').addEventListener('change',  e => e.target.files[0] && loadJsonFile(e.target.files[0]));
