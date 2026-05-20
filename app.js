@@ -368,13 +368,13 @@ function applyTransforms() {
   const _rx = deg(state.robotTr.rx), _ry = deg(state.robotTr.ry), _rz = deg(state.robotTr.rz);
   robotGroup.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
   robotGroup.rotation.set(0, 0, 0);
-  // Rotation auf kinematicsRoot anwenden — Pivot-Weltpositionen drehen mit
-  kinematicsRoot.rotation.set(_rx, _ry, _rz);
+  // Rotation auf einzelne Meshes (kinematicsRoot bleibt unrotiert → Skelett bleibt stabil)
+  kinematicsRoot.rotation.set(0, 0, 0);
   kinematicsRoot.position.set(state.robotTr.x, state.robotTr.y, state.robotTr.z);
   toolGroup.position.set(state.toolTr.x, state.toolTr.y, state.toolTr.z);
   toolGroup.rotation.set(_rx, _ry, _rz);
-  // Mesh-Rotation auf 0 — Rotation liegt bereits auf kinematicsRoot
-  for (const [, mesh] of meshes) mesh.rotation.set(0, 0, 0);
+  // STL-Korrektur auf ALLE Meshes gleichmäßig anwenden
+  for (const [, mesh] of meshes) mesh.rotation.set(_rx, _ry, _rz);
   if (axisPointGroup) { axisPointGroup.position.set(0,0,0); axisPointGroup.rotation.set(0,0,0); axisPointGroup.scale.set(1,1,1); }
   applyJointRotations();
   scene.updateMatrixWorld(true);
