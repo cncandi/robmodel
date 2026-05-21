@@ -3681,11 +3681,12 @@ async function loadRobotFromLib(robot) {
       } catch(e) { console.warn('JSON parse error', e); }
     }
 
-    // STLs
+    // STLs + OSD Dateien
     for (const name of Object.keys(zip.files)) {
-      if (zip.files[name].dir || !/\.stl$/i.test(name)) continue;
-      const buf = await zip.files[name].async('uint8array');
-      const fname = name.split('/').pop();
+      if (zip.files[name].dir || !/\.(stl|osd)$/i.test(name)) continue;
+      let buf = await zip.files[name].async('uint8array');
+      if (/\.osd$/i.test(name)) buf = new Uint8Array(osdToBinaryStl(buf.buffer));
+      const fname = name.split('/').pop().replace(/\.osd$/i, '.stl');
       state.buffers.set(fname, buf);
       state.files.push({ path: fname, name: fname, size: buf.byteLength, type: 'STL' });
     }
