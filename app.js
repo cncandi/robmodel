@@ -3685,7 +3685,7 @@ async function loadRobotFromLib(robot) {
     for (const name of Object.keys(zip.files)) {
       if (zip.files[name].dir || !/\.(stl|osd)$/i.test(name)) continue;
       let buf = await zip.files[name].async('uint8array');
-      if (/\.osd$/i.test(name)) buf = new Uint8Array(osdToBinaryStl(buf.buffer));
+      if (/\.osd$/i.test(name)) buf = new Uint8Array(osdToBinaryStl(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)));
       const fname = name.split('/').pop().replace(/\.osd$/i, '.stl');
       state.buffers.set(fname, buf);
       state.files.push({ path: fname, name: fname, size: buf.byteLength, type: 'STL' });
@@ -3791,7 +3791,7 @@ async function loadComponentFromZip(zip) {
     if (zip.files[name].dir || !/\.(stl|osd)$/i.test(name)) continue;
     const key = name.split('/').pop().replace(/\.(stl|osd)$/i,'');
     let raw = await zip.files[name].async('uint8array');
-    if (/\.osd$/i.test(name)) raw = new Uint8Array(osdToBinaryStl(raw.buffer));
+    if (/\.osd$/i.test(name)) raw = new Uint8Array(osdToBinaryStl(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength)));
     stlBufs[key] = raw;
   }
 
