@@ -273,7 +273,8 @@ function _orthoUpdateFrustum(aspect) {
   orthoCamera.bottom = -h2;
   orthoCamera.updateProjectionMatrix();
 }
-function toggleCameraMode() {
+function setCameraMode(toOrtho) {
+  if (toOrtho === isOrtho) return;
   const w = renderer.domElement.width;
   const h = renderer.domElement.height;
   const aspect = w / h;
@@ -288,7 +289,7 @@ function toggleCameraMode() {
     perspCamera.aspect = aspect;
     perspCamera.updateProjectionMatrix();
   } else {
-    // → Orthografisch: Frustum so setzen dass Sichtgröße identisch bleibt
+    // → Orthografisch
     orthoCamera.position.copy(perspCamera.position);
     orthoCamera.quaternion.copy(perspCamera.quaternion);
     orthoCamera.up.copy(perspCamera.up);
@@ -300,13 +301,11 @@ function toggleCameraMode() {
   }
   isOrtho = !isOrtho;
   controls.update();
-  const btn = $('camModeBtn');
-  if (btn) {
-    btn.textContent = isOrtho ? 'Ortho' : 'Perspektive';
-    if(isOrtho){ btn.classList.add('on'); } else { btn.classList.remove('on'); }
-    btn.style.background = ''; btn.style.borderColor = ''; btn.style.color = '';
-  }
+  const bp = $('camBtnPersp'), bo = $('camBtnOrtho');
+  if (bp) { if(isOrtho) bp.classList.remove('on'); else bp.classList.add('on'); }
+  if (bo) { if(isOrtho) bo.classList.add('on');    else bo.classList.remove('on'); }
 }
+function toggleCameraMode() { setCameraMode(!isOrtho); }
 
 function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
 
@@ -4155,8 +4154,11 @@ $('applyStlRotBtn').onclick = () => {
   loadStls().then(() => { renderRows(); });
 };
 $('toggleGrid').onclick   = () => grid.visible = !grid.visible;
-$('camModeBtn')?.addEventListener('click', toggleCameraMode);
-const _cmb=$('camModeBtn'); if(_cmb){_cmb.textContent='Perspektive';_cmb.classList.remove('on');}
+// camBtnPersp/Ortho use inline onclick
+// camera mode init: perspective is default
+const _cbp=$('camBtnPersp'),_cbo=$('camBtnOrtho');
+if(_cbp) _cbp.classList.add('on');
+if(_cbo) _cbo.classList.remove('on');
 
 let _axisLabelsVisible = true;
 // Robot-Visibility: 0=sichtbar, 1=durchsichtig, 2=unsichtbar
