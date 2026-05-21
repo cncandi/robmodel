@@ -147,6 +147,69 @@ header.top .title    { display: none !important; }
 .mnu-right button{display:flex;align-items:center;gap:5px}
 .appname .ico{margin-right:6px;width:15px;height:15px}
 
+
+/* ── Ribbon toolbar ──────────────────────────────────────────── */
+.ribbon {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--bdr);
+  padding: 0 6px;
+  gap: 0;
+  min-height: 58px;
+  flex-shrink: 0;
+}
+.rib-group {
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  padding: 4px 6px;
+  position: relative;
+}
+.rib-group + .rib-group::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 1px;
+  background: var(--bdr);
+}
+.rib-group-label {
+  position: absolute;
+  bottom: 2px;
+  left: 0; right: 0;
+  text-align: center;
+  font-size: .6em;
+  color: var(--txt3);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.rib-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  padding: 5px 7px 14px;
+  cursor: pointer;
+  color: var(--txt2);
+  font-family: monospace;
+  font-size: .68em;
+  white-space: nowrap;
+  min-width: 38px;
+  transition: background .1s, color .1s;
+  position: relative;
+}
+.rib-btn:hover { background: rgba(255,255,255,.07); color: var(--txt); }
+.rib-btn.on    { background: rgba(255,122,0,.12); color: var(--acc); }
+.rib-btn svg   { width: 20px; height: 20px; stroke: currentColor; fill: none;
+                 stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.rib-btn svg.filled { fill: currentColor; stroke: none; }
+.rib-sep { width: 1px; background: var(--bdr); margin: 8px 3px; flex-shrink: 0; }
+
 </style>
 
 </head>
@@ -1223,6 +1286,58 @@ document.getElementById('helpBtn').addEventListener('click', function(){
 document.getElementById('helpModal').addEventListener('click', function(e){
   if(e.target === this) this.style.display = 'none';
 });
+})();
+</script>
+
+<script>
+(function(){
+  // Sync ribbon view buttons with data-view clicks
+  document.querySelectorAll('[data-view]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var v = btn.getAttribute('data-view');
+      ['iso','top','bottom','front','back','left','right'].forEach(function(k){
+        var rb = document.getElementById('rib-'+k);
+        if(rb) rb.classList.toggle('on', k===v);
+      });
+      // sync camera mode buttons
+      var isIso = v==='iso';
+      var rp=document.getElementById('rib-persp'), ro=document.getElementById('rib-ortho');
+      if(rp) rp.classList.toggle('on', isIso);
+      if(ro) ro.classList.toggle('on', !isIso);
+    });
+  });
+  // Sync ribbon persp/ortho with menu buttons
+  ['camBtnPersp','camBtnOrtho'].forEach(function(id){
+    var btn = document.getElementById(id);
+    if(!btn) return;
+    var orig = btn.onclick;
+    btn.addEventListener('click', function(){
+      var isOrtho = id==='camBtnOrtho';
+      var rp=document.getElementById('rib-persp'), ro=document.getElementById('rib-ortho');
+      if(rp) rp.classList.toggle('on',!isOrtho);
+      if(ro) ro.classList.toggle('on', isOrtho);
+    });
+  });
+  // Sync gimbal/measure .on state
+  ['gimbalToggle','measureBtn'].forEach(function(id){
+    var btn=document.getElementById(id);
+    var ribId={'gimbalToggle':'rib-gimbal','measureBtn':'rib-measure'}[id];
+    if(!btn||!ribId) return;
+    btn.addEventListener('click', function(){
+      setTimeout(function(){
+        var rb=document.getElementById(ribId);
+        if(rb) rb.classList.toggle('on', btn.classList.contains('on'));
+      },0);
+    });
+  });
+  // downloadZip: enable/disable rib-save
+  var obs=new MutationObserver(function(){
+    var dz=document.getElementById('downloadZip');
+    var rs=document.getElementById('rib-save');
+    if(dz&&rs) rs.disabled=dz.disabled;
+  });
+  var dz=document.getElementById('downloadZip');
+  if(dz) obs.observe(dz,{attributes:true,attributeFilter:['disabled']});
 })();
 </script>
 
