@@ -35,6 +35,7 @@
       <button id="downloadJson" style="display:none" disabled>⬇ JSON</button>
       <button id="downloadZip" style="display:none" disabled>💾 Save ZIP</button>
       <button id="newBtn" title="Beispiel-Kinematik laden" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.3);color:#ff8030;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">Example</button>
+      <button id="helpBtn" title="Hilfe / Help" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#7aa0bb;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">❓ Hilfe</button>
       <button id="exGreiferBtn" title="Beispiel-Greifer mit 2 synchronen Backen" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#4ade80;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">Example Greifer</button>
     </div>
   </header>
@@ -863,6 +864,127 @@
     </div>
   </div>
 </div>
+
+
+<!-- ─── HILFE MODAL ───────────────────────────────────────────── -->
+<div id="helpModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);backdrop-filter:blur(3px);align-items:center;justify-content:center">
+  <div style="background:#111720;border:1px solid #1e2d40;border-radius:8px;width:min(860px,96vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 48px rgba(0,0,0,.8)">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;padding:14px 20px;border-bottom:1px solid #1e2d40;background:#192030;flex-shrink:0">
+      <span style="font-family:monospace;font-size:1em;font-weight:600;color:#d0dce8">❓ RobModel — Hilfe</span>
+      <div id="helpLangToggle" style="margin-left:auto;display:flex;gap:4px;background:#0a0e14;border:1px solid #1e2d40;border-radius:4px;overflow:hidden">
+        <button id="hlDE" onclick="helpSetLang('de')" style="background:#ff7a00;border:none;color:#000;font-family:monospace;font-size:.78em;padding:4px 12px;cursor:pointer;font-weight:600">DE</button>
+        <button id="hlEN" onclick="helpSetLang('en')" style="background:none;border:none;color:#7a9ab8;font-family:monospace;font-size:.78em;padding:4px 12px;cursor:pointer">EN</button>
+      </div>
+      <button onclick="document.getElementById('helpModal').style.display='none'" style="margin-left:12px;background:none;border:none;color:#7a9ab8;cursor:pointer;font-size:1.3em;padding:0 4px;line-height:1">✕</button>
+    </div>
+    <!-- Content -->
+    <div id="helpContent" style="overflow-y:auto;padding:28px 28px 36px;font-family:'Segoe UI',sans-serif;font-size:13px;line-height:1.65;color:#d0dce8"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+var _hl = 'de';
+
+var HELP = {
+de: `
+<div style="margin-bottom:6px;font-family:monospace;font-size:1.25em;font-weight:600;color:#ff7a00">⚙ RobModel</div>
+<p style="color:#7a9ab8;margin-bottom:24px;font-size:.92em">Roboter-Konfigurator — 3D-Modelle aus STL/OSD/STEP zusammenstellen &amp; exportieren</p>
+
+<div style="font-size:.68em;letter-spacing:.14em;text-transform:uppercase;color:#3a5570;border-bottom:1px solid #1e2d40;padding-bottom:5px;margin-bottom:14px">Beschreibung</div>
+<p style="margin-bottom:12px">RobModel ist ein browserbasiertes Werkzeug zum Aufbau vollständiger 3D-Robotermodelle. Einzelne Geometrie-Dateien (STL, OSD, STEP) werden per Drag&amp;Drop den Roboterachsen A1–A6, dem Sockel, Werkzeug oder der Umgebung zugewiesen. Das fertige Modell wird als ZIP-Paket exportiert und direkt in RobSimul geladen.</p>
+<p style="margin-bottom:24px">Über die integrierte Bibliothek stehen vorkonfigurierte Robotermodelle zur Verfügung. Kinematikparameter (Achspositionen, Gelenkgrenzen, Drehrichtungen) werden manuell eingestellt oder aus einem vorhandenen Paket übernommen.</p>
+
+<div style="font-size:.68em;letter-spacing:.14em;text-transform:uppercase;color:#3a5570;border-bottom:1px solid #1e2d40;padding-bottom:5px;margin-bottom:14px">Funktionen</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:24px">
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">📂 Drag &amp; Drop Import</b><br><span style="color:#7a9ab8;font-size:.8em">STL, OSD und STEP direkt in den Viewport ziehen. Automatische Typeerkennung anhand des Dateinamens (z.B. base.stl → Sockel).</span></div>
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">🤖 Achszuweisung</b><br><span style="color:#7a9ab8;font-size:.8em">14 Kategorien: A1–A6, Sockel, Werkzeug, Endeffektor, Umgebung, Positionierer, Schiene, Festes Objekt, Bewegliches Objekt.</span></div>
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">📐 Kinematik-Editor</b><br><span style="color:#7a9ab8;font-size:.8em">Achspositionen, Gelenkgrenzen, Drehrichtung und Referenzpose direkt im 3D-Viewport einstellen.</span></div>
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">🎯 Gimbal-Positionierung</b><br><span style="color:#7a9ab8;font-size:.8em">Objekte per Maus verschieben und drehen. Modus wechselbar: Translate (T) / Rotate (R).</span></div>
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">📚 Roboter-Bibliothek</b><br><span style="color:#7a9ab8;font-size:.8em">Fertige Robotermodelle laden. Filter nach Hersteller und Typ.</span></div>
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">📏 Messtool</b><br><span style="color:#7a9ab8;font-size:.8em">Abstände und Positionen zwischen Punkten im 3D-Modell messen.</span></div>
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">💾 Export als ZIP</b><br><span style="color:#7a9ab8;font-size:.8em">Alle STL-Dateien, Kinematikdaten und Konfiguration in ein ZIP-Paket für RobSimul packen.</span></div>
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">🏭 Umgebungsmodelle</b><br><span style="color:#7a9ab8;font-size:.8em">Schutzzäune, Maschinengehäuse und andere Objekte als STL oder Grundkörper (Box, Zylinder) hinzufügen.</span></div>
+</div>
+
+<div style="font-size:.68em;letter-spacing:.14em;text-transform:uppercase;color:#3a5570;border-bottom:1px solid #1e2d40;padding-bottom:5px;margin-bottom:14px">Workflow</div>
+<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px;counter-reset:ws">
+  <div style="display:flex;gap:12px;align-items:flex-start;background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:10px 13px"><span style="background:rgba(255,122,0,.15);color:#ff7a00;border:1px solid rgba(255,122,0,.3);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72em;font-weight:600;flex-shrink:0;font-family:monospace">1</span><div><b style="color:#d0dce8;font-size:.87em">Dateien laden</b><br><span style="color:#7a9ab8;font-size:.8em">STL/OSD/STEP per Drag&amp;Drop in den Viewport oder ZIP über „Archiv laden" öffnen.</span></div></div>
+  <div style="display:flex;gap:12px;align-items:flex-start;background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:10px 13px"><span style="background:rgba(255,122,0,.15);color:#ff7a00;border:1px solid rgba(255,122,0,.3);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72em;font-weight:600;flex-shrink:0;font-family:monospace">2</span><div><b style="color:#d0dce8;font-size:.87em">Komponenten zuweisen</b><br><span style="color:#7a9ab8;font-size:.8em">Im Dialog jede Datei der richtigen Kategorie zuordnen. Die Autoerkennung schlägt einen Typ vor.</span></div></div>
+  <div style="display:flex;gap:12px;align-items:flex-start;background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:10px 13px"><span style="background:rgba(255,122,0,.15);color:#ff7a00;border:1px solid rgba(255,122,0,.3);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72em;font-weight:600;flex-shrink:0;font-family:monospace">3</span><div><b style="color:#d0dce8;font-size:.87em">Kinematik konfigurieren</b><br><span style="color:#7a9ab8;font-size:.8em">Achspunkte im 3D-Viewport setzen. Gelenkgrenzen und Drehrichtungen festlegen.</span></div></div>
+  <div style="display:flex;gap:12px;align-items:flex-start;background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:10px 13px"><span style="background:rgba(255,122,0,.15);color:#ff7a00;border:1px solid rgba(255,122,0,.3);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72em;font-weight:600;flex-shrink:0;font-family:monospace">4</span><div><b style="color:#d0dce8;font-size:.87em">Endeffektor / Umgebung ergänzen</b><br><span style="color:#7a9ab8;font-size:.8em">Optionale Teile hinzufügen und per Gimbal positionieren.</span></div></div>
+  <div style="display:flex;gap:12px;align-items:flex-start;background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:10px 13px"><span style="background:rgba(255,122,0,.15);color:#ff7a00;border:1px solid rgba(255,122,0,.3);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72em;font-weight:600;flex-shrink:0;font-family:monospace">5</span><div><b style="color:#d0dce8;font-size:.87em">Exportieren</b><br><span style="color:#7a9ab8;font-size:.8em">„Save ZIP" erzeugt das Paket für RobSimul.</span></div></div>
+</div>
+
+<div style="font-size:.68em;letter-spacing:.14em;text-transform:uppercase;color:#3a5570;border-bottom:1px solid #1e2d40;padding-bottom:5px;margin-bottom:14px">Tastenkürzel</div>
+<table style="width:100%;border-collapse:collapse;font-size:.82em">
+  <tr><td style="padding:5px 16px 5px 0;border-bottom:1px solid #1e2d40;color:#d0dce8;font-family:monospace">G</td><td style="padding:5px 0;border-bottom:1px solid #1e2d40;color:#7a9ab8">Gimbal ein-/ausschalten</td></tr>
+  <tr><td style="padding:5px 16px 5px 0;border-bottom:1px solid #1e2d40;color:#d0dce8;font-family:monospace">T / R</td><td style="padding:5px 0;border-bottom:1px solid #1e2d40;color:#7a9ab8">Gimbal-Modus: Translate / Rotate</td></tr>
+  <tr><td style="padding:5px 16px 5px 0;border-bottom:1px solid #1e2d40;color:#d0dce8;font-family:monospace">Mausrad</td><td style="padding:5px 0;border-bottom:1px solid #1e2d40;color:#7a9ab8">Zoom</td></tr>
+  <tr><td style="padding:5px 16px 5px 0;border-bottom:1px solid #1e2d40;color:#d0dce8;font-family:monospace">Rechte Maustaste</td><td style="padding:5px 0;border-bottom:1px solid #1e2d40;color:#7a9ab8">Szene drehen</td></tr>
+  <tr><td style="padding:5px 16px 5px 0;color:#d0dce8;font-family:monospace">Mittlere Maustaste</td><td style="padding:5px 0;color:#7a9ab8">Szene verschieben</td></tr>
+</table>
+`,
+en: `
+<div style="margin-bottom:6px;font-family:monospace;font-size:1.25em;font-weight:600;color:#ff7a00">⚙ RobModel</div>
+<p style="color:#7a9ab8;margin-bottom:24px;font-size:.92em">Robot Configurator — assemble 3D models from STL/OSD/STEP and export</p>
+
+<div style="font-size:.68em;letter-spacing:.14em;text-transform:uppercase;color:#3a5570;border-bottom:1px solid #1e2d40;padding-bottom:5px;margin-bottom:14px">Description</div>
+<p style="margin-bottom:12px">RobModel is a browser-based tool for building complete 3D robot models. Individual geometry files (STL, OSD, STEP) are assigned to robot axes A1–A6, the base pedestal, tool, or environment via drag &amp; drop. The finished model is exported as a ZIP package and loaded directly into RobSimul.</p>
+<p style="margin-bottom:24px">An integrated library provides pre-configured robot models. Kinematic parameters (axis positions, joint limits, rotation directions) can be set manually or imported from an existing package.</p>
+
+<div style="font-size:.68em;letter-spacing:.14em;text-transform:uppercase;color:#3a5570;border-bottom:1px solid #1e2d40;padding-bottom:5px;margin-bottom:14px">Features</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:24px">
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">📂 Drag &amp; Drop Import</b><br><span style="color:#7a9ab8;font-size:.8em">Drag STL, OSD, and STEP files into the viewport. Auto-detection based on filename (e.g. base.stl → pedestal).</span></div>
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">🤖 Component Assignment</b><br><span style="color:#7a9ab8;font-size:.8em">14 categories: A1–A6, pedestal, tool, end-effector, environment, positioner, rail, fixed object, moving object.</span></div>
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">📐 Kinematics Editor</b><br><span style="color:#7a9ab8;font-size:.8em">Set axis positions, joint limits, rotation direction, and reference pose in the 3D viewport.</span></div>
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">🎯 Gimbal Positioning</b><br><span style="color:#7a9ab8;font-size:.8em">Move and rotate objects with the mouse. Toggle between Translate (T) and Rotate (R) modes.</span></div>
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">📚 Robot Library</b><br><span style="color:#7a9ab8;font-size:.8em">Load pre-built robot models. Filter by manufacturer and type.</span></div>
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">📏 Measurement Tool</b><br><span style="color:#7a9ab8;font-size:.8em">Measure distances and positions between points in the 3D model.</span></div>
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">💾 ZIP Export</b><br><span style="color:#7a9ab8;font-size:.8em">Pack all STL files, kinematic data and configuration into a ZIP package for RobSimul.</span></div>
+  <div style="background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:11px 13px"><b style="color:#d0dce8;font-size:.88em">🏭 Environment Models</b><br><span style="color:#7a9ab8;font-size:.8em">Add safety fences, machine housings, and other objects as STL or primitives (box, cylinder).</span></div>
+</div>
+
+<div style="font-size:.68em;letter-spacing:.14em;text-transform:uppercase;color:#3a5570;border-bottom:1px solid #1e2d40;padding-bottom:5px;margin-bottom:14px">Workflow</div>
+<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px">
+  <div style="display:flex;gap:12px;align-items:flex-start;background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:10px 13px"><span style="background:rgba(255,122,0,.15);color:#ff7a00;border:1px solid rgba(255,122,0,.3);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72em;font-weight:600;flex-shrink:0;font-family:monospace">1</span><div><b style="color:#d0dce8;font-size:.87em">Load files</b><br><span style="color:#7a9ab8;font-size:.8em">Drag STL/OSD/STEP into the viewport or open a ZIP via "Archiv laden".</span></div></div>
+  <div style="display:flex;gap:12px;align-items:flex-start;background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:10px 13px"><span style="background:rgba(255,122,0,.15);color:#ff7a00;border:1px solid rgba(255,122,0,.3);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72em;font-weight:600;flex-shrink:0;font-family:monospace">2</span><div><b style="color:#d0dce8;font-size:.87em">Assign components</b><br><span style="color:#7a9ab8;font-size:.8em">In the dialog, assign each file to the correct category. Auto-detection suggests a type.</span></div></div>
+  <div style="display:flex;gap:12px;align-items:flex-start;background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:10px 13px"><span style="background:rgba(255,122,0,.15);color:#ff7a00;border:1px solid rgba(255,122,0,.3);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72em;font-weight:600;flex-shrink:0;font-family:monospace">3</span><div><b style="color:#d0dce8;font-size:.87em">Configure kinematics</b><br><span style="color:#7a9ab8;font-size:.8em">Set axis points in the 3D viewport. Define joint limits and rotation directions.</span></div></div>
+  <div style="display:flex;gap:12px;align-items:flex-start;background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:10px 13px"><span style="background:rgba(255,122,0,.15);color:#ff7a00;border:1px solid rgba(255,122,0,.3);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72em;font-weight:600;flex-shrink:0;font-family:monospace">4</span><div><b style="color:#d0dce8;font-size:.87em">Add end-effector / environment</b><br><span style="color:#7a9ab8;font-size:.8em">Add optional parts and position them using the gimbal.</span></div></div>
+  <div style="display:flex;gap:12px;align-items:flex-start;background:#192030;border:1px solid #1e2d40;border-radius:5px;padding:10px 13px"><span style="background:rgba(255,122,0,.15);color:#ff7a00;border:1px solid rgba(255,122,0,.3);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72em;font-weight:600;flex-shrink:0;font-family:monospace">5</span><div><b style="color:#d0dce8;font-size:.87em">Export</b><br><span style="color:#7a9ab8;font-size:.8em">"Save ZIP" creates the package for RobSimul.</span></div></div>
+</div>
+
+<div style="font-size:.68em;letter-spacing:.14em;text-transform:uppercase;color:#3a5570;border-bottom:1px solid #1e2d40;padding-bottom:5px;margin-bottom:14px">Keyboard Shortcuts</div>
+<table style="width:100%;border-collapse:collapse;font-size:.82em">
+  <tr><td style="padding:5px 16px 5px 0;border-bottom:1px solid #1e2d40;color:#d0dce8;font-family:monospace">G</td><td style="padding:5px 0;border-bottom:1px solid #1e2d40;color:#7a9ab8">Toggle gimbal on/off</td></tr>
+  <tr><td style="padding:5px 16px 5px 0;border-bottom:1px solid #1e2d40;color:#d0dce8;font-family:monospace">T / R</td><td style="padding:5px 0;border-bottom:1px solid #1e2d40;color:#7a9ab8">Gimbal mode: Translate / Rotate</td></tr>
+  <tr><td style="padding:5px 16px 5px 0;border-bottom:1px solid #1e2d40;color:#d0dce8;font-family:monospace">Mouse wheel</td><td style="padding:5px 0;border-bottom:1px solid #1e2d40;color:#7a9ab8">Zoom</td></tr>
+  <tr><td style="padding:5px 16px 5px 0;border-bottom:1px solid #1e2d40;color:#d0dce8;font-family:monospace">Right mouse button</td><td style="padding:5px 0;border-bottom:1px solid #1e2d40;color:#7a9ab8">Rotate scene</td></tr>
+  <tr><td style="padding:5px 16px 5px 0;color:#d0dce8;font-family:monospace">Middle mouse button</td><td style="padding:5px 0;color:#7a9ab8">Pan scene</td></tr>
+</table>
+`
+};
+
+window.helpSetLang = function(l) {
+  _hl = l;
+  document.getElementById('hlDE').style.background = l==='de' ? '#ff7a00' : 'none';
+  document.getElementById('hlDE').style.color      = l==='de' ? '#000'    : '#7a9ab8';
+  document.getElementById('hlEN').style.background = l==='en' ? '#ff7a00' : 'none';
+  document.getElementById('hlEN').style.color      = l==='en' ? '#000'    : '#7a9ab8';
+  document.getElementById('helpContent').innerHTML = HELP[l];
+};
+
+document.getElementById('helpBtn').addEventListener('click', function(){
+  document.getElementById('helpModal').style.display = 'flex';
+  document.getElementById('helpContent').innerHTML = HELP[_hl];
+});
+
+document.getElementById('helpModal').addEventListener('click', function(e){
+  if(e.target === this) this.style.display = 'none';
+});
+})();
+</script>
 
 </body>
 </html>
