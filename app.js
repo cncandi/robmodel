@@ -78,6 +78,7 @@ let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup
 var objekteGroups = [];
 var effektorGroups = [];
 var positionerGroups = [];
+var umfGroups = [];
 var festeGrps = []; // [{containerGrp, pivotGrp, meshGrp, pivotSphere}]
 const meshes = new Map();
 const axisMeshes = [];
@@ -477,6 +478,8 @@ function rebuildRobotKinematics() {
   (state.objekte||[]).forEach((_,i)=>{ if(state.objekte[i]?.mountMode==='a6') rebuildObjektMesh(i); });
   // Re-attach Endeffektoren to new A6 pivot
   (state.effektoren||[]).forEach((_,i)=>rebuildEffMesh(i));
+  // Rebuild Umgebung meshes
+  (state.umfElemente||[]).forEach((_,i)=>rebuildUmfMesh(i));
 }
 
 function applyJointRotations() {
@@ -989,6 +992,9 @@ clearAll._inner = function(clearSkeleton) {
   // Reset feste Objekte
   (festeGrps||[]).forEach(g=>{ if(g?.parent) g.parent.remove(g); });
   festeGrps.length=0; state.festeObjekte=[];
+  // Reset Umgebung
+  (umfGroups||[]).forEach(g=>{ if(g&&g.parent) g.parent.remove(g); });
+  umfGroups.length=0; state.umfElemente=[];
   // File-Inputs leeren damit gleiche Dateien/Ordner erneut geladen werden können
   const _si=$('sourceZip'); if(_si) _si.value='';
   const _sf=$('sourceFolder'); if(_sf) _sf.value='';
@@ -1665,6 +1671,25 @@ function renderObjRows() {
   }));
 }
 
+function rebuildUmfMesh(i) {
+  const u=state.umfElemente[i]; if(!u) return;
+  if(!umfGroups[i]) umfGroups[i]=new THREE.Group();
+  const grp=umfGroups[i];
+  if(grp.parent!==scene){ if(grp.parent) grp.parent.remove(grp); scene.add(grp); }
+  while(grp.children.length) grp.remove(grp.children[0]);
+  const o=u.offset||{}, deg2=Math.PI/180;
+  grp.position.set(o.x||0,o.y||0,o.z||0);
+  grp.rotation.set((o.rx||0)*deg2,(o.ry||0)*deg2,(o.rz||0)*deg2,'XYZ');
+  if(u.stlFile?.buf){
+    const geo=loader.parse(u.stlFile.buf.buffer||u.stlFile.buf); geo.computeVertexNormals();
+    grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:u.color||0x3a5a7a,shininess:60})));
+  } else if(u.objectType&&u.objectType!=='stl'){
+    const L=u.length||2000,W=u.width||200,H=u.height||2000,R=u.radius||500;
+    const geo=u.objectType==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
+    grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:u.color||0x3a5a7a,shininess:60,transparent:true,opacity:0.85,side:THREE.DoubleSide})));
+  }
+}
+
 function rebuildObjektMesh(i) {
   const o=state.objekte[i]; if(!o) return;
   if(!objekteGroups[i]) objekteGroups[i]=new THREE.Group();
@@ -2125,6 +2150,7 @@ function _getGimbalMeshes() {
   (positionerGroups||[]).forEach((g,i)=>{ if(g?.containerGrp) g.containerGrp.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'pos', idx:i, grp:g.containerGrp}); }); });
   (festeGrps||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'fix', idx:i, grp:g}); }); });
   (effektorGroups||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'eff', idx:i, grp:g}); }); });
+  (umfGroups||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'umf', idx:i, grp:g}); }); });
   return result;
 }
 
@@ -2188,6 +2214,12 @@ function _gimbalChanged() {
   } else if(type==='eff' && state.effektoren[idx]){
     state.effektoren[idx].offset = Object.assign(state.effektoren[idx].offset||{}, bo);
     rebuildEffMesh(idx);
+  } else if(type==='umf' && state.umfElemente[idx]){
+    state.umfElemente[idx].offset = Object.assign(state.umfElemente[idx].offset||{}, bo);
+    rebuildUmfMesh(idx);
+    if($('umfModal')?.style.display!=='none'){
+      ['x','y','z','rx','ry','rz'].forEach(k=>{ const el=$('umf-'+k); if(el) el.value=bo[k]||0; });
+    }
   }
 }
 
@@ -2333,6 +2365,7 @@ function sceneBox(){
   (objekteGroups||[]).forEach(g=>{ if(g) box.expandByObject(g); });
   (positionerGroups||[]).forEach(g=>{ if(g?.containerGrp) box.expandByObject(g.containerGrp); });
   if(railGroup?.children?.length) box.expandByObject(railGroup);
+  (umfGroups||[]).forEach(g=>{ if(g) box.expandByObject(g); });
   if(!Number.isFinite(box.min.x)){box.min.set(-500,-500,0);box.max.set(1500,500,1500);}
   return box;
 }
@@ -2824,8 +2857,10 @@ function renderUmfRows() {
     inp.dataset.umfIdx=btn.dataset.umfStl; inp.click();
   }));
   el.querySelectorAll('[data-umf-del]').forEach(btn=>btn.addEventListener('click',()=>{
-    state.umfElemente.splice(+btn.dataset.umfDel,1);
-    renderUmfRows(); rebuildRobotKinematics(); applyTransforms();
+    const di=+btn.dataset.umfDel;
+    if(umfGroups[di]&&umfGroups[di].parent) umfGroups[di].parent.remove(umfGroups[di]);
+    state.umfElemente.splice(di,1); umfGroups.splice(di,1);
+    renderUmfRows(); applyTransforms();
   }));
   el.querySelectorAll('[data-umf-edit]').forEach(btn=>btn.addEventListener('click',()=>openUmfModal(+btn.dataset.umfEdit)));
 }
@@ -4386,7 +4421,8 @@ async function _dropAssignStl(file, cat) {
       state.activeEff=state.effektoren.length-1; rebuildEffMesh(state.activeEff); renderEffRow?.();
     } else if(cat==='Umgebung'){
       state.umfElemente.push({name:dn.replace('.stl',''),stlFile:{name:dn,buf:stlBuf,path:dn},offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}});
-      state.buffers.set(dn,stlBuf); renderUmfRows?.();
+      umfGroups.push(null); state.buffers.set(dn,stlBuf);
+      rebuildUmfMesh(state.umfElemente.length-1); renderUmfRows?.();
     } else if(cat==='Positionierer'){
       const eAx='E'+(state.positioners.length+2);
       const pos={name:dn.replace('.stl',''),eNum:state.positioners.length+2,type:'stl',rotAxis:'Z+',
