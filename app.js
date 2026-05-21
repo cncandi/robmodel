@@ -1600,9 +1600,9 @@ function renderRows(){
       <td><b>${esc(j.name)}</b></td>
       <td><input class="angleInput" data-joint-angle="${i}" type="number" step="0.1" value="${state.jointAngles?.[i]??0}"></td>
       <td><span class="axisDir">${axisDirectionLabel(i)}</span></td>
-      <td><input data-j="${i}" data-f="x" value="${j.offset?.x??''}"></td>
-      <td><input data-j="${i}" data-f="y" value="${j.offset?.y??''}"></td>
-      <td><input data-j="${i}" data-f="z" value="${j.offset?.z??''}"></td>
+      <td><input data-j="${i}" data-f="x" title="${j.offset?.x??''}" value="${j.offset?.x??''}" style="width:90px"></td>
+      <td><input data-j="${i}" data-f="y" title="${j.offset?.y??''}" value="${j.offset?.y??''}" style="width:70px"></td>
+      <td><input data-j="${i}" data-f="z" title="${j.offset?.z??''}" value="${j.offset?.z??''}" style="width:90px"></td>
       <td><input data-j="${i}" data-f="min" value="${j.min??''}"></td>
       <td><input data-j="${i}" data-f="max" value="${j.max??''}"></td>
       <td><select class="dirSel" data-j="${i}" data-f="rotationSign"><option value="1" ${(num(j.rotationSign)??1)>=0?'selected':''}>+</option><option value="-1" ${(num(j.rotationSign)??1)<0?'selected':''}>−</option></select></td>
