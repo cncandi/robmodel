@@ -3707,7 +3707,7 @@ async function loadRobotFromLib(robot) {
         const parts = Array.isArray(info) ? info : [info];
         state.axisStlParts[ax] = [];
         parts.forEach(p => {
-          const stlName=(p.name||'').replace(/\.stl$/i,'')+'.stl';
+          const stlName=(p.name||'').replace(/\.(stl|osd)$/i,'')+'.stl';
           const buf=state.buffers.get(stlName);
           state.axisStlParts[ax].push({name:stlName,color:p.color||'#e8a020',buf:buf||null});
           if (!state.axisStlMap[ax]&&(buf||state.stls.find(f=>f.name===stlName))) state.axisStlMap[ax]=stlName;
@@ -3784,12 +3784,14 @@ async function loadComponentFromZip(zip) {
     }
   }
 
-  // Collect all STL buffers: stl/XX.stl or XX.stl → key without extension
+  // Collect all STL/OSD buffers: stl/XX.stl|osd → key without extension
   const stlBufs = {};
   for (const name of Object.keys(zip.files)) {
-    if (zip.files[name].dir || !/\.stl$/i.test(name)) continue;
-    const key = name.split('/').pop().replace(/\.stl$/i,'');
-    stlBufs[key] = await zip.files[name].async('uint8array');
+    if (zip.files[name].dir || !/\.(stl|osd)$/i.test(name)) continue;
+    const key = name.split('/').pop().replace(/\.(stl|osd)$/i,'');
+    let raw = await zip.files[name].async('uint8array');
+    if (/\.osd$/i.test(name)) raw = new Uint8Array(osdToBinaryStl(raw.buffer));
+    stlBufs[key] = raw;
   }
 
   const type = cfg.type;
