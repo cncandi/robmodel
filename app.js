@@ -2124,6 +2124,7 @@ function _getGimbalMeshes() {
   (objekteGroups||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'obj', idx:i, grp:g}); }); });
   (positionerGroups||[]).forEach((g,i)=>{ if(g?.containerGrp) g.containerGrp.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'pos', idx:i, grp:g.containerGrp}); }); });
   (festeGrps||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'fix', idx:i, grp:g}); }); });
+  (effektorGroups||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'eff', idx:i, grp:g}); }); });
   return result;
 }
 
@@ -2184,6 +2185,9 @@ function _gimbalChanged() {
     if($('fixModal')?.style.display!=='none'){
       ['x','y','z','rx','ry','rz'].forEach(k=>{ const el=$('fm-'+k); if(el) el.value=bo[k]||0; });
     }
+  } else if(type==='eff' && state.effektoren[idx]){
+    state.effektoren[idx].offset = Object.assign(state.effektoren[idx].offset||{}, bo);
+    rebuildEffMesh(idx);
   }
 }
 
@@ -4376,24 +4380,35 @@ async function _dropAssignStl(file, cat) {
       const mesh=new THREE.Mesh(geom,new THREE.MeshStandardMaterial({color:cat==='Podest'?'#334455':'#2563eb',roughness:.6,metalness:.1}));mesh.name=dn;meshes.set(dn,mesh);
       rebuildRobotKinematics();applyTransforms();
     } else if(cat==='Endeffektor'){
-      const eff={name:dn.replace('.stl',''),objectType:'stl',color:'#607080',offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0},ePos:0,teile:[{name:dn,objectType:'stl',color:'#607080',offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0},stlFile:{name:dn,buf:stlBuf}}]};
-      state.effektoren.push(eff);effektorGroups.push(null);state.activeEff=state.effektoren.length-1;rebuildEffMesh(state.activeEff);renderEffRow?.();
+      const eff={name:dn.replace('.stl',''),color:'#607080',offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0},ePos:0,
+        teile:[{name:dn,objectType:'stl',color:'#607080',offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0},stlFile:{name:dn,buf:stlBuf}}]};
+      state.effektoren.push(eff); effektorGroups.push(null);
+      state.activeEff=state.effektoren.length-1; rebuildEffMesh(state.activeEff); renderEffRow?.();
     } else if(cat==='Umgebung'){
       state.umfElemente.push({name:dn.replace('.stl',''),stlFile:{name:dn,buf:stlBuf,path:dn},offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}});
-      state.buffers.set(dn,stlBuf);rebuildAllUmf?.();renderUmfRow?.();
+      state.buffers.set(dn,stlBuf); renderUmfRows?.();
     } else if(cat==='Positionierer'){
-      state.positioners=state.positioners||[];
-      state.positioners.push({name:dn.replace('.stl',''),joints:[],stlFile:{name:dn,buf:stlBuf},offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}});
-      positionerGroups.push(null);rebuildPositionerMesh?.(state.positioners.length-1);
+      const eAx='E'+(state.positioners.length+2);
+      const pos={name:dn.replace('.stl',''),eNum:state.positioners.length+2,type:'stl',rotAxis:'Z+',
+        pivotX:0,pivotY:0,pivotZ:0,eMin:-180,eMax:180,ePos:0,showBox:false,boxOffset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}};
+      state.axisStlParts[eAx]=[{name:dn,color:'#e8a020',buf:stlBuf}];
+      state.positioners.push(pos); positionerGroups.push(null);
+      rebuildPositionerMesh?.(state.positioners.length-1); renderPosRows?.();
     } else if(cat==='Schiene'){
-      state.schienen=state.schienen||[];
-      state.schienen.push({name:dn.replace('.stl',''),stlFile:{name:dn,buf:stlBuf},offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}});rebuildAllSchienen?.();
+      const eAx='E1';
+      state.schienen=[{name:dn.replace('.stl',''),length_mm:2000,height_mm:200,width_mm:400,axis:'X+',
+        eNumber:1,eMin:0,eMax:2000,ePos:0,showBox:false,boxOffset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}}];
+      state.axisStlParts[eAx]=[{name:dn,color:'#2563eb',buf:stlBuf}];
+      rebuildRailMeshes(); renderRailRows?.();
     } else if(cat==='Festes Obj.'){
-      state.festeObjekte=state.festeObjekte||[];
-      state.festeObjekte.push({name:dn.replace('.stl',''),stlFile:{name:dn,buf:stlBuf},offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}});rebuildAllFeste?.();
+      const fidx=state.festeObjekte.length;
+      state.festeObjekte.push({name:dn.replace('.stl',''),stlFile:{name:dn,buf:stlBuf},color:'#606060',x:0,y:0,z:0,rx:0,ry:0,rz:0});
+      festeGrps.push(null); rebuildFixMesh(fidx); renderFixRows?.();
     } else if(cat==='Bew. Obj.'){
-      state.objekte=state.objekte||[];
-      state.objekte.push({name:dn.replace('.stl',''),stlFile:{name:dn,buf:stlBuf},offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0},mountMode:'fixed'});rebuildObjektMesh(state.objekte.length-1);
+      const oidx=state.objekte.length, lbl='Label'+(oidx+1);
+      state.objekte.push({name:dn.replace('.stl',''),labelNum:oidx+1,axis:'Y+',ePos:0,mountMode:'fixed',showBox:false,boxOffset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}});
+      state.axisStlParts[lbl]=[{name:dn,color:'#4499cc',buf:stlBuf}];
+      objekteGroups.push(null); rebuildObjektMesh(oidx); renderObjRows?.();
     }
     renderAll();enableSave?.();
   } catch(err){alert('Fehler: '+err.message);}
