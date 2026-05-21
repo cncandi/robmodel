@@ -1180,7 +1180,7 @@ async function loadDemoKr8() {
 
 function zeroAllTransforms() {
   state.robotTr={x:0,y:0,z:0,rx:0,ry:0,rz:0}; state.toolTr={x:0,y:0,z:0,rx:0,ry:0,rz:0};
-  state.jointAngles=[0,-90,90,0,0,0];
+  setJointAnglesToReferencePose();  // Kanonenstellung statt hardcoded [0,-90,90,0,0,0]
   setInputs('r',state.robotTr); setInputs('t',state.toolTr);
   
 }
