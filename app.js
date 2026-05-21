@@ -302,10 +302,9 @@ function toggleCameraMode() {
   controls.update();
   const btn = $('camModeBtn');
   if (btn) {
-    btn.textContent = isOrtho ? '🔲 Perspektive' : '⬜ Ortho';
-    btn.style.background = isOrtho ? 'rgba(37,99,235,.2)' : 'rgba(255,255,255,.05)';
-    btn.style.borderColor = isOrtho ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.15)';
-    btn.style.color = isOrtho ? '#60a5fa' : '#6a8fa8';
+    btn.textContent = isOrtho ? 'Ortho' : 'Perspektive';
+    if(isOrtho){ btn.classList.add('on'); } else { btn.classList.remove('on'); }
+    btn.style.background = ''; btn.style.borderColor = ''; btn.style.color = '';
   }
 }
 
@@ -4157,7 +4156,7 @@ $('applyStlRotBtn').onclick = () => {
 };
 $('toggleGrid').onclick   = () => grid.visible = !grid.visible;
 $('camModeBtn')?.addEventListener('click', toggleCameraMode);
-const _cmb=$('camModeBtn'); if(_cmb){_cmb.textContent='⬜ Ortho';_cmb.style.background='rgba(255,255,255,.05)';_cmb.style.borderColor='rgba(255,255,255,.15)';_cmb.style.color='#6a8fa8';}
+const _cmb=$('camModeBtn'); if(_cmb){_cmb.textContent='Perspektive';_cmb.classList.remove('on');}
 
 let _axisLabelsVisible = true;
 // Robot-Visibility: 0=sichtbar, 1=durchsichtig, 2=unsichtbar
