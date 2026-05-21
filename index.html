@@ -227,7 +227,8 @@ header.top .title    { display: none !important; }
       <div class="mnudrop">
         <button id="themeBtn"><svg class="ico"><use href="#i-contrast"/></svg>Theme wechseln</button>
         <button id="toggleGrid"><svg class="ico"><use href="#i-grid"/></svg>Raster ein/aus</button>
-        <button id="camModeBtn"><svg class="ico"><use href="#i-ortho"/></svg>Ortho / Perspektive</button>
+        <button id="camBtnPersp" onclick="setCameraMode(false)" class="on"><svg class="ico"><use href="#i-ortho"/></svg>Perspektive</button>
+        <button id="camBtnOrtho" onclick="setCameraMode(true)"><svg class="ico"><use href="#i-ortho"/></svg>Ortho</button>
         <button id="resetView"><svg class="ico"><use href="#i-reset"/></svg>Zurücksetzen</button>
         <div class="mnusep"></div>
         <button data-view="iso"><svg class="ico"><use href="#i-iso"/></svg>ISO</button>
