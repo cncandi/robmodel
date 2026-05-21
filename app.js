@@ -495,7 +495,8 @@ function parseReferencePose() {
   state.referencePose = [0,-90,90,0,0,0]; return state.referencePose;
 }
 function setJointAnglesToReferencePose() {
-  state.jointAngles = [0, -90, 90, 0, 0, 0];  // Referenzpose
+  const ref = parseReferencePose();
+  state.jointAngles = ref.slice();
   while (state.jointAngles.length < 6) state.jointAngles.push(0);
 }
 
@@ -977,6 +978,8 @@ clearAll._inner = function(clearSkeleton) {
   // File-Inputs leeren damit gleiche Dateien/Ordner erneut geladen werden können
   const _si=$('sourceZip'); if(_si) _si.value='';
   const _sf=$('sourceFolder'); if(_sf) _sf.value='';
+  const _rp=$('refPose'); if(_rp) _rp.value='0,-90,90,0,0,0';
+  state.referencePose=[0,-90,90,0,0,0];
   // Render minimal
   renderRailRows(); renderObjRows(); renderPosRows(); renderFixRows();
   renderAxisStlRows(); renderRows(); renderTcp();
