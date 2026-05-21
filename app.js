@@ -4281,7 +4281,119 @@ renderer.domElement.addEventListener('pointerdown', pickAxisPoint);
 const dz=$('dropZone');
 ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag-over');}));
 ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag-over');}));
-dz.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)loadSourceZip(f).catch(err=>alert(err.message));});
+dz.addEventListener('drop', async e => {
+  const files = Array.from(e.dataTransfer.files);
+  if (!files.length) return;
+  const zip  = files.find(f => /\.zip$/i.test(f.name));
+  const stls = files.filter(f => /\.(stl|osd|stp|step)$/i.test(f.name));
+  if (zip) { loadSourceZip(zip).catch(err=>alert(err.message)); return; }
+  if (stls.length) { _dropStlsQueue(stls); return; }
+  // Ordner-Drop: alle Dateien aus DataTransfer
+  const items = Array.from(e.dataTransfer.items||[]);
+  if (items.length) {
+    const allFiles = [];
+    for (const item of items) {
+      const entry = item.webkitGetAsEntry?.();
+      if (entry?.isDirectory) { await _collectEntries(entry, allFiles); }
+      else if (item.getAsFile) { const f=item.getAsFile(); if(f) allFiles.push(f); }
+    }
+    if (allFiles.length) { loadSourceFolder(allFiles).catch(err=>alert(err.message)); return; }
+  }
+  loadSourceZip(files[0]).catch(err=>alert(err.message));
+});
+
+// Ordner-Drop: Dateien rekursiv einsammeln
+async function _collectEntries(entry, out) {
+  if (entry.isFile) {
+    await new Promise(res => entry.file(f => { out.push(f); res(); }, res));
+  } else if (entry.isDirectory) {
+    const reader = entry.createReader();
+    await new Promise(res => reader.readEntries(async entries => {
+      for (const e of entries) await _collectEntries(e, out);
+      res();
+    }));
+  }
+}
+
+// STL-Dateien per Drag-and-Drop — Achszuweisungs-Dialog
+var _dropPendingStls = [];
+function _dropStlsQueue(files) {
+  _dropPendingStls = files.slice();
+  _dropNextStl();
+}
+function _dropNextStl() {
+  if (!_dropPendingStls.length) return;
+  const file = _dropPendingStls[0];
+  // Achse aus Dateiname versuchen (A1..A6, joint1..6, podest, tool)
+  const nm = file.name.toLowerCase();
+  var guessAx = null;
+  const jm = nm.match(/(?:joint[\s_-]*|a)([1-6])/i); if (jm) guessAx = 'A'+jm[1];
+  if (/podest|base|pedestal/i.test(nm)) guessAx = 'Podest';
+  if (/tool|tcp|werkzeug/i.test(nm)) guessAx = 'Tool';
+  _showDropAxisPicker(file, guessAx);
+}
+function _showDropAxisPicker(file, preselect) {
+  var dlg = document.getElementById('drop-axis-dlg');
+  if (!dlg) {
+    dlg = document.createElement('div');
+    dlg.id = 'drop-axis-dlg';
+    dlg.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center';
+    dlg.innerHTML = '<div style="background:var(--bg2);border:1px solid var(--acc);border-radius:8px;padding:20px 24px;font-family:monospace;min-width:280px">'
+      +'<div id="drop-dlg-title" style="color:var(--acc);font-weight:700;margin-bottom:14px;font-size:.95em"></div>'
+      +'<div id="drop-dlg-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px"></div>'
+      +'<div style="display:flex;gap:8px;justify-content:flex-end">'
+      +'<button onclick="_dropSkipStl()" style="padding:5px 12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:4px;color:var(--txt2);cursor:pointer">Überspringen</button>'
+      +'<button onclick="_dropCancelAll()" style="padding:5px 12px;background:rgba(220,60,60,.2);border:1px solid rgba(220,60,60,.4);border-radius:4px;color:#f87171;cursor:pointer">Abbrechen</button>'
+      +'</div></div>';
+    document.body.appendChild(dlg);
+  }
+  document.getElementById('drop-dlg-title').textContent = '📁 ' + file.name + ' → Achse zuweisen';
+  var btns = document.getElementById('drop-dlg-btns');
+  btns.innerHTML = '';
+  ['A1','A2','A3','A4','A5','A6','Podest','Tool'].forEach(ax => {
+    var b = document.createElement('button');
+    b.textContent = ax;
+    b.style.cssText = 'padding:5px 12px;border-radius:4px;cursor:pointer;font-family:monospace;font-size:.9em;'
+      +(ax===preselect?'background:var(--acc);color:#000;border:none;font-weight:700;':'background:var(--bg3);border:1px solid var(--bdr);color:var(--txt2);');
+    b.onclick = function(){ _dropAssignStl(file, ax); };
+    btns.appendChild(b);
+  });
+  dlg.style.display = 'flex';
+}
+function _closeDropDlg() { var d=document.getElementById('drop-axis-dlg'); if(d) d.style.display='none'; }
+function _dropSkipStl() { _dropPendingStls.shift(); _closeDropDlg(); _dropNextStl(); }
+function _dropCancelAll() { _dropPendingStls=[]; _closeDropDlg(); }
+async function _dropAssignStl(file, ax) {
+  _closeDropDlg();
+  try {
+    const rawBuf = await file.arrayBuffer();
+    const fname = file.name;
+    const geom = await parseGeometry(rawBuf, fname); geom.computeVertexNormals();
+    const u8 = new Uint8Array(rawBuf);
+    const stlBuf = /\.(stp|step)$/i.test(fname)?new Uint8Array(stlFromGeometry(geom)):/\.osd$/i.test(fname)?new Uint8Array(osdToBinaryStl(rawBuf.slice(0,rawBuf.byteLength))):u8;
+    const displayName = fname.replace(/\.(stp|step|osd)$/i,'.stl');
+    if (ax==='Podest' || ax==='Tool') {
+      const key = ax==='Podest'?'podest':'tool1_tcp';
+      state.buffers.set(displayName, stlBuf);
+      if (!state.stls.find(f=>f.name===displayName)) state.stls.push({path:displayName,name:displayName,type:'STL',size:stlBuf.byteLength});
+      state.files=state.stls;
+      const mat=new THREE.MeshStandardMaterial({color:ax==='Podest'?'#334455':'#2563eb',roughness:.62,metalness:.08});
+      const mesh=new THREE.Mesh(geom,mat); mesh.name=displayName; meshes.set(displayName,mesh);
+    } else {
+      if (!state.axisStlParts[ax]) state.axisStlParts[ax]=[];
+      if (!state.axisStlParts[ax].find(p=>norm(p.name)===norm(displayName)))
+        state.axisStlParts[ax].push({name:displayName,color:'#e8a020',buf:stlBuf});
+      state.axisStlMap[ax]=state.axisStlParts[ax][0]?.name||displayName;
+      if (!state.stls.find(f=>f.name===displayName)) state.stls.push({path:displayName,name:displayName,type:'STL',size:stlBuf.byteLength});
+      state.files=state.stls; state.buffers.set(displayName,stlBuf);
+      const mat=new THREE.MeshStandardMaterial({color:'#e8a020',roughness:.62,metalness:.08});
+      const mesh=new THREE.Mesh(geom,mat); mesh.name=displayName; meshes.set(displayName,mesh);
+    }
+    rebuildRobotKinematics(); applyTransforms(); renderAxisStlRows(); renderAll(); enableSave();
+  } catch(err) { alert('Fehler: '+err.message); }
+  _dropPendingStls.shift();
+  _dropNextStl();
+}
 
 
 // ── STL-Export aus BufferGeometry ───────────────────────────────
