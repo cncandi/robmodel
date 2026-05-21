@@ -1360,7 +1360,7 @@ function buildJson() {
     tcp: { x: tcpX??0, y: tcpY??0, z: tcpZ??0, a: tcpA??0, b: tcpB??0, c: tcpC??0 },
     stlFiles,
     sceneModels: {
-      pedestal: { px:0, py:0, pz:0, rx:0, ry:0, rz:0, name: 'podest' },
+      pedestal: { px:0, py:0, pz:0, rx:0, ry:0, rz:0, name: (state.sceneModels?.pedestal?.name || 'podest').replace(/\.(stl|osd)$/i,'') },
       tool:     { px:0, py:0, pz:0, rx:0, ry:0, rz:0, name: toolName }
     }
   };
