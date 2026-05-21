@@ -10,6 +10,113 @@
     {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"}}
   </script>
   <link rel="stylesheet" href="style.css">
+
+<style>
+/* ── Menüleiste ──────────────────────────────────────────────── */
+header.top {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 10px 0 0;
+  height: 36px;
+  min-height: 36px;
+  border-bottom: 1px solid var(--bdr);
+  background: var(--bg4);
+}
+header.top .appname {
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--acc);
+  letter-spacing: 1px;
+  padding: 0 14px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  border-right: 1px solid var(--bdr);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+header.top .appname span { color: var(--txt3); font-weight: 400; font-size: .8em; margin-left: 5px; }
+
+/* menu bar */
+nav.menubar { display: flex; align-items: stretch; height: 100%; }
+.mnu { position: relative; height: 100%; }
+.mnubtn {
+  height: 100%;
+  background: none;
+  border: none;
+  color: var(--txt2);
+  font-family: monospace;
+  font-size: 12px;
+  padding: 0 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .1s, color .1s;
+}
+.mnubtn:hover, .mnu.open .mnubtn {
+  background: var(--acc);
+  color: #fff;
+}
+/* dropdown */
+.mnudrop {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 210px;
+  background: var(--bg4);
+  border: 1px solid var(--bdr);
+  border-top: 2px solid var(--acc);
+  box-shadow: 0 6px 24px rgba(0,0,0,.7);
+  z-index: 9000;
+  padding: 4px 0;
+}
+.mnu.open .mnudrop { display: block; }
+.mnudrop button, .mnudrop label.mnuitem {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  color: var(--txt2);
+  font-family: monospace;
+  font-size: 12px;
+  padding: 6px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .1s, color .1s;
+  box-sizing: border-box;
+}
+.mnudrop button:hover, .mnudrop label.mnuitem:hover { background: rgba(255,138,0,.12); color: var(--txt); }
+.mnudrop button:disabled { opacity: .35; cursor: not-allowed; }
+.mnudrop button:disabled:hover { background: none; color: var(--txt2); }
+.mnusep { height: 1px; background: var(--bdr); margin: 3px 0; }
+
+/* right side quick buttons */
+.mnu-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.mnu-right button {
+  background: rgba(255,255,255,.05);
+  border: 1px solid var(--bdr);
+  color: var(--txt2);
+  font-family: monospace;
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background .1s, color .1s;
+}
+.mnu-right button:hover { background: rgba(255,255,255,.1); color: var(--txt); }
+/* hide old toolbar class if still referenced */
+header.top .toolbar { display: none !important; }
+header.top .title    { display: none !important; }
+</style>
+
 </head>
 <body>
 
@@ -17,28 +124,66 @@
 
   <!-- ─── HEADER ──────────────────────────────────────────────── -->
   <header class="top">
-    <div class="title">
-      <h1>RobModel</h1>
-      <div class="subtitle">Roboter-Kinematik Editor · v39</div>
+  <div class="appname">⚙ RobModel <span>v39</span></div>
+
+  <nav class="menubar" id="mainMenubar">
+
+    <!-- DATEI -->
+    <div class="mnu" id="mnuDatei">
+      <button class="mnubtn">Datei</button>
+      <div class="mnudrop">
+        <button id="clearAllBtn" title="Strg+Klick: nur STL leeren">⬜ Neu</button>
+        <div class="mnusep"></div>
+        <label class="mnuitem" for="sourceZip">📦 Archiv laden…</label>
+        <label class="mnuitem" for="sourceFolder">📁 Ordner laden…</label>
+        <div class="mnusep"></div>
+        <button id="downloadZip" disabled>💾 Als ZIP speichern</button>
+        <button id="downloadJson" disabled>⬇ JSON exportieren</button>
+        <div class="mnusep"></div>
+        <button id="roblibBtn">🗄 In RobLib speichern</button>
+      </div>
     </div>
-    <div class="toolbar">
-      <button id="clearAllBtn" title="Klick: Alles leeren&#10;Strg+Klick: Alles außer Skelett leeren" style="background:rgba(204,51,51,.25);border:1px solid rgba(204,51,51,.5);color:#f87171;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px;font-weight:bold;margin-left:12px">Neu</button>
-      <button id="robotLibBtn" title="Roboter aus Library laden">📚 Library</button>
-      <label class="filebtn" for="sourceZip" title="EncyCAM-Archiv oder KUKA-ZIP laden">📦 Archiv laden</label>
-      <input id="sourceZip" type="file" accept=".zip,application/zip">
-      <label class="filebtn" for="sourceFolder" title="Ordner mit STL/XML/JSON-Dateien laden">📁 Ordner laden</label>
-      <input id="sourceFolder" type="file" webkitdirectory multiple>
-      <input id="jsonInput" type="file" accept=".json,application/json" style="display:none">
-      <input id="checkZip" type="file" accept=".zip,application/zip" style="display:none">
-      <button id="themeBtn" title="Theme wechseln">◑</button>
-      <button id="roblibBtn" title="In ROBLIB speichern">save roblib</button>
-      <button id="downloadJson" style="display:none" disabled>⬇ JSON</button>
-      <button id="downloadZip" style="display:none" disabled>💾 Save ZIP</button>
-      <button id="newBtn" title="Beispiel-Kinematik laden" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.3);color:#ff8030;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">Example</button>
-      <button id="helpBtn" title="Hilfe / Help" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#7aa0bb;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">❓ Hilfe</button>
-      <button id="exGreiferBtn" title="Beispiel-Greifer mit 2 synchronen Backen" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#4ade80;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">Example Greifer</button>
+
+    <!-- BEARBEITEN -->
+    <div class="mnu" id="mnuBearbeiten">
+      <button class="mnubtn">Bearbeiten</button>
+      <div class="mnudrop">
+        <button id="newBtn">📐 Beispiel-Kinematik laden</button>
+        <button id="exGreiferBtn">🦾 Beispiel-Greifer laden</button>
+      </div>
     </div>
-  </header>
+
+    <!-- ANSICHT -->
+    <div class="mnu" id="mnuAnsicht">
+      <button class="mnubtn">Ansicht</button>
+      <div class="mnudrop">
+        <button id="themeBtn">◑ Theme wechseln</button>
+        <button onclick="document.getElementById('toggleGrid')?.click()">⊞ Raster ein/aus</button>
+        <button onclick="document.getElementById('resetView')?.click()">↺ Ansicht zurücksetzen</button>
+      </div>
+    </div>
+
+    <!-- HILFE -->
+    <div class="mnu" id="mnuHilfe">
+      <button class="mnubtn">Hilfe</button>
+      <div class="mnudrop">
+        <button id="helpBtn">❓ Hilfe / Help</button>
+      </div>
+    </div>
+
+  </nav>
+
+  <!-- Schnellzugriff rechts -->
+  <div class="mnu-right">
+    <button id="robotLibBtn">📚 Library</button>
+  </div>
+
+  <!-- hidden file inputs -->
+  <input id="sourceZip"    type="file" accept=".zip,application/zip" style="display:none">
+  <input id="sourceFolder" type="file" webkitdirectory multiple style="display:none">
+  <input id="jsonInput"    type="file" accept=".json,application/json" style="display:none">
+  <input id="checkZip"     type="file" accept=".zip,application/zip" style="display:none">
+</header>
 
   <!-- ─── MAIN ─────────────────────────────────────────────────── -->
   <main class="main">
@@ -865,6 +1010,30 @@
   </div>
 </div>
 
+
+<script>
+(function(){
+  // Dropdown open/close
+  document.querySelectorAll('.mnu').forEach(function(mnu){
+    mnu.querySelector('.mnubtn')?.addEventListener('click', function(e){
+      e.stopPropagation();
+      var isOpen = mnu.classList.contains('open');
+      document.querySelectorAll('.mnu.open').forEach(function(m){ m.classList.remove('open'); });
+      if(!isOpen) mnu.classList.add('open');
+    });
+  });
+  // Close on outside click
+  document.addEventListener('click', function(){
+    document.querySelectorAll('.mnu.open').forEach(function(m){ m.classList.remove('open'); });
+  });
+  // Close on menu item click
+  document.querySelectorAll('.mnudrop button, .mnudrop label').forEach(function(el){
+    el.addEventListener('click', function(){
+      document.querySelectorAll('.mnu.open').forEach(function(m){ m.classList.remove('open'); });
+    });
+  });
+})();
+</script>
 
 <!-- ─── HILFE MODAL ───────────────────────────────────────────── -->
 <div id="helpModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);backdrop-filter:blur(3px);align-items:center;justify-content:center">
