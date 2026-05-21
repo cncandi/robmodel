@@ -422,6 +422,12 @@ function cumulativeAxisPositions() {
 }
 
 function syncJointsFromAxisPoints() {
+  // Altes Format migrieren: axisPoints[1].x wurde früher als z-Offset gespeichert
+  const ap1 = state.axisPoints[1];
+  if (ap1 && num(ap1.x) !== 0 && (num(ap1.z) || 0) === 0 && ap1.source !== 'manuell') {
+    ap1.z = ap1.x; ap1.x = 0;
+    if (state.joints[1]?.offset) { state.joints[1].offset.z = state.joints[1].offset.x; state.joints[1].offset.x = 0; }
+  }
   state.axisPoints.forEach((p, i) => {
     if (!state.joints[i]) return;
     p.x = num(p.x) ?? 0; p.y = num(p.y) ?? 0; p.z = num(p.z) ?? 0;
@@ -789,8 +795,16 @@ function stepToGeometry(arrayBuffer) {
 // ── OSD → Binary STL ─────────────────────────────────────────────
 function osdToBinaryStl(arrayBuffer) {
   const data = new Uint8Array(arrayBuffer);
-  const view = new DataView(arrayBuffer);
   if (!data.length) return new ArrayBuffer(84);
+  // Prüfen ob bereits binäres STL (80-Byte-Header, dann uint32 Dreiecksanzahl)
+  if (data.length >= 84) {
+    const view84 = new DataView(arrayBuffer);
+    const triCount = view84.getUint32(80, true);
+    if (triCount > 0 && 84 + triCount * 50 === data.length) {
+      return arrayBuffer;  // schon binäres STL
+    }
+  }
+  const view = new DataView(arrayBuffer);
   const hdr = new TextDecoder('utf-8',{fatal:false}).decode(data.slice(0,100));
   const isV2 = hdr.includes('+SprutCAM: OpenGL stream file (version 2.00)');
   const headerSize = isV2 ? 105 : 165;
