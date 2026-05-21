@@ -273,38 +273,30 @@ function _orthoUpdateFrustum(aspect) {
   orthoCamera.bottom = -h2;
   orthoCamera.updateProjectionMatrix();
 }
-function setCameraMode(toOrtho) {
-  if (toOrtho === isOrtho) return;
-  const w = renderer.domElement.width;
-  const h = renderer.domElement.height;
-  const aspect = w / h;
+function toggleCameraMode() {
+  const aspect = renderer.domElement.width / renderer.domElement.height;
   if (isOrtho) {
-    // → Perspektive
     perspCamera.position.copy(orthoCamera.position);
     perspCamera.quaternion.copy(orthoCamera.quaternion);
     perspCamera.up.copy(orthoCamera.up);
-    camera = perspCamera;
-    controls.object = camera;
-    transformControls.camera = camera;
-    perspCamera.aspect = aspect;
-    perspCamera.updateProjectionMatrix();
+    camera = perspCamera; controls.object = camera; transformControls.camera = camera;
+    perspCamera.aspect = aspect; perspCamera.updateProjectionMatrix();
   } else {
-    // → Orthografisch
     orthoCamera.position.copy(perspCamera.position);
     orthoCamera.quaternion.copy(perspCamera.quaternion);
     orthoCamera.up.copy(perspCamera.up);
-    orthoCamera.zoom = 1;
-    camera = orthoCamera;
-    controls.object = camera;
-    transformControls.camera = camera;
+    orthoCamera.zoom = 1; camera = orthoCamera; controls.object = camera; transformControls.camera = camera;
     _orthoUpdateFrustum(aspect);
   }
   isOrtho = !isOrtho;
   controls.update();
-  const btn = $('camModeBtn');
-  if(btn){ btn.textContent = isOrtho ? 'Ortho' : 'Perspektive'; }
-  const rib = $('rib-cammode');
-  if(rib){ rib.childNodes[1].textContent = isOrtho ? 'Ortho' : 'Perspektive'; rib.classList.toggle('on', !isOrtho); }
+  const lbl = isOrtho ? 'Ortho' : 'Perspektive';
+  ['camModeBtn','rib-cammode'].forEach(id => {
+    const b = $(id); if(!b) return;
+    b.classList.toggle('on', !isOrtho);
+    const t = [...b.childNodes].find(n => n.nodeType===3 && n.textContent.trim());
+    if(t) t.textContent = lbl;
+  });
 }
 
 
@@ -4155,7 +4147,7 @@ $('applyStlRotBtn').onclick = () => {
   loadStls().then(() => { renderRows(); });
 };
 $('toggleGrid').onclick   = () => grid.visible = !grid.visible;
-// camBtnPersp/Ortho use inline onclick
+
 // camera mode init: perspective default
 const _cmb=$('camModeBtn'); if(_cmb) _cmb.textContent='Perspektive';
 const _crb=$('rib-cammode'); if(_crb){ _crb.classList.add('on'); }
