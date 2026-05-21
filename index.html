@@ -364,8 +364,7 @@ header.top .title    { display: none !important; }
     <span class="rib-group-label">Werkzeuge</span>
   </div>
   <div class="rib-group" style="padding-bottom:16px">
-    <button class="rib-btn on" id="rib-persp" onclick="setCameraMode(false)"><svg><use href="#i-ortho"/></svg>Perspektive</button>
-    <button class="rib-btn"    id="rib-ortho" onclick="setCameraMode(true)"><svg><use href="#i-ortho"/></svg>Ortho</button>
+    <button class="rib-btn on" id="rib-cammode" onclick="toggleCameraMode()" title="Perspektive / Ortho"><svg><use href="#i-ortho"/></svg>Perspektive</button>
     <button class="rib-btn" onclick="document.getElementById('toggleGrid')?.click()"    title="Raster"><svg><use href="#i-grid"/></svg>Raster</button>
     <button class="rib-btn" onclick="document.getElementById('themeBtn')?.click()"      title="Theme"><svg><use href="#i-contrast"/></svg>Theme</button>
     <button class="rib-btn" onclick="document.getElementById('axisLabelBtn')?.click()" title="Labels"><svg><use href="#i-tag"/></svg>Labels</button>
@@ -1349,18 +1348,7 @@ document.getElementById('helpModal').addEventListener('click', function(e){
       if(ro) ro.classList.toggle('on', !isIso);
     });
   });
-  // Sync ribbon persp/ortho with menu buttons
-  ['camBtnPersp','camBtnOrtho'].forEach(function(id){
-    var btn = document.getElementById(id);
-    if(!btn) return;
-    var orig = btn.onclick;
-    btn.addEventListener('click', function(){
-      var isOrtho = id==='camBtnOrtho';
-      var rp=document.getElementById('rib-persp'), ro=document.getElementById('rib-ortho');
-      if(rp) rp.classList.toggle('on',!isOrtho);
-      if(ro) ro.classList.toggle('on', isOrtho);
-    });
-  });
+  // Sync ribbon persp/ortho with menu buttons});
   // Sync gimbal/measure .on state
   ['gimbalToggle','measureBtn'].forEach(function(id){
     var btn=document.getElementById(id);
@@ -1393,28 +1381,6 @@ function handleRibView(btn){
   if(rp)rp.classList.toggle('on',v==='iso');
   if(ro)ro.classList.toggle('on',v!=='iso');
 }
-// Sync rib-persp/ortho when setCameraMode is called
-(function(){
-  var _sc=window.setCameraMode;
-  window.setCameraMode=function(toOrtho){
-    _sc(toOrtho);
-    var rp=document.getElementById('rib-persp'),ro=document.getElementById('rib-ortho');
-    if(rp)rp.classList.toggle('on',!toOrtho);
-    if(ro)ro.classList.toggle('on',toOrtho);
-  };
-  // Sync gimbal/measure
-  ['gimbalToggle','measureBtn'].forEach(function(id){
-    var btn=document.getElementById(id);
-    var ribId={'gimbalToggle':'rib-gimbal','measureBtn':'rib-measure'}[id];
-    if(!btn||!ribId)return;
-    btn.addEventListener('click',function(){
-      setTimeout(function(){
-        var rb=document.getElementById(ribId);
-        if(rb)rb.classList.toggle('on',btn.classList.contains('on'));
-      },0);
-    });
-  });
-})();
 </script>
 </body>
 </html>
