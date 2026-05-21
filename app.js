@@ -4759,9 +4759,18 @@ async function tryLoadAxisPng(buffers) {
       body: JSON.stringify({ image: b64, mime: mime })
     });
 
-    const data = await resp.json();
+    const raw = await resp.text();
+    // Debug: bei Fehler anzeigen
+    let data;
+    try { data = JSON.parse(raw); } catch(e) {
+      throw new Error('Server-Antwort kein JSON: ' + raw.slice(0,200));
+    }
+    if (data.error) throw new Error('API-Fehler: ' + (data.error.message||JSON.stringify(data.error)));
     const text = (data.content || []).map(c => c.text || '').join('');
-    const json = JSON.parse(text.replace(/```json|```/g, '').trim());
+    // JSON robust extrahieren: erstes { bis letztes }
+    const jsonStart = text.indexOf('{'), jsonEnd = text.lastIndexOf('}');
+    if (jsonStart < 0 || jsonEnd < 0) throw new Error('Kein JSON in Antwort: ' + text.slice(0,200));
+    const json = JSON.parse(text.slice(jsonStart, jsonEnd + 1));
 
     // axisOffsets → state.axisPoints
     if (Array.isArray(json.axisOffsets)) {
