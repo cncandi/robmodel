@@ -25,7 +25,7 @@ const colors = { Base:'#333333', A1:'#ffffff', A2:'#999999', A3:'#ff7f00', A4:'#
 // ── KR8-Zielwerte (default) ───────────────────────────────────────
 const KR8_TARGET = [
   { x: 150,  y: 0, z: 450  },  // A1 Rz  — X=horizontal (Three.X), Z=vertikal (Three.Z)
-  { x: 610,  y: 0, z: 0    },  // A2 Ry
+  { x: 0,    y: 0, z: 610  },  // A2 Ry — z-offset (normales Mapping)
   { x: 0,    y: 0, z: 200  },  // A3 Ry
   { x: 630,  y: 0, z: 0    },  // A4 Rx
   { x: 80,   y: 0, z: 0    },  // A5 Ry
@@ -414,8 +414,7 @@ function cumulativeAxisPositions() {
   for (let i=0; i<5; i++) {
     const p = state.axisPoints[i];
     if (!p) { pts.push(new THREE.Vector3(x,y,z)); continue; }
-    if (i === 1) { z += num(p.x)||0; }
-    else { x += num(p.x)||0; z += num(p.z)||0; }
+    x += num(p.x)||0; z += num(p.z)||0;  // einheitliches Mapping für alle Achsen
     y += num(p.y)||0;
     pts.push(new THREE.Vector3(x,y,z));
   }
@@ -678,18 +677,10 @@ function onAxisObjectMoved() {
   const p = state.axisPoints[apIdx];
   if (!p) return;
 
-  // cumulativeAxisPositions hat für axisPoints[1] (→ A3) Sonderregel:
-  //   z += p.x  (p.x wird als Z-Offset verwendet, nicht als X)
-  // Damit Z-Pfeil → Z-Bewegung:  local.z → p.x
-  if (apIdx === 1) {
-    p.x = Number(local.z.toFixed(3));
-    p.y = Number(local.y.toFixed(3));
-    p.z = 0;
-  } else {
-    p.x = Number(local.x.toFixed(3));
-    p.y = Number(local.y.toFixed(3));
-    p.z = Number(local.z.toFixed(3));
-  }
+  // Einheitliches Mapping: XYZ-Pfeil → XYZ-Offset für alle Achsen
+  p.x = Number(local.x.toFixed(3));
+  p.y = Number(local.y.toFixed(3));
+  p.z = Number(local.z.toFixed(3));
   p.source = 'manuell';
   syncJointsFromAxisPoints(); rebuildRobotKinematics(); applyTransforms(); renderRows();
 }
