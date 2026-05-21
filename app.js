@@ -997,7 +997,6 @@ async function loadSourceZip(file) {
   setJointAnglesToReferencePose();
   ['rRx','rRy','rRz'].forEach(function(id,i){ const el=document.getElementById(id); if(el) el.value=[90,0,-90][i]; });
   await loadStls(); enableSave(); renderAll(); setView('iso');
-  await tryLoadAxisPng(state.buffers);
 }
 
 
@@ -1037,7 +1036,6 @@ async function loadSourceFolder(files) {
   ['rRx','rRy','rRz'].forEach(function(id,i){ const el=document.getElementById(id); if(el) el.value=[90,0,-90][i]; });
 
   await loadStls(); enableSave(); renderAll(); setView('iso');
-  await tryLoadAxisPng(state.buffers);
 }
 
 async function loadPackageZip(file) {
@@ -4723,8 +4721,6 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
-// ═══════════════════════════════════════════════════
-// AXIS.PNG — Kinematik aus Screenshot extrahieren
 // ═══════════════════════════════════════════════════
 
 async function tryLoadAxisPng(buffers) {
