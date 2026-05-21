@@ -4065,6 +4065,7 @@ function openLibFiltered(type) {
 
 $('posLibRefreshBtn')?.addEventListener('click', () => openLibFiltered('positioner'));
 $('railLibRefreshBtn')?.addEventListener('click', () => openLibFiltered('rail'));
+$('effLibRefreshBtn')?.addEventListener('click',  () => openLibFiltered('endeffektor'));
 $('objLibRefreshBtn')?.addEventListener('click',  () => openLibFiltered('label'));
 $('fixLibRefreshBtn')?.addEventListener('click',  () => openLibFiltered('fixture'));
 $('robotLibClose').onclick = () => { $('robotLibModal').style.display = 'none'; };
