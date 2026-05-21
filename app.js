@@ -1408,6 +1408,9 @@ function simulateAxis(axisIndex){
     else value=lerp(min,startValue,smooth(phase-2));
     state.jointAngles=base.slice();state.jointAngles[axisIndex]=value;
     applyJointRotations();
+    // Winkelfeld in Tabelle live aktualisieren
+    var _inp=document.querySelector('[data-joint-angle="'+axisIndex+'"]');
+    if(_inp) _inp.value=value.toFixed(1);
     if(t<1&&state.simulation.active&&state.simulation.axis===axisIndex){state.simulation.raf=requestAnimationFrame(step);}
     else{state.jointAngles=base.slice();state.jointAngles[axisIndex]=startValue;applyJointRotations();state.simulation={active:false,axis:null,raf:null};}
   };
