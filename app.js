@@ -3187,6 +3187,21 @@ function filterLibItems(items) {
   return items.filter(r => (r.type||'robot') === _libTypeFilter);
 }
 
+
+window._libThumbsVisible = false; // default: ausgeblendet
+
+function toggleLibThumbs() {
+  window._libThumbsVisible = !window._libThumbsVisible;
+  const btn = document.getElementById('rl-thumb-toggle');
+  if (btn) {
+    btn.textContent = window._libThumbsVisible ? '⊡ Thumbnails' : '⊞ Thumbnails';
+    btn.style.color = window._libThumbsVisible ? '#ff6000' : '#6a8fa8';
+    btn.style.borderColor = window._libThumbsVisible ? 'rgba(255,96,0,.4)' : 'rgba(255,255,255,.12)';
+    btn.style.background = window._libThumbsVisible ? 'rgba(255,96,0,.15)' : 'rgba(255,255,255,.05)';
+  }
+  if (window._libAllItems) renderLibList(window._libAllItems);
+}
+
 function renderLibList(items) {
   window._libAllItems = items;
   const filtered = filterLibItems(items);
@@ -3197,8 +3212,11 @@ function renderLibList(items) {
     container.innerHTML = '<div style="padding:16px;font-family:monospace;font-size:11px;color:#4a6a8a">Keine Einträge.</div>';
     return;
   }
+  const showThumbs = window._libThumbsVisible !== false;
   container.innerHTML = filtered.map((r) => {
-    const thumb = r.thumb_url ? `<img src="${r.thumb_url}" style="width:44px;height:44px;object-fit:cover;border-radius:4px;flex-shrink:0;background:#0f1e2e" onerror="this.style.display='none'">` : `<span style="font-size:20px;width:44px;text-align:center;flex-shrink:0">${TYPE_ICON[r.type||'robot']||'📦'}</span>`;
+    const thumb = showThumbs
+      ? (r.thumb_url ? `<img src="${r.thumb_url}" style="width:44px;height:44px;object-fit:cover;border-radius:4px;flex-shrink:0;background:#0f1e2e" onerror="this.style.display='none'">` : `<span style="font-size:20px;width:44px;text-align:center;flex-shrink:0">${TYPE_ICON[r.type||'robot']||'📦'}</span>`)
+      : '';
     return `
     <div data-lib-ri="${items.indexOf(r)}" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer" class="lib-row">
       ${thumb}
