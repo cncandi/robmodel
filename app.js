@@ -1188,7 +1188,9 @@ function parseMachineStateParameters(xml) {
     const iv = initEl ? parseFloat(initEl.getAttribute('DefaultValue')) : null;
     const j = state.joints[i - 1];
     if (!j) continue;
-    // Min/Max aus XML ignorieren — Skelett bleibt unverändert
+    // Min/Max aus XML: Achsgrenzen übernehmen (Skelett-Positionen bleiben ignoriert)
+    if (mn !== null && !isNaN(mn)) j.min = mn;
+    if (mx !== null && !isNaN(mx)) j.max = mx;
     if (iv !== null && !isNaN(iv)) state.jointAngles[i - 1] = iv;
   }
 }
