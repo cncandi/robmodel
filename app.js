@@ -994,6 +994,7 @@ async function loadSourceZip(file) {
   setJointAnglesToReferencePose();
   ['rRx','rRy','rRz'].forEach(function(id,i){ const el=document.getElementById(id); if(el) el.value=[90,0,-90][i]; });
   await loadStls(); enableSave(); renderAll(); setView('iso');
+  await tryLoadAxisPng(state.buffers);
 }
 
 
@@ -1033,6 +1034,7 @@ async function loadSourceFolder(files) {
   ['rRx','rRy','rRz'].forEach(function(id,i){ const el=document.getElementById(id); if(el) el.value=[90,0,-90][i]; });
 
   await loadStls(); enableSave(); renderAll(); setView('iso');
+  await tryLoadAxisPng(state.buffers);
 }
 
 async function loadPackageZip(file) {
@@ -1600,9 +1602,9 @@ function renderRows(){
       <td><b>${esc(j.name)}</b></td>
       <td><input class="angleInput" data-joint-angle="${i}" type="number" step="0.1" value="${state.jointAngles?.[i]??0}"></td>
       <td><span class="axisDir">${axisDirectionLabel(i)}</span></td>
-      <td><input data-j="${i}" data-f="x" title="${j.offset?.x??''}" value="${j.offset?.x??''}" style="width:90px"></td>
-      <td><input data-j="${i}" data-f="y" title="${j.offset?.y??''}" value="${j.offset?.y??''}" style="width:70px"></td>
-      <td><input data-j="${i}" data-f="z" title="${j.offset?.z??''}" value="${j.offset?.z??''}" style="width:90px"></td>
+      <td><input data-j="${i}" data-f="x" value="${j.offset?.x??''}"></td>
+      <td><input data-j="${i}" data-f="y" value="${j.offset?.y??''}"></td>
+      <td><input data-j="${i}" data-f="z" value="${j.offset?.z??''}"></td>
       <td><input data-j="${i}" data-f="min" value="${j.min??''}"></td>
       <td><input data-j="${i}" data-f="max" value="${j.max??''}"></td>
       <td><select class="dirSel" data-j="${i}" data-f="rotationSign"><option value="1" ${(num(j.rotationSign)??1)>=0?'selected':''}>+</option><option value="-1" ${(num(j.rotationSign)??1)<0?'selected':''}>−</option></select></td>
@@ -4712,3 +4714,102 @@ document.addEventListener('keydown', function(e) {
     }
   }
 });
+
+// ═══════════════════════════════════════════════════
+// AXIS.PNG — Kinematik aus Screenshot extrahieren
+// ═══════════════════════════════════════════════════
+
+async function tryLoadAxisPng(buffers) {
+  // Sucht nach axis.png (oder axis.PNG, Axis.png, ...) in den geladenen Dateien
+  const imgKey = Array.from(buffers.keys()).find(k =>
+    /^(?:.*[/\\])?axis\.(png|jpg|jpeg|webp)$/i.test(k)
+  );
+  if (!imgKey) return false;
+
+  const u8 = buffers.get(imgKey);
+  if (!u8 || u8.byteLength === 0) return false;
+
+  // Base64 kodieren
+  let b64 = '';
+  const chunk = 8192;
+  for (let i = 0; i < u8.length; i += chunk) {
+    b64 += String.fromCharCode(...u8.subarray(i, i + chunk));
+  }
+  b64 = btoa(b64);
+  const mime = /\.jpe?g$/i.test(imgKey) ? 'image/jpeg' : /\.webp$/i.test(imgKey) ? 'image/webp' : 'image/png';
+
+  // Status anzeigen
+  const notice = document.createElement('div');
+  notice.style.cssText = 'position:fixed;top:60px;right:16px;z-index:9000;background:#1a3050;border:1px solid #4488cc;color:#aaddff;padding:10px 16px;border-radius:6px;font-family:monospace;font-size:12px';
+  notice.textContent = '📐 axis.png gefunden — analysiere Kinematik…';
+  document.body.appendChild(notice);
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: mime, data: b64 }
+            },
+            {
+              type: 'text',
+              text: 'Dieses Bild zeigt einen Roboter mit Bemaßungen und kinematischen Daten. Extrahiere alle sichtbaren Maße und Achsgrenzen. Antworte NUR mit diesem JSON-Format (kein Text davor/danach):\n{\n  "axisOffsets": [\n    {"name":"A1","x":0,"y":0,"z":0},\n    {"name":"A2","x":0,"y":0,"z":0},\n    {"name":"A3","x":0,"y":0,"z":0},\n    {"name":"A4","x":0,"y":0,"z":0},\n    {"name":"A5","x":0,"y":0,"z":0},\n    {"name":"A6","x":0,"y":0,"z":0}\n  ],\n  "axisLimits": [\n    {"name":"J1","min":-170,"max":170},\n    {"name":"J2","min":-65,"max":85},\n    {"name":"J3","min":-180,"max":70},\n    {"name":"J4","min":-300,"max":300},\n    {"name":"J5","min":-130,"max":130},\n    {"name":"J6","min":-360,"max":360}\n  ]\n}\nBestimme die X/Y/Z Offsets aus den sichtbaren Bemaßungslinien. Die Bemaßungen geben Abstände zwischen den Gelenkachsen in mm an.'
+            }
+          ]
+        }]
+      })
+    });
+
+    const data = await resp.json();
+    const text = (data.content || []).map(c => c.text || '').join('');
+    const json = JSON.parse(text.replace(/```json|```/g, '').trim());
+
+    // axisOffsets → state.axisPoints
+    if (Array.isArray(json.axisOffsets)) {
+      json.axisOffsets.forEach((a, i) => {
+        if (!state.axisPoints[i]) return;
+        state.axisPoints[i].x = Number(a.x) || 0;
+        state.axisPoints[i].y = Number(a.y) || 0;
+        state.axisPoints[i].z = Number(a.z) || 0;
+        state.axisPoints[i].source = 'axis.png';
+      });
+    }
+
+    // axisLimits → state.joints
+    if (Array.isArray(json.axisLimits)) {
+      json.axisLimits.forEach((l, i) => {
+        if (!state.joints[i]) return;
+        if (l.min !== null && l.min !== undefined) state.joints[i].min = Number(l.min);
+        if (l.max !== null && l.max !== undefined) state.joints[i].max = Number(l.max);
+      });
+    }
+
+    syncJointsFromAxisPoints();
+    rebuildRobotKinematics();
+    applyTransforms();
+    updateAxisPointVisuals();
+    renderRows();
+
+    notice.style.background = '#1a4020';
+    notice.style.borderColor = '#44cc88';
+    notice.style.color = '#88ffcc';
+    notice.textContent = '✓ Kinematik aus axis.png übernommen';
+    setTimeout(() => notice.remove(), 3000);
+    return true;
+
+  } catch(err) {
+    notice.style.background = '#402020';
+    notice.style.borderColor = '#cc4444';
+    notice.style.color = '#ffaaaa';
+    notice.textContent = '⚠ axis.png: ' + err.message;
+    setTimeout(() => notice.remove(), 4000);
+    return false;
+  }
+}
