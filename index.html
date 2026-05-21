@@ -290,7 +290,7 @@ header.top .title    { display: none !important; }
       <div class="mnudrop">
         <button id="themeBtn"><svg class="ico"><use href="#i-contrast"/></svg>Theme wechseln</button>
         <button id="toggleGrid"><svg class="ico"><use href="#i-grid"/></svg>Raster ein/aus</button>
-        <button id="camModeBtn" onclick="toggleCameraMode()"><svg class="ico"><use href="#i-ortho"/></svg>Perspektive</button>
+        <button id="camModeBtn" onclick="toggleCameraMode()" class="on"><svg class="ico"><use href="#i-ortho"/></svg>Ortho</button>
         <button id="resetView"><svg class="ico"><use href="#i-reset"/></svg>Zurücksetzen</button>
         <div class="mnusep"></div>
         <button data-view="iso"><svg class="ico"><use href="#i-iso"/></svg>ISO</button>
@@ -364,7 +364,7 @@ header.top .title    { display: none !important; }
     <span class="rib-group-label">Werkzeuge</span>
   </div>
   <div class="rib-group" style="padding-bottom:16px">
-    <button class="rib-btn on" id="rib-cammode" onclick="toggleCameraMode()" title="Perspektive / Ortho"><svg><use href="#i-ortho"/></svg>Perspektive</button>
+    <button class="rib-btn on" id="rib-cammode" onclick="toggleCameraMode()" title="Perspektive / Ortho"><svg><use href="#i-ortho"/></svg>Ortho</button>
     <button class="rib-btn" onclick="document.getElementById('toggleGrid')?.click()"    title="Raster"><svg><use href="#i-grid"/></svg>Raster</button>
     <button class="rib-btn" onclick="document.getElementById('themeBtn')?.click()"      title="Theme"><svg><use href="#i-contrast"/></svg>Theme</button>
     <button class="rib-btn" onclick="document.getElementById('axisLabelBtn')?.click()" title="Labels"><svg><use href="#i-tag"/></svg>Labels</button>
