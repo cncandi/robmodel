@@ -671,14 +671,27 @@ function onAxisObjectMoved() {
   const mesh = transformControls.object; if (!mesh) return;
   const idx = mesh.userData.axisIndex;
   if (idx === 0) return;  // A1 ist immer an Ursprung — nicht verschiebbar
+  const apIdx = idx - 1;  // axisPoints-Index
   const pts = cumulativeAxisPositions();
   const prev = pts[idx - 1] || new THREE.Vector3(0,0,0);
   const local = mesh.position.clone().sub(prev);
-  // Kugel A(idx+1) liegt an pts[idx], bestimmt durch axisPoints[idx-1]
-  const p = state.axisPoints[idx - 1];
+  const p = state.axisPoints[apIdx];
   if (!p) return;
-  p.x = Number(local.x.toFixed(3)); p.y = Number(local.y.toFixed(3)); p.z = Number(local.z.toFixed(3)); p.source = 'manuell';
-  syncJointsFromAxisPoints(); rebuildRobotKinematics(); applyTransforms(); renderRows(); 
+
+  // cumulativeAxisPositions hat für axisPoints[1] (→ A3) Sonderregel:
+  //   z += p.x  (p.x wird als Z-Offset verwendet, nicht als X)
+  // Damit Z-Pfeil → Z-Bewegung:  local.z → p.x
+  if (apIdx === 1) {
+    p.x = Number(local.z.toFixed(3));
+    p.y = Number(local.y.toFixed(3));
+    p.z = 0;
+  } else {
+    p.x = Number(local.x.toFixed(3));
+    p.y = Number(local.y.toFixed(3));
+    p.z = Number(local.z.toFixed(3));
+  }
+  p.source = 'manuell';
+  syncJointsFromAxisPoints(); rebuildRobotKinematics(); applyTransforms(); renderRows();
 }
 
 
