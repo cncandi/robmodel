@@ -4148,9 +4148,8 @@ $('applyStlRotBtn').onclick = () => {
 };
 $('toggleGrid').onclick   = () => grid.visible = !grid.visible;
 
-// camera mode init: perspective default
-const _cmb=$('camModeBtn'); if(_cmb) _cmb.textContent='Perspektive';
-const _crb=$('rib-cammode'); if(_crb){ _crb.classList.add('on'); }
+// camera mode init: ortho default
+toggleCameraMode();
 
 let _axisLabelsVisible = true;
 // Robot-Visibility: 0=sichtbar, 1=durchsichtig, 2=unsichtbar
