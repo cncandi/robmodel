@@ -3692,7 +3692,6 @@ async function loadRobotFromLib(robot) {
       try {
         state.packageJson = JSON.parse(await zip.files[jsonEntry].async('string'));
         applyJsonToState(state.packageJson);
-        setJointAnglesToReferencePose();  // Referenzpose auf Gelenkwinkel anwenden
       } catch(e) { console.warn('JSON parse error', e); }
     }
 
@@ -3734,14 +3733,6 @@ async function loadRobotFromLib(robot) {
 
     bar.style.width = '85%';
     zeroAllTransforms();
-    // stlRotation aus JSON übernehmen (rRx/rRy/rRz wurden in applyJsonToState gesetzt)
-    const _rRx = parseFloat(document.getElementById('rRx')?.value||0)||0;
-    const _rRy = parseFloat(document.getElementById('rRy')?.value||0)||0;
-    const _rRz = parseFloat(document.getElementById('rRz')?.value||0)||0;
-    if (!_rRx && !_rRy && !_rRz) {
-      // Kein Wert aus JSON → Standard-Rotation setzen
-      ['rRx','rRy','rRz'].forEach(function(id,i){var el=document.getElementById(id);if(el)el.value=[90,0,-90][i];});
-    }
     await loadStls(); enableSave(); renderAll(); setView('iso');
     bar.style.width = '100%'; prog.style.display = 'none';
     status.textContent = '✓ ' + robot.name + ' geladen';
