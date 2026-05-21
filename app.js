@@ -3692,6 +3692,7 @@ async function loadRobotFromLib(robot) {
       try {
         state.packageJson = JSON.parse(await zip.files[jsonEntry].async('string'));
         applyJsonToState(state.packageJson);
+        setJointAnglesToReferencePose();
       } catch(e) { console.warn('JSON parse error', e); }
     }
 
