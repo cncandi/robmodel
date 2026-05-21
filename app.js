@@ -4157,6 +4157,7 @@ $('applyStlRotBtn').onclick = () => {
 };
 $('toggleGrid').onclick   = () => grid.visible = !grid.visible;
 $('camModeBtn')?.addEventListener('click', toggleCameraMode);
+const _cmb=$('camModeBtn'); if(_cmb){_cmb.textContent='⬜ Ortho';_cmb.style.background='rgba(255,255,255,.05)';_cmb.style.borderColor='rgba(255,255,255,.15)';_cmb.style.color='#6a8fa8';}
 
 let _axisLabelsVisible = true;
 // Robot-Visibility: 0=sichtbar, 1=durchsichtig, 2=unsichtbar
