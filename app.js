@@ -4767,7 +4767,7 @@ async function tryLoadAxisPng(buffers) {
     try { data = JSON.parse(raw); } catch(e) {
       throw new Error('Server-Antwort kein JSON: ' + raw.slice(0,200));
     }
-    if (data.error) throw new Error('API-Fehler: ' + (data.error.message||JSON.stringify(data.error)));
+    if (!resp.ok || data.error) throw new Error(data.error?.message || data.error || 'HTTP ' + resp.status);
     const text = (data.content || []).map(c => c.text || '').join('');
     // JSON robust extrahieren: erstes { bis letztes }
     const jsonStart = text.indexOf('{'), jsonEnd = text.lastIndexOf('}');
