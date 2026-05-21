@@ -344,6 +344,50 @@ header.top .title    { display: none !important; }
   <input id="checkZip"     type="file" accept=".zip,application/zip" style="display:none">
 </header>
 
+<!-- ── RIBBON ──────────────────────────────────────────────── -->
+<div class="ribbon">
+  <div class="rib-group" style="padding-bottom:16px">
+    <button class="rib-btn" onclick="document.getElementById('clearAllBtn')?.click()" title="Neu"><svg><use href="#i-new"/></svg>Neu</button>
+    <button class="rib-btn" onclick="document.getElementById('sourceZip')?.click()" title="Archiv laden"><svg><use href="#i-archive"/></svg>Archiv</button>
+    <button class="rib-btn" onclick="document.getElementById('sourceFolder')?.click()" title="Ordner laden"><svg><use href="#i-folder"/></svg>Ordner</button>
+    <button class="rib-btn" id="rib-save" onclick="document.getElementById('downloadZip')?.click()" title="Speichern"><svg><use href="#i-save"/></svg>Speichern</button>
+    <span class="rib-group-label">Datei</span>
+  </div>
+  <div class="rib-group" style="padding-bottom:16px">
+    <button class="rib-btn" onclick="document.getElementById('robotLibBtn')?.click()" title="Library"><svg><use href="#i-lib"/></svg>Library</button>
+    <button class="rib-btn" onclick="document.getElementById('roblibBtn')?.click()" title="RobLib"><svg><use href="#i-db"/></svg>RobLib</button>
+    <span class="rib-group-label">Bibliothek</span>
+  </div>
+  <div class="rib-group" style="padding-bottom:16px">
+    <button class="rib-btn" id="rib-gimbal"   onclick="document.getElementById('gimbalToggle')?.click()" title="Gimbal"><svg><use href="#i-move"/></svg>Gimbal</button>
+    <button class="rib-btn" id="rib-measure"  onclick="document.getElementById('measureBtn')?.click()"  title="Messen"><svg><use href="#i-ruler"/></svg>Messen</button>
+    <span class="rib-group-label">Werkzeuge</span>
+  </div>
+  <div class="rib-group" style="padding-bottom:16px">
+    <button class="rib-btn on" id="rib-persp" onclick="setCameraMode(false)"><svg><use href="#i-ortho"/></svg>Perspektive</button>
+    <button class="rib-btn"    id="rib-ortho" onclick="setCameraMode(true)"><svg><use href="#i-ortho"/></svg>Ortho</button>
+    <button class="rib-btn" onclick="document.getElementById('toggleGrid')?.click()"    title="Raster"><svg><use href="#i-grid"/></svg>Raster</button>
+    <button class="rib-btn" onclick="document.getElementById('themeBtn')?.click()"      title="Theme"><svg><use href="#i-contrast"/></svg>Theme</button>
+    <button class="rib-btn" onclick="document.getElementById('axisLabelBtn')?.click()" title="Labels"><svg><use href="#i-tag"/></svg>Labels</button>
+    <button class="rib-btn" onclick="document.getElementById('robotVisBtn')?.click()"  title="Roboter"><svg><use href="#i-eye"/></svg>Roboter</button>
+    <span class="rib-group-label">Anzeige</span>
+  </div>
+  <div class="rib-group" style="padding-bottom:16px">
+    <button class="rib-btn on" id="rib-viso"    data-view="iso"    onclick="handleRibView(this)"><svg><use href="#i-iso"/></svg>ISO</button>
+    <button class="rib-btn"    id="rib-vtop"    data-view="top"    onclick="handleRibView(this)"><svg><use href="#i-top"/></svg>Top</button>
+    <button class="rib-btn"    id="rib-vbottom" data-view="bottom" onclick="handleRibView(this)"><svg><use href="#i-bot"/></svg>Bot</button>
+    <button class="rib-btn"    id="rib-vfront"  data-view="front"  onclick="handleRibView(this)"><svg><use href="#i-front"/></svg>Front</button>
+    <button class="rib-btn"    id="rib-vback"   data-view="back"   onclick="handleRibView(this)"><svg><use href="#i-back"/></svg>Back</button>
+    <button class="rib-btn"    id="rib-vleft"   data-view="left"   onclick="handleRibView(this)"><svg><use href="#i-left"/></svg>Left</button>
+    <button class="rib-btn"    id="rib-vright"  data-view="right"  onclick="handleRibView(this)"><svg><use href="#i-right"/></svg>Right</button>
+    <span class="rib-group-label">Ansicht</span>
+  </div>
+  <div class="rib-group" style="padding-bottom:16px;margin-left:auto">
+    <button class="rib-btn" onclick="document.getElementById('helpBtn')?.click()" title="Hilfe"><svg><use href="#i-help"/></svg>Hilfe</button>
+    <span class="rib-group-label">Hilfe</span>
+  </div>
+</div>
+
   <!-- ─── MAIN ─────────────────────────────────────────────────── -->
   <main class="main">
 
@@ -1340,6 +1384,38 @@ document.getElementById('helpModal').addEventListener('click', function(e){
 })();
 </script>
 
+<script>
+function handleRibView(btn){
+  var v=btn.getAttribute('data-view');
+  setView(v);
+  document.querySelectorAll('.rib-btn[data-view]').forEach(function(b){b.classList.toggle('on',b===btn);});
+  var rp=document.getElementById('rib-persp'),ro=document.getElementById('rib-ortho');
+  if(rp)rp.classList.toggle('on',v==='iso');
+  if(ro)ro.classList.toggle('on',v!=='iso');
+}
+// Sync rib-persp/ortho when setCameraMode is called
+(function(){
+  var _sc=window.setCameraMode;
+  window.setCameraMode=function(toOrtho){
+    _sc(toOrtho);
+    var rp=document.getElementById('rib-persp'),ro=document.getElementById('rib-ortho');
+    if(rp)rp.classList.toggle('on',!toOrtho);
+    if(ro)ro.classList.toggle('on',toOrtho);
+  };
+  // Sync gimbal/measure
+  ['gimbalToggle','measureBtn'].forEach(function(id){
+    var btn=document.getElementById(id);
+    var ribId={'gimbalToggle':'rib-gimbal','measureBtn':'rib-measure'}[id];
+    if(!btn||!ribId)return;
+    btn.addEventListener('click',function(){
+      setTimeout(function(){
+        var rb=document.getElementById(ribId);
+        if(rb)rb.classList.toggle('on',btn.classList.contains('on'));
+      },0);
+    });
+  });
+})();
+</script>
 </body>
 </html>
 
