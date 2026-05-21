@@ -115,6 +115,30 @@ nav.menubar { display: flex; align-items: stretch; height: 100%; }
 /* hide old toolbar class if still referenced */
 header.top .toolbar { display: none !important; }
 header.top .title    { display: none !important; }
+
+/* slider in dropdown */
+.mnuslider {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 16px;
+  color: var(--txt2);
+  font-family: monospace;
+  font-size: 12px;
+  cursor: default;
+}
+.mnuslider input[type=range] {
+  width: 80px;
+  accent-color: #60a5fa;
+  cursor: pointer;
+}
+/* active state for data-view and toggle buttons in dropdown */
+.mnudrop button.active,
+.mnudrop button[data-view].active {
+  color: var(--acc);
+  background: rgba(255,122,0,.1);
+}
+
 </style>
 
 </head>
@@ -158,8 +182,36 @@ header.top .title    { display: none !important; }
       <button class="mnubtn">Ansicht</button>
       <div class="mnudrop">
         <button id="themeBtn">◑ Theme wechseln</button>
-        <button onclick="document.getElementById('toggleGrid')?.click()">⊞ Raster ein/aus</button>
-        <button onclick="document.getElementById('resetView')?.click()">↺ Ansicht zurücksetzen</button>
+        <button id="toggleGrid">⊞ Raster ein/aus</button>
+        <button id="camModeBtn">⬜ Ortho / Perspektive</button>
+        <button id="resetView">↺ Zurücksetzen</button>
+        <div class="mnusep"></div>
+        <button data-view="iso">▣ ISO</button>
+        <button data-view="top">↑ Top</button>
+        <button data-view="bottom">↓ Bottom</button>
+        <button data-view="front">→ Front</button>
+        <button data-view="back">← Back</button>
+        <button data-view="left">◁ Left</button>
+        <button data-view="right">▷ Right</button>
+      </div>
+    </div>
+
+    <!-- WERKZEUGE -->
+    <div class="mnu" id="mnuWerkzeuge">
+      <button class="mnubtn">Werkzeuge</button>
+      <div class="mnudrop">
+        <button id="gimbalToggle">🎯 Gimbal ein/aus</button>
+        <button id="gimbalModeBtn" style="display:none">⟳ Gimbal: Translate/Rotate</button>
+        <button id="measureBtn">📏 Messen</button>
+        <div class="mnusep"></div>
+        <button id="axisLabelBtn">🏷 Labels ein/aus</button>
+        <button id="robotVisBtn">🤖 Roboter ein/aus</button>
+        <div class="mnusep"></div>
+        <div class="mnuslider" onclick="event.stopPropagation()">
+          <span>⚫ Punkte</span>
+          <input id="jointSizeSlider" type="range" min="5" max="120" value="50" step="1" title="Größe der Knotenpunkte">
+          <span id="jointSizeVal" style="min-width:22px;text-align:right">50</span>
+        </div>
       </div>
     </div>
 
@@ -190,37 +242,11 @@ header.top .title    { display: none !important; }
 
     <!-- 3D VIEWER -->
     <section class="viewerCard" id="dropZone">
-      <div class="viewerHead">
-        <span class="badge info" id="fileBadge">Keine Datei geladen</span>
-        <span class="badge sel" id="axisSelBadge" style="display:none"></span>
-        <div class="row gap4">
-          <button id="resetView">↺ Ansicht</button>
-          <button id="toggleGrid">Raster</button>
-          <button id="gimbalToggle" title="Komponente anklicken und verschieben/rotieren" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">🎯 Gimbal</button>
-          <button id="gimbalModeBtn" title="Wechsel Verschieben/Rotieren" style="display:none;background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">T</button>
-          <button id="measureBtn" title="Messung: P1 → P2 anklicken" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">📏 Messen</button>
-          <button id="camModeBtn" title="Perspektive / Orthografisch wechseln" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">⬜ Ortho</button>
-          <button id="axisLabelBtn" title="A1-A6 Labels ein/ausblenden" style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">🏷 Labels</button>
-          <button id="robotVisBtn" title="Roboter ein/ausblenden" style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:4px;padding:4px 10px;cursor:pointer;font-family:monospace;font-size:12px">🤖 Roboter</button>
-          <label style="font-size:11px;color:#6a8fa8;font-family:monospace;display:flex;align-items:center;gap:4px;margin-left:4px;pointer-events:all">
-            ⚫ Punkte
-            <input id="jointSizeSlider" type="range" min="5" max="120" value="50" step="1"
-              style="width:70px;accent-color:#60a5fa;cursor:pointer;pointer-events:all"
-              title="Größe der Knotenpunkte">
-            <span id="jointSizeVal" style="min-width:26px;text-align:right">50</span>
-          </label>
-        </div>
-      </div>
+      <!-- fileBadge + axisSelBadge: hidden, kept for JS -->
+      <span id="fileBadge" style="display:none"></span>
+      <span class="badge sel" id="axisSelBadge" style="display:none;position:absolute;top:6px;right:6px;z-index:20"></span>
       <div class="viewHelp">LMB: Rotation &nbsp;|&nbsp; MMB: Pan &nbsp;|&nbsp; RMB: Rotation &nbsp;|&nbsp; Scroll: Zoom</div>
-      <div class="viewPresets">
-        <button class="active" data-view="iso">ISO</button>
-        <button data-view="top">Top</button>
-        <button data-view="bottom">Bot</button>
-        <button data-view="front">Front</button>
-        <button data-view="back">Back</button>
-        <button data-view="left">Left</button>
-        <button data-view="right">Right</button>
-      </div>
+
       <div class="axis">
         <div><span class="line x"></span>X</div>
         <div><span class="line y"></span>Y</div>
