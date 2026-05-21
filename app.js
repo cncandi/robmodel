@@ -4751,26 +4751,12 @@ async function tryLoadAxisPng(buffers) {
   document.body.appendChild(notice);
 
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    // PHP-Proxy verwenden (verhindert CORS-Fehler beim direkten API-Aufruf)
+    const _proxyUrl = (typeof ROBMODEL_BASE !== 'undefined' ? ROBMODEL_BASE : '') + 'axis_analyze.php';
+    const resp = await fetch(_proxyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: mime, data: b64 }
-            },
-            {
-              type: 'text',
-              text: 'Dieses Bild zeigt einen Roboter mit Bemaßungen und kinematischen Daten. Extrahiere alle sichtbaren Maße und Achsgrenzen. Antworte NUR mit diesem JSON-Format (kein Text davor/danach):\n{\n  "axisOffsets": [\n    {"name":"A1","x":0,"y":0,"z":0},\n    {"name":"A2","x":0,"y":0,"z":0},\n    {"name":"A3","x":0,"y":0,"z":0},\n    {"name":"A4","x":0,"y":0,"z":0},\n    {"name":"A5","x":0,"y":0,"z":0},\n    {"name":"A6","x":0,"y":0,"z":0}\n  ],\n  "axisLimits": [\n    {"name":"J1","min":-170,"max":170},\n    {"name":"J2","min":-65,"max":85},\n    {"name":"J3","min":-180,"max":70},\n    {"name":"J4","min":-300,"max":300},\n    {"name":"J5","min":-130,"max":130},\n    {"name":"J6","min":-360,"max":360}\n  ]\n}\nBestimme die X/Y/Z Offsets aus den sichtbaren Bemaßungslinien. Die Bemaßungen geben Abstände zwischen den Gelenkachsen in mm an.'
-            }
-          ]
-        }]
-      })
+      body: JSON.stringify({ image: b64, mime: mime })
     });
 
     const data = await resp.json();
