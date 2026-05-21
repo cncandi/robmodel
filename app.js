@@ -301,11 +301,12 @@ function setCameraMode(toOrtho) {
   }
   isOrtho = !isOrtho;
   controls.update();
-  const bp = $('camBtnPersp'), bo = $('camBtnOrtho');
-  if (bp) { if(isOrtho) bp.classList.remove('on'); else bp.classList.add('on'); }
-  if (bo) { if(isOrtho) bo.classList.add('on');    else bo.classList.remove('on'); }
+  const btn = $('camModeBtn');
+  if(btn){ btn.textContent = isOrtho ? 'Ortho' : 'Perspektive'; }
+  const rib = $('rib-cammode');
+  if(rib){ rib.childNodes[1].textContent = isOrtho ? 'Ortho' : 'Perspektive'; rib.classList.toggle('on', !isOrtho); }
 }
-function toggleCameraMode() { setCameraMode(!isOrtho); }
+
 
 function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
 
@@ -4155,10 +4156,9 @@ $('applyStlRotBtn').onclick = () => {
 };
 $('toggleGrid').onclick   = () => grid.visible = !grid.visible;
 // camBtnPersp/Ortho use inline onclick
-// camera mode init: perspective is default
-const _cbp=$('camBtnPersp'),_cbo=$('camBtnOrtho');
-if(_cbp) _cbp.classList.add('on');
-if(_cbo) _cbo.classList.remove('on');
+// camera mode init: perspective default
+const _cmb=$('camModeBtn'); if(_cmb) _cmb.textContent='Perspektive';
+const _crb=$('rib-cammode'); if(_crb){ _crb.classList.add('on'); }
 
 let _axisLabelsVisible = true;
 // Robot-Visibility: 0=sichtbar, 1=durchsichtig, 2=unsichtbar
