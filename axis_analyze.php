@@ -11,7 +11,7 @@ if (file_exists(__DIR__ . '/config_ai.php')) {
     include __DIR__ . '/config_ai.php';  // definiert $anthropicApiKey
     $apiKey = $anthropicApiKey ?? '';
 }
-if (!$apiKey) { http_response_code(500); echo json_encode(['error'=>'API-Key nicht konfiguriert. config_ai.php anlegen mit: <?php $anthropicApiKey="sk-ant-..."']); exit; }
+if (!$apiKey) { http_response_code(400); echo json_encode(['error'=>'API-Key nicht konfiguriert. Bitte config_ai.php anlegen: <?php $anthropicApiKey="sk-ant-api03-...";']); exit; }
 
 $body = json_decode(file_get_contents('php://input'), true);
 if (empty($body['image'])) { http_response_code(400); echo json_encode(['error'=>'Kein Bild']); exit; }
