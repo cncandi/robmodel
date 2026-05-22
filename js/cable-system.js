@@ -1,28 +1,30 @@
 /**
- * cable-system.js  –  Kabel-Editor (RobModel) / Kabel-Viewer (RobSimul)
+ * cable-system.js  –  Kabel  (RobModel Editor / RobSimul Viewer)
  *
- * RobModel:  init(THREE, scene, {upAxis:'z'})
- *            setTrackObjects({tcp, a1..a6})  ← am Ende von rebuildRobotKinematics()
- *            refresh()                        ← in applyJointRotations()
+ * RobModel:
+ *   init(THREE, scene, {upAxis:'z'})
+ *   setTrackObjects({tcp,a1..a6})   ← Ende rebuildRobotKinematics()
+ *   refresh()                        ← in applyJointRotations()
  *
- * RobSimul:  init(THREE, scene, {upAxis:'y', viewerOnly:true})
- *            loadCables(arr)                  ← in applyKinematicData()
+ * RobSimul:
+ *   init(THREE, scene, {upAxis:'y', viewerOnly:true})
+ *   loadCables(arr)                  ← in applyKinematicData()
  *
- * Track-Modi im Anker:  null → Welt-XYZ   |   'a1'..'a6' → Gelenkpunkt   |   'tcp' → Werkzeugspitze
- *
+ * Standard: 1 Kabel, 6 Anker an A1–A6 (track:'a1'…'a6').
+ * Länge je Segment = Gelenk-Abstand + 15% Durchhang-Puffer.
  * JSON-Schlüssel "cables": [{thickness, anchors:[{x,y,z,segLen,track?}]}]
  */
 
 class CableSystem {
 
-  // ─── 1. Zustand ────────────────────────────────────────────────────────────
+  // ─── Zustand ────────────────────────────────────────────────────────────────
 
   constructor() {
     this.THREE      = null;
     this.scene      = null;
     this.upAxis     = 'y';
     this.viewerOnly = false;
-    this.visible    = false;
+    this.visible    = true;   // 3D-Kabel sichtbar (Menü-Button schaltet um)
     this._cables    = [];
     this.selCab     = 0;
     this.selAnch    = 0;
@@ -32,19 +34,16 @@ class CableSystem {
     this.N_PTS      = 40;
     this._sGeoSm    = null;
     this._sGeoLg    = null;
-    this._panel     = null;
-    this._TRACK_LABELS = {
-      a1:'A1 – Achse 1', a2:'A2 – Achse 2', a3:'A3 – Achse 3',
-      a4:'A4 – Achse 4', a5:'A5 – Achse 5', a6:'A6 – Flansch',
-      tcp:'TCP – Werkzeugspitze'
+    this._LABELS    = {
+      a1:'A1',a2:'A2',a3:'A3',a4:'A4',a5:'A5',a6:'A6',tcp:'TCP'
     };
   }
 
   get cables() { return this._cables; }
 
-  // ─── 2. Initialisierung ─────────────────────────────────────────────────────
+  // ─── Initialisierung ────────────────────────────────────────────────────────
 
-  init(THREE, scene, opts = {}) {
+  init(THREE, scene, opts={}) {
     this.THREE      = THREE;
     this.scene      = scene;
     this.upAxis     = opts.upAxis     || 'y';
@@ -53,108 +52,113 @@ class CableSystem {
     this._sGeoLg    = new THREE.SphereGeometry(11, 16, 12);
 
     if (!this.viewerOnly) {
-      // Standard-Kabel: A1 → TCP (folgt dem Roboter sobald setTrackObjects aufgerufen wird)
+      // Standard: 1 Kabel, 6 Anker A1–A6
       this._cables = [{
         thickness: 6,
-        anchors: [
-          { x:0, y:0, z:0, ox:0, oy:0, oz:0, segLen:1200, track:'a1' },
-          { x:0, y:0, z:0, ox:0, oy:0, oz:0, segLen:1200, track:'tcp' },
-        ]
+        anchors: ['a1','a2','a3','a4','a5','a6'].map((t,i) => ({
+          x:0, y:0, z:0, ox:0, oy:0, oz:0,
+          segLen: 200,   // wird bei setTrackObjects() durch auto-Länge ersetzt
+          track: t
+        }))
       }];
-      this._buildPanel();
+      this._injectStyles();
+      // Editor wird nach DOM-Ready aufgebaut (index.html muss cs-inline-editor enthalten)
+      setTimeout(() => { this._buildInlineEditor(); this.refresh(); }, 0);
     } else {
       this._buildErrorBanner();
     }
   }
 
-  // ─── 3. Track-Objekte registrieren ──────────────────────────────────────────
-  // Muss nach jedem rebuildRobotKinematics() aufgerufen werden,
-  // da die Pivot-Gruppen bei jedem Rebuild neu erstellt werden.
+  // ─── Track-Objekte + Auto-Länge ─────────────────────────────────────────────
 
   setTrackObjects(map) {
     this._trackMap = {};
-    for (const [k, v] of Object.entries(map)) {
-      if (v) this._trackMap[k] = v;
-    }
-    this._updateTrackDropdown();
+    for (const [k,v] of Object.entries(map)) { if(v) this._trackMap[k]=v; }
+    this._updateRefDropdown();
+    this.autoLength();   // Segmentlängen nach echten Gelenkabständen setzen
+    this.refresh();
   }
 
-  // ─── 4. Laden aus JSON (viewerOnly) ─────────────────────────────────────────
+  /**
+   * autoLength(): Setzt segLen jedes Segments auf  Gelenk-Abstand × (1 + slack).
+   * Nur wenn aktueller segLen < Abstand (Kabel wäre gespannt).
+   */
+  autoLength(slack=0.15) {
+    this._cables.forEach((cab, ci) => {
+      for (let ai=0; ai<cab.anchors.length-1; ai++) {
+        const p1 = this._anchorWorldPos(ci, ai);
+        const p2 = this._anchorWorldPos(ci, ai+1);
+        const dist = p1.distanceTo(p2);
+        if (dist > 1) {
+          const minLen = Math.ceil(dist * (1+slack));
+          if (cab.anchors[ai].segLen < minLen) cab.anchors[ai].segLen = minLen;
+        }
+      }
+    });
+    this._loadAnchorEdit();   // L→-Slider aktualisieren
+    this._renderTable();
+  }
+
+  // ─── JSON laden (RobSimul) ──────────────────────────────────────────────────
 
   loadCables(arr) {
     if (!Array.isArray(arr)) return;
     this._cables = JSON.parse(JSON.stringify(arr));
-    this.selCab  = 0;
-    this.selAnch = 0;
+    this.selCab  = 0; this.selAnch = 0;
     this.visible = arr.length > 0;
-    if (!this.viewerOnly && this._panel) {
-      this._panel.style.display = this.visible ? 'flex' : 'none';
-      this._renderTable(); this._loadDetail();
-    }
     this._updateSideCard();
     this.refresh();
   }
 
-  // ─── 5. Ankerpunkt-Weltposition ─────────────────────────────────────────────
+  // ─── Ankerpunkt-Weltposition ────────────────────────────────────────────────
 
   _anchorWorldPos(ci, ai) {
-    const T = this.THREE, a = this._cables[ci].anchors[ai];
+    const T=this.THREE, a=this._cables[ci].anchors[ai];
     if (a.track && this._trackMap[a.track]) {
-      const obj = this._trackMap[a.track];
-      const wp  = new T.Vector3();
+      const obj=this._trackMap[a.track], wp=new T.Vector3();
       obj.getWorldPosition(wp);
-      if (a.ox || a.oy || a.oz) {
-        const wq = new T.Quaternion();
-        obj.getWorldQuaternion(wq);
-        wp.add(new T.Vector3(a.ox||0, a.oy||0, a.oz||0).applyQuaternion(wq));
+      if (a.ox||a.oy||a.oz) {
+        const wq=new T.Quaternion(); obj.getWorldQuaternion(wq);
+        wp.add(new T.Vector3(a.ox||0,a.oy||0,a.oz||0).applyQuaternion(wq));
       }
       return wp;
     }
-    return new T.Vector3(a.x||0, a.y||0, a.z||0);
+    return new T.Vector3(a.x||0,a.y||0,a.z||0);
   }
 
-  // ─── 6. Physik: Verlet PBD ──────────────────────────────────────────────────
+  // ─── Physik ─────────────────────────────────────────────────────────────────
 
   _resolveFloor(p) {
-    if (this.upAxis==='z' && p.z<0){p.z=0;return true;}
-    if (this.upAxis==='y' && p.y<0){p.y=0;return true;}
+    if(this.upAxis==='z'&&p.z<0){p.z=0;return true;}
+    if(this.upAxis==='y'&&p.y<0){p.y=0;return true;}
     return false;
   }
 
-  _simCable(p1, p2, L) {
-    const T=this.THREE, chord=p1.distanceTo(p2);
-    if (chord>=L-0.01) return {taut:true,  ratio:Math.min(chord/L,1), pts:null};
-    if (chord<0.5)      return {taut:false, ratio:0, pts:null};
-    const N=this.N_PTS, rL=L/N;
-    const pos=[],old=[];
+  _simCable(p1,p2,L) {
+    const T=this.THREE,chord=p1.distanceTo(p2);
+    if(chord>=L-0.01)return{taut:true, ratio:Math.min(chord/L,1),pts:null};
+    if(chord<0.5)     return{taut:false,ratio:0,pts:null};
+    const N=this.N_PTS,rL=L/N,pos=[],old=[];
     for(let i=0;i<=N;i++){const p=p1.clone().lerp(p2,i/N);pos.push(p);old.push(p.clone());}
     const GY=0.14,DM=0.85,STEPS=280,CP=8,up=this.upAxis;
     for(let s=0;s<STEPS;s++){
-      for(let i=1;i<N;i++){
-        const v=pos[i].clone().sub(old[i]).multiplyScalar(DM);
-        old[i].copy(pos[i]);pos[i].add(v);
-        if(up==='z')pos[i].z-=GY;else pos[i].y-=GY;
-      }
+      for(let i=1;i<N;i++){const v=pos[i].clone().sub(old[i]).multiplyScalar(DM);old[i].copy(pos[i]);pos[i].add(v);if(up==='z')pos[i].z-=GY;else pos[i].y-=GY;}
       for(let c=0;c<CP;c++){
-        for(let i=0;i<N;i++){
-          const d=pos[i].distanceTo(pos[i+1]);if(d<1e-4)continue;
-          const cr=new T.Vector3().subVectors(pos[i+1],pos[i]).multiplyScalar((d-rL)/(d*2));
-          if(i>0)pos[i].add(cr);if(i<N)pos[i+1].sub(cr);
-        }
+        for(let i=0;i<N;i++){const d=pos[i].distanceTo(pos[i+1]);if(d<1e-4)continue;const cr=new T.Vector3().subVectors(pos[i+1],pos[i]).multiplyScalar((d-rL)/(d*2));if(i>0)pos[i].add(cr);if(i<N)pos[i+1].sub(cr);}
         pos[0].copy(p1);pos[N].copy(p2);
         for(let i=1;i<N;i++)this._resolveFloor(pos[i]);
       }
     }
-    return {taut:false,ratio:chord/L,pts:pos};
+    return{taut:false,ratio:chord/L,pts:pos};
   }
 
-  // ─── 7. Rendering ───────────────────────────────────────────────────────────
+  // ─── 3D-Rendering ───────────────────────────────────────────────────────────
 
   _tCol(r){
     if(r>=1.0)return{color:0xff2222,emissive:0x440000,emissiveIntensity:.6};
     if(r>.92) return{color:0xff5500,emissive:0x110000,emissiveIntensity:.2};
     if(r>.75) return{color:0x885500,emissive:0,emissiveIntensity:0};
-    return         {color:0xd0e0f0,emissive:0,emissiveIntensity:0};
+    return         {color:0xd0e8f8,emissive:0,emissiveIntensity:0};
   }
 
   _tube(pts,col,r){
@@ -164,7 +168,7 @@ class CableSystem {
   }
 
   refresh() {
-    if (!this.scene) return;
+    if(!this.scene)return;
     const T=this.THREE;
     this.sceneObjs.forEach(o=>{
       o.meshes.forEach(m=>{this.scene.remove(m);m.geometry.dispose();m.material.dispose();});
@@ -181,7 +185,7 @@ class CableSystem {
         const sel=!this.viewerOnly&&ci===this.selCab&&ai===this.selAnch;
         const tracked=!!(cab.anchors[ai].track);
         const col=tracked?0xf05500:0x4488cc;
-        const mat=new T.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:sel?.7:.25,roughness:.3,metalness:.5});
+        const mat=new T.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:sel?.8:.25,roughness:.3,metalness:.5});
         const m=new T.Mesh(sel?this._sGeoLg:this._sGeoSm,mat);
         m.position.copy(pos[ai]);this.scene.add(m);obj.marks.push(m);
       }
@@ -195,278 +199,191 @@ class CableSystem {
       }
       this.sceneObjs.push(obj);this.cableMaxR.push(maxR);
     });
-    if(!this.viewerOnly)this._renderTable();
+    if(!this.viewerOnly){this._renderTable();this._updateSideCard();}
     this._updateErrorBanner(broken);
-    this._updateSideCard();
   }
 
-  // ─── 8. Seitenleisten-Karte (#kabel-rows) ───────────────────────────────────
+  // ─── Seitenleiste: Kurzübersicht (#kabel-rows) ──────────────────────────────
 
   _updateSideCard(){
     const div=document.getElementById('kabel-rows');if(!div)return;
     const b=document.getElementById('kabelBadge');if(b)b.textContent=this._cables.length;
     div.innerHTML=!this._cables.length
-      ?'<div style="font-size:13px;color:var(--txt3,#6a9aaa);padding:4px 0">Keine Kabel definiert</div>'
+      ?'<div style="font-size:13px;color:var(--txt3);padding:3px 0">–</div>'
       :this._cables.map((c,i)=>{
-          const r=this.cableMaxR[i]||0,pct=Math.min(Math.round(r*100),100);
-          const bc=r>=1?'#cc2222':r>.92?'#cc4400':r>.75?'#886600':'#1a6a2a';
-          return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bdr,#1a3050)">
-            <span style="font-weight:700;color:var(--acc,#f05500);font-size:14px;min-width:22px">K${i+1}</span>
-            <span style="color:var(--txt3,#6a9aaa);font-size:13px">${c.anchors.length} Anker · ${c.thickness}mm</span>
-            <div style="flex:1;height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden">
-              <div style="width:${pct}%;height:100%;background:${bc};border-radius:2px"></div></div>
-            <span style="color:var(--txt3,#6a9aaa);font-size:12px;min-width:32px;text-align:right">${pct}%</span>
-            <button onclick="window.cableSystem.selCab_f(${i});window.cableSystem.setVisible(true)"
-              style="background:none;border:1px solid var(--bdr,#1a3050);color:var(--txt2,#a0bfcf);cursor:pointer;font-size:13px;padding:2px 7px;border-radius:2px" title="Bearbeiten">✏</button>
-          </div>`;
-        }).join('');
+        const r=this.cableMaxR[i]||0,pct=Math.min(Math.round(r*100),100);
+        const bc=r>=1?'#cc2222':r>.92?'#cc4400':r>.75?'#886600':'#1a6a2a';
+        const on=i===this.selCab?'background:rgba(240,85,0,.12);border-color:rgba(240,85,0,.35)':'';
+        return `<div style="display:flex;align-items:center;gap:7px;padding:5px 6px;
+                  border:1px solid var(--bdr);border-radius:2px;cursor:pointer;margin-bottom:3px;${on}"
+                  onclick="window.cableSystem.selCab_f(${i})">
+          <span style="font-weight:700;color:${i===this.selCab?'var(--acc)':'var(--txt3)'};font-size:14px;min-width:24px">K${i+1}</span>
+          <span style="color:var(--txt3);font-size:13px;flex:1">${c.anchors.length}A · ${c.thickness}mm</span>
+          <div style="width:60px;height:3px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:${bc};border-radius:2px"></div></div>
+          <span style="color:var(--txt3);font-size:12px;min-width:34px;text-align:right">${pct}%</span>
+          <button onclick="event.stopPropagation();window.cableSystem.delCable(${i})"
+            style="background:none;border:none;color:rgba(255,255,255,.2);cursor:pointer;font-size:14px;padding:0 2px">×</button>
+        </div>`;
+      }).join('');
   }
 
-  // ─── 9. Editor-Panel aufbauen ────────────────────────────────────────────────
+  // ─── Inline-Editor aufbauen (#cs-inline-editor) ─────────────────────────────
 
-  _buildErrorBanner(){
-    if(document.getElementById('cs-err'))return;
-    const s=document.createElement('style');
-    s.textContent=`#cs-err{display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);background:rgba(180,0,0,.92);border:2px solid #cc2222;color:#fff;font:bold 13px/1 monospace;letter-spacing:2px;padding:10px 20px;text-transform:uppercase;z-index:9500;border-radius:3px;animation:cs-blink .65s ease-in-out infinite}@keyframes cs-blink{0%,100%{opacity:1}50%{opacity:.6}}`;
-    document.head.appendChild(s);
-    const e=document.createElement('div');e.id='cs-err';document.body.appendChild(e);
-  }
+  _buildInlineEditor(){
+    const container=document.getElementById('cs-inline-editor');
+    if(!container||container.dataset.built==='1')return;
+    container.dataset.built='1';
+    container.style.cssText='border-top:1px solid var(--bdr);margin-top:6px;padding-top:8px';
 
-  _buildPanel(){
-    if(this._panel)return;
-
-    // CSS – nutzt die App-Variablen; Override nur für Range-Slider-Größe
-    const sty=document.createElement('style');
-    sty.textContent=`
-      #cs-panel{
-        position:fixed;top:0;right:0;width:280px;height:100vh;
-        background:var(--bg2,#070e1a);border-left:1px solid var(--bdr,#1a3050);
-        display:none;flex-direction:column;overflow-y:auto;z-index:8500;
-        font-size:14px;color:var(--txt,#c8d8e8);
-        scrollbar-width:thin;scrollbar-color:var(--bg4,#0f1e2e) transparent;
-      }
-      #cs-panel .cs-card{
-        background:var(--bg3,#0a1525);border:1px solid var(--bdr,#1a3050);
-        border-radius:3px;margin:6px;padding:8px 10px;
-      }
-      #cs-panel .cs-head{
-        display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;
-      }
-      #cs-panel h3{
-        font-size:14px;font-weight:700;color:var(--txt2,#a0bfcf);
-        display:flex;align-items:center;gap:6px;margin:0;
-      }
-      #cs-panel .cs-close{
-        background:none;border:none;color:var(--txt3,#6a9aaa);
-        cursor:pointer;font-size:18px;padding:0 4px;line-height:1;
-      }
-      #cs-panel .cs-close:hover{color:var(--txt,#c8d8e8)}
-      #cs-panel .cs-btn{
-        background:var(--bg2,#070e1a);border:1px solid var(--bdr,#1a3050);
-        color:var(--txt2,#a0bfcf);border-radius:2px;padding:4px 10px;
-        font-size:14px;cursor:pointer;font-family:inherit;
-      }
-      #cs-panel .cs-btn:hover{background:var(--bg4,#0f1e2e);color:var(--txt,#c8d8e8)}
-      #cs-panel .cs-lbl{
-        font-size:13px;color:var(--txt3,#6a9aaa);font-weight:600;
-        margin-bottom:4px;display:block;
-      }
-      #cs-panel select{
-        width:100%;background:var(--bg2,#070e1a);
-        border:1px solid var(--bdr,#1a3050);border-radius:2px;
-        padding:5px 7px;font-size:14px;color:var(--txt,#c8d8e8);
-        font-family:inherit;cursor:pointer;
-      }
-      #cs-panel select:focus{outline:none;border-color:var(--acc,#f05500)}
-      /* Range-Slider – größer als Browser-Standard */
-      #cs-panel input[type=range]{
-        -webkit-appearance:none;width:100%;height:4px;
-        background:var(--bdr,#1a3050);border-radius:2px;outline:none;cursor:pointer;
-      }
-      #cs-panel input[type=range]::-webkit-slider-thumb{
-        -webkit-appearance:none;width:16px;height:16px;border-radius:50%;
-        background:var(--acc,#f05500);border:2px solid var(--bg2,#070e1a);
-        box-shadow:0 0 0 1px var(--acc,#f05500);cursor:pointer;
-      }
-      #cs-panel input[type=range]::-moz-range-thumb{
-        width:16px;height:16px;border-radius:50%;background:var(--acc,#f05500);
-        border:2px solid var(--bg2,#070e1a);cursor:pointer;
-      }
-      #cs-panel .cs-row{
-        display:flex;align-items:center;gap:8px;margin-bottom:7px;
-      }
-      #cs-panel .cs-axlbl{
-        font-size:13px;font-weight:700;min-width:18px;text-align:right;
-      }
-      #cs-panel .cs-val{
-        font-size:13px;color:var(--txt2,#a0bfcf);min-width:48px;text-align:right;
-      }
-      #cs-panel .cs-sep{height:1px;background:var(--bdr,#1a3050);margin:6px 0}
-      /* Kabel-Tabelle */
-      .cs-crow{
-        display:grid;grid-template-columns:24px 1fr 40px 28px 18px;
-        align-items:center;gap:5px;padding:6px 7px;cursor:pointer;
-        border:1px solid transparent;border-radius:2px;font-size:13px;
-      }
-      .cs-crow:hover{background:rgba(255,255,255,.05)}
-      .cs-crow.on{background:rgba(240,85,0,.1);border-color:rgba(240,85,0,.3)}
-      .cs-cnum{font-weight:700;color:var(--txt3,#6a9aaa)}.cs-crow.on .cs-cnum{color:var(--acc,#f05500)}
-      .cs-cinfo{color:var(--txt3,#6a9aaa);font-size:12px}
-      .cs-ctbar{height:3px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
-      .cs-ctpct{font-size:12px;color:var(--txt3,#6a9aaa);text-align:right}
-      .cs-cdel{background:none;border:none;color:rgba(255,255,255,.2);cursor:pointer;font-size:14px;padding:0}
-      .cs-cdel:hover{color:#ff4444}
-      /* Anker-Chips */
-      #cs-achips{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}
-      .cs-chip{
-        padding:4px 10px;font-size:13px;font-family:inherit;cursor:pointer;
-        border:1px solid var(--bdr,#1a3050);background:var(--bg2,#070e1a);
-        color:var(--txt2,#a0bfcf);border-radius:2px;transition:all .12s;
-      }
-      .cs-chip:hover{border-color:var(--txt2);color:var(--txt,#c8d8e8)}
-      .cs-chip.on{background:var(--acc,#f05500);border-color:var(--acc,#f05500);color:#fff;font-weight:700}
-      .cs-dim{opacity:.3;pointer-events:none}
-      .cs-tracked{opacity:.35}
-      #cs-err{display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);background:rgba(180,0,0,.92);border:2px solid #cc2222;color:#fff;font:bold 13px/1 monospace;letter-spacing:2px;padding:10px 20px;text-transform:uppercase;z-index:9500;border-radius:3px;animation:cs-blink .65s ease-in-out infinite}
-    `;
-    document.head.appendChild(sty);
-
-    const p=document.createElement('div');p.id='cs-panel';
-    p.innerHTML=`
-      <!-- Kopfzeile -->
-      <div class="cs-card" style="margin-bottom:0;border-radius:0;border-left:none;border-top:none;border-right:none">
-        <div class="cs-head" style="margin-bottom:0">
-          <h3>🔌 Kabel-Editor</h3>
-          <button class="cs-close" onclick="window.cableSystem.setVisible(false)">✕</button>
-        </div>
-      </div>
-
-      <!-- Kabel-Liste -->
-      <div class="cs-card">
-        <div class="cs-head">
-          <h3>Kabel</h3>
-          <button class="cs-btn" onclick="window.cableSystem.addCable()">+ Neu</button>
-        </div>
-        <div id="cs-ctable"></div>
-      </div>
-
+    container.innerHTML=`
       <!-- Ausgewähltes Kabel -->
-      <div class="cs-card">
-        <h3 id="cs-detlbl" style="margin-bottom:10px">Kabel 1 · 2 Anker</h3>
+      <div id="cs-det-head" style="font-size:13px;font-weight:700;color:var(--txt2);margin-bottom:8px;letter-spacing:.5px"></div>
 
-        <!-- Radius -->
-        <label class="cs-lbl">Radius</label>
-        <div class="cs-row">
-          <input type="range" id="cs-slt" min="1" max="30" value="6" step="0.5" oninput="window.cableSystem.updThick()">
-          <span class="cs-val" id="cs-sltv">6 mm</span>
-        </div>
-
-        <div class="cs-sep"></div>
-
-        <!-- Ankerpunkte -->
-        <div class="cs-head" style="margin-bottom:4px">
-          <h3>Ankerpunkte</h3>
-          <div style="display:flex;gap:5px">
-            <button class="cs-btn" onclick="window.cableSystem.addAnchor()">+</button>
-            <button class="cs-btn" onclick="window.cableSystem.delAnchor()">−</button>
-          </div>
-        </div>
-        <div id="cs-achips"></div>
-
-        <!-- Referenz / Track -->
-        <label class="cs-lbl" style="margin-top:6px">Referenz (Anhängepunkt)</label>
-        <select id="cs-ref" onchange="window.cableSystem.updRef()" style="margin-bottom:8px">
-          <option value="">— Welt (X/Y/Z) —</option>
-        </select>
-
-        <!-- XYZ-Koordinaten (gesperrt wenn Track aktiv) -->
-        <div id="cs-xyz-block">
-          <div class="cs-row">
-            <span class="cs-axlbl" style="color:#ff6666">X</span>
-            <input type="range" id="cs-ax" min="-2000" max="2000" value="0" step="10" oninput="window.cableSystem.updA()">
-            <span class="cs-val" id="cs-axv">0</span>
-          </div>
-          <div class="cs-row">
-            <span class="cs-axlbl" style="color:#66cc88">Y</span>
-            <input type="range" id="cs-ay" min="-200" max="3000" value="0" step="10" oninput="window.cableSystem.updA()">
-            <span class="cs-val" id="cs-ayv">0</span>
-          </div>
-          <div class="cs-row">
-            <span class="cs-axlbl" style="color:#6699ff">Z</span>
-            <input type="range" id="cs-az" min="-2000" max="2000" value="0" step="10" oninput="window.cableSystem.updA()">
-            <span class="cs-val" id="cs-azv">0</span>
-          </div>
-        </div>
-
-        <!-- Länge zum nächsten Ankerpunkt -->
-        <div class="cs-row" id="cs-lrow">
-          <span class="cs-axlbl" style="min-width:28px;font-size:12px;color:var(--txt3,#6a9aaa)">L→</span>
-          <input type="range" id="cs-al" min="50" max="3000" value="1200" step="10" oninput="window.cableSystem.updA()">
-          <span class="cs-val" id="cs-alv">1200</span>
+      <!-- Radius -->
+      <div style="margin-bottom:8px">
+        <div style="font-size:12px;color:var(--txt3);margin-bottom:3px">R</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="range" id="cs-slt" min="1" max="30" value="6" step="0.5" oninput="window.cableSystem.updThick()" style="flex:1">
+          <span id="cs-sltv" style="font-size:13px;color:var(--txt2);min-width:44px;text-align:right">6 mm</span>
         </div>
       </div>
-    `;
-    document.body.appendChild(p);
-    const e=document.createElement('div');e.id='cs-err';document.body.appendChild(e);
-    this._panel=p;
+
+      <!-- Ankerpunkte -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+        <span style="font-size:12px;color:var(--txt3);font-weight:700;letter-spacing:.5px">ANKERPUNKTE</span>
+        <div style="display:flex;gap:4px">
+          <button onclick="window.cableSystem.addAnchor()" class="cs-ibtn">+</button>
+          <button onclick="window.cableSystem.delAnchor()" class="cs-ibtn">−</button>
+        </div>
+      </div>
+      <div id="cs-achips" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px"></div>
+
+      <!-- Referenz -->
+      <div style="font-size:12px;color:var(--txt3);margin-bottom:3px">Ref</div>
+      <select id="cs-ref" onchange="window.cableSystem.updRef()" style="width:100%;background:var(--bg2);border:1px solid var(--bdr);border-radius:2px;padding:5px 7px;font-size:14px;color:var(--txt);font-family:inherit;cursor:pointer;margin-bottom:8px">
+        <option value="">— Welt (X/Y/Z) —</option>
+      </select>
+
+      <!-- XYZ (nur wenn kein Track) -->
+      <div id="cs-xyz-block">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+          <span style="font-size:13px;font-weight:700;color:#ff6666;min-width:14px;text-align:right">X</span>
+          <input type="range" id="cs-ax" min="-2000" max="2000" value="0" step="10" oninput="window.cableSystem.updA()" style="flex:1">
+          <span id="cs-axv" style="font-size:13px;color:var(--txt2);min-width:44px;text-align:right">0</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+          <span style="font-size:13px;font-weight:700;color:#66cc88;min-width:14px;text-align:right">Y</span>
+          <input type="range" id="cs-ay" min="-200" max="3000" value="0" step="10" oninput="window.cableSystem.updA()" style="flex:1">
+          <span id="cs-ayv" style="font-size:13px;color:var(--txt2);min-width:44px;text-align:right">0</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+          <span style="font-size:13px;font-weight:700;color:#6699ff;min-width:14px;text-align:right">Z</span>
+          <input type="range" id="cs-az" min="-2000" max="2000" value="0" step="10" oninput="window.cableSystem.updA()" style="flex:1">
+          <span id="cs-azv" style="font-size:13px;color:var(--txt2);min-width:44px;text-align:right">0</span>
+        </div>
+      </div>
+
+      <!-- L→ (immer sichtbar, beim letzten Anker deaktiviert) -->
+      <div id="cs-lrow">
+        <div style="font-size:12px;color:var(--txt3);margin-bottom:3px">L→ <span id="cs-ldist" style="color:var(--txt3);font-size:11px"></span></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="range" id="cs-al" min="10" max="3000" value="1200" step="10" oninput="window.cableSystem.updA()" style="flex:1">
+          <span id="cs-alv" style="font-size:13px;color:var(--txt2);min-width:44px;text-align:right">1200</span>
+        </div>
+      </div>`;
+
     this._renderTable();
     this._loadDetail();
   }
 
-  // ─── 10. Track-Dropdown aktualisieren ────────────────────────────────────────
+  // ─── CSS (Range-Slider-Größe, Anker-Chips) ──────────────────────────────────
 
-  _updateTrackDropdown(){
-    const sel=document.getElementById('cs-ref');if(!sel)return;
-    const cur=sel.value;
-    sel.innerHTML='<option value="">— Welt (X/Y/Z) —</option>'+
-      Object.keys(this._trackMap).map(k=>{
-        const lbl=this._TRACK_LABELS[k]||k;
-        return `<option value="${k}"${cur===k?' selected':''}>${lbl}</option>`;
-      }).join('');
+  _injectStyles(){
+    if(document.getElementById('cs-styles'))return;
+    const s=document.createElement('style');s.id='cs-styles';
+    s.textContent=`
+      /* Range-Slider – app-konform, großer Thumb */
+      #cs-inline-editor input[type=range]{
+        -webkit-appearance:none;width:100%;height:4px;
+        background:var(--bdr,#1a3050);border-radius:2px;outline:none;cursor:pointer;
+      }
+      #cs-inline-editor input[type=range]::-webkit-slider-thumb{
+        -webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+        background:var(--acc,#f05500);border:2px solid var(--bg2,#070e1a);
+        box-shadow:0 0 0 1px var(--acc,#f05500);cursor:pointer;
+      }
+      #cs-inline-editor input[type=range]::-moz-range-thumb{
+        width:16px;height:16px;border-radius:50%;
+        background:var(--acc,#f05500);border:2px solid var(--bg2,#070e1a);cursor:pointer;
+      }
+      #cs-inline-editor input[type=range].dim::-webkit-slider-thumb{background:var(--bdr,#1a3050);box-shadow:none;}
+      /* Kleine Inline-Buttons */
+      .cs-ibtn{
+        background:var(--bg2,#070e1a);border:1px solid var(--bdr,#1a3050);
+        color:var(--txt2,#a0bfcf);border-radius:2px;padding:3px 10px;
+        font-size:14px;cursor:pointer;font-family:inherit;
+      }
+      .cs-ibtn:hover{background:var(--bg4,#0f1e2e);color:var(--txt,#c8d8e8)}
+      /* Anker-Chips */
+      .cs-chip{
+        padding:4px 10px;font-size:13px;font-family:inherit;cursor:pointer;
+        border:1px solid var(--bdr,#1a3050);background:var(--bg2,#070e1a);
+        color:var(--txt2,#a0bfcf);border-radius:2px;
+      }
+      .cs-chip:hover{border-color:var(--txt2);color:var(--txt,#c8d8e8)}
+      .cs-chip.on{background:var(--acc,#f05500);border-color:var(--acc,#f05500);color:#fff;font-weight:700}
+      /* Kabel-Listzeilen */
+      .cs-crow{
+        display:grid;grid-template-columns:24px 1fr 44px 32px 18px;
+        align-items:center;gap:5px;padding:6px 7px;cursor:pointer;
+        border:1px solid transparent;border-radius:2px;font-size:13px;
+      }
+      .cs-crow:hover{background:rgba(255,255,255,.04)}
+      .cs-crow.on{background:rgba(240,85,0,.1);border-color:rgba(240,85,0,.3)!important}
+      .cs-cnum{font-weight:700;color:var(--txt3)}.cs-crow.on .cs-cnum{color:var(--acc)}
+      .cs-cinfo{color:var(--txt3);font-size:12px}
+      .cs-ctbar{height:3px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
+      .cs-ctpct{font-size:12px;color:var(--txt3);text-align:right}
+      .cs-cdel{background:none;border:none;color:rgba(255,255,255,.2);cursor:pointer;font-size:14px;padding:0}
+      .cs-cdel:hover{color:#ff4444}
+      /* Fehler-Banner */
+      #cs-err{display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);
+        background:rgba(180,0,0,.92);border:2px solid #cc2222;color:#fff;
+        font:bold 13px/1 monospace;letter-spacing:2px;padding:10px 20px;
+        text-transform:uppercase;z-index:9500;border-radius:3px;
+        animation:cs-blink .65s ease-in-out infinite}
+      @keyframes cs-blink{0%,100%{opacity:1}50%{opacity:.6}}
+    `;
+    document.head.appendChild(s);
+    const e=document.createElement('div');e.id='cs-err';document.body.appendChild(e);
   }
 
-  // ─── 11. Kabel-Tabelle ────────────────────────────────────────────────────────
+  // ─── Editor-UI: Kabel-Tabelle ────────────────────────────────────────────────
 
   _renderTable(){
-    const div=document.getElementById('cs-ctable');if(!div)return;
-    div.innerHTML=this._cables.map((c,i)=>{
-      const r=this.cableMaxR[i]||0,pct=Math.min(Math.round(r*100),100);
-      const bc=r>=1?'#cc2222':r>.92?'#cc4400':r>.75?'#886600':'#1a6a2a';
-      return `<div class="cs-crow${i===this.selCab?' on':''}" onclick="window.cableSystem.selCab_f(${i})">
-        <span class="cs-cnum">K${i+1}</span>
-        <span class="cs-cinfo">${c.anchors.length}A · ${c.thickness}mm</span>
-        <div class="cs-ctbar"><div style="width:${pct}%;background:${bc};height:100%;border-radius:2px"></div></div>
-        <span class="cs-ctpct">${pct}%</span>
-        <button class="cs-cdel" onclick="event.stopPropagation();window.cableSystem.delCable(${i})">×</button>
-      </div>`;
-    }).join('');
+    // Nur wenn inline Editor existiert
+    const container=document.getElementById('cs-inline-editor');if(!container)return;
+    // Kurzübersicht in kabel-rows
+    this._updateSideCard();
+    // Detail-Header
+    const dh=document.getElementById('cs-det-head');
+    if(dh&&this._cables[this.selCab]){
+      const cab=this._cables[this.selCab];
+      dh.textContent=`KABEL ${this.selCab+1}  ·  ${cab.anchors.length} ANKER`;
+    }
   }
 
-  selCab_f(i){this.selCab=i;this.selAnch=Math.min(this.selAnch,this._cables[i].anchors.length-1);this._loadDetail();this.refresh();}
-  addCable(){
-    if(this._cables.length>=8)return;
-    const up=this.upAxis;
-    this._cables.push({thickness:6,anchors:[
-      {x:0,y:up==='z'?1200:500,z:up==='z'?-400:0,segLen:1200,track:null,ox:0,oy:0,oz:0},
-      {x:0,y:up==='z'?1200:500,z:up==='z'? 400:0,segLen:1200,track:null,ox:0,oy:0,oz:0}]});
-    this.selCab=this._cables.length-1;this.selAnch=0;this._loadDetail();this.refresh();
-  }
-  delCable(i){
-    if(this._cables.length<=1)return;
-    this._cables.splice(i,1);this.selCab=Math.min(this.selCab,this._cables.length-1);
-    this.selAnch=Math.min(this.selAnch,this._cables[this.selCab].anchors.length-1);
-    this._loadDetail();this.refresh();
-  }
-
-  // ─── 12. Anker-Detail ─────────────────────────────────────────────────────────
+  // ─── Editor-UI: Anker-Detail ─────────────────────────────────────────────────
 
   _loadDetail(){
     const cab=this._cables[this.selCab];if(!cab)return;
-    const n=document.getElementById('cs-detlbl');
-    if(n)n.textContent=`Kabel ${this.selCab+1}  ·  ${cab.anchors.length} Anker`;
+    const dh=document.getElementById('cs-det-head');
+    if(dh)dh.textContent=`KABEL ${this.selCab+1}  ·  ${cab.anchors.length} ANKER`;
     const slt=document.getElementById('cs-slt');
     if(slt){slt.value=cab.thickness;document.getElementById('cs-sltv').textContent=cab.thickness+' mm';}
-    this._renderChips();this._loadAnchorEdit();
+    this._renderChips();
+    this._loadAnchorEdit();
   }
 
   _renderChips(){
@@ -475,74 +392,143 @@ class CableSystem {
     this._cables[this.selCab].anchors.forEach((a,i)=>{
       const btn=document.createElement('button');
       btn.className='cs-chip'+(i===this.selAnch?' on':'');
-      btn.textContent='A'+(i+1)+(a.track?'  🔗':'');
+      const lbl=a.track?this._LABELS[a.track]||a.track:`A${i+1}`;
+      btn.textContent=lbl;
       btn.onclick=()=>this.selA(i);
       div.appendChild(btn);
     });
   }
 
+  _updateRefDropdown(){
+    const sel=document.getElementById('cs-ref');if(!sel)return;
+    const cur=sel.value;
+    const longLabels={
+      a1:'A1 – Achse 1',a2:'A2 – Achse 2',a3:'A3 – Achse 3',
+      a4:'A4 – Achse 4',a5:'A5 – Achse 5',a6:'A6 – Flansch (A6)',
+      tcp:'TCP – Werkzeugspitze'
+    };
+    sel.innerHTML='<option value="">— Welt (X/Y/Z) —</option>'+
+      Object.keys(this._trackMap).map(k=>
+        `<option value="${k}"${cur===k?' selected':''}>${longLabels[k]||k}</option>`
+      ).join('');
+  }
+
   _loadAnchorEdit(){
-    const a=this._cables[this.selCab].anchors[this.selAnch];if(!a)return;
-    const isLast=this.selAnch===this._cables[this.selCab].anchors.length-1;
+    const cab=this._cables[this.selCab];if(!cab)return;
+    const a=cab.anchors[this.selAnch];if(!a)return;
+    const isLast=this.selAnch===cab.anchors.length-1;
     const tracked=!!(a.track);
+
+    // Referenz-Dropdown
     const sel=document.getElementById('cs-ref');
-    if(sel){this._updateTrackDropdown();sel.value=a.track||'';}
+    if(sel){this._updateRefDropdown();sel.value=a.track||'';}
+
+    // XYZ sperren wenn Track aktiv
+    const xyz=document.getElementById('cs-xyz-block');
+    if(xyz)xyz.style.opacity=tracked?'0.3':'1';
+    if(xyz)xyz.style.pointerEvents=tracked?'none':'auto';
     [['cs-ax',a.x||0],['cs-ay',a.y||0],['cs-az',a.z||0]].forEach(([id,v])=>{
       const el=document.getElementById(id);if(el)el.value=v;
       const vd=document.getElementById(id+'v');if(vd)vd.textContent=v;
     });
-    const xyz=document.getElementById('cs-xyz-block');
-    if(xyz)xyz.className=tracked?'cs-tracked':'';
-    document.getElementById('cs-al').value=a.segLen;
-    document.getElementById('cs-alv').textContent=a.segLen;
-    const lr=document.getElementById('cs-lrow');if(lr)lr.className='cs-row'+(isLast?' cs-dim':'');
+
+    // L→ (letzter Anker: deaktiviert)
+    const lrow=document.getElementById('cs-lrow');
+    if(lrow)lrow.style.opacity=isLast?'0.3':'1';
+    if(lrow)lrow.style.pointerEvents=isLast?'none':'auto';
+    const al=document.getElementById('cs-al');if(al)al.value=a.segLen;
+    const alv=document.getElementById('cs-alv');if(alv)alv.textContent=a.segLen;
+
+    // Aktueller Abstand zum nächsten Anker als Hinweis
+    const ld=document.getElementById('cs-ldist');
+    if(ld&&!isLast){
+      const p1=this._anchorWorldPos(this.selCab,this.selAnch);
+      const p2=this._anchorWorldPos(this.selCab,this.selAnch+1);
+      const dist=Math.round(p1.distanceTo(p2));
+      ld.textContent=dist>0?`(Abstand: ${dist} mm)`:'';
+    }else if(ld)ld.textContent='';
+  }
+
+  // ─── Event-Handler ───────────────────────────────────────────────────────────
+
+  selCab_f(i){
+    this.selCab=i;this.selAnch=Math.min(this.selAnch,this._cables[i].anchors.length-1);
+    this._loadDetail();this.refresh();
   }
 
   selA(i){this.selAnch=i;this._renderChips();this._loadAnchorEdit();this.refresh();}
 
+  addCable(){
+    if(this._cables.length>=8)return;
+    const up=this.upAxis;
+    this._cables.push({thickness:6,anchors:[
+      {x:0,y:up==='z'?1200:500,z:up==='z'?-400:0,segLen:800,track:null,ox:0,oy:0,oz:0},
+      {x:0,y:up==='z'?1200:500,z:up==='z'? 400:0,segLen:800,track:null,ox:0,oy:0,oz:0}]});
+    this.selCab=this._cables.length-1;this.selAnch=0;
+    this._loadDetail();this.refresh();
+  }
+
+  delCable(i){
+    if(this._cables.length<=1)return;
+    this._cables.splice(i,1);
+    this.selCab=Math.min(this.selCab,this._cables.length-1);
+    this.selAnch=Math.min(this.selAnch,this._cables[this.selCab].anchors.length-1);
+    this._loadDetail();this.refresh();
+  }
+
   updRef(){
     const a=this._cables[this.selCab].anchors[this.selAnch];
     a.track=document.getElementById('cs-ref').value||null;
+    // Auto-Länge für dieses Segment aktualisieren
+    const p1=this._anchorWorldPos(this.selCab,this.selAnch);
+    const p2=this._anchorWorldPos(this.selCab,this.selAnch+1<this._cables[this.selCab].anchors.length?this.selAnch+1:this.selAnch);
+    const dist=p1.distanceTo(p2);
+    if(dist>1&&a.segLen<dist*1.1)a.segLen=Math.ceil(dist*1.15);
     this._renderChips();this._loadAnchorEdit();this.refresh();
   }
 
   updA(){
     const a=this._cables[this.selCab].anchors[this.selAnch];
     if(!a.track){
-      a.x=+document.getElementById('cs-ax').value;document.getElementById('cs-axv').textContent=a.x;
-      a.y=+document.getElementById('cs-ay').value;document.getElementById('cs-ayv').textContent=a.y;
-      a.z=+document.getElementById('cs-az').value;document.getElementById('cs-azv').textContent=a.z;
+      a.x=+document.getElementById('cs-ax').value; document.getElementById('cs-axv').textContent=a.x;
+      a.y=+document.getElementById('cs-ay').value; document.getElementById('cs-ayv').textContent=a.y;
+      a.z=+document.getElementById('cs-az').value; document.getElementById('cs-azv').textContent=a.z;
     }
     a.segLen=+document.getElementById('cs-al').value;document.getElementById('cs-alv').textContent=a.segLen;
+    this._loadAnchorEdit();  // Abstandsanzeige aktualisieren
     this.refresh();
   }
 
   updThick(){
     const v=+document.getElementById('cs-slt').value;
-    this._cables[this.selCab].thickness=v;document.getElementById('cs-sltv').textContent=v+' mm';this.refresh();
+    this._cables[this.selCab].thickness=v;document.getElementById('cs-sltv').textContent=v+' mm';
+    this.refresh();
   }
 
   addAnchor(){
     const cab=this._cables[this.selCab];if(cab.anchors.length>=8)return;
     const last=cab.anchors.at(-1);
-    cab.anchors.push({...last,x:last.x+200,track:null});
-    this.selAnch=cab.anchors.length-1;this._renderChips();this._loadAnchorEdit();this.refresh();
+    cab.anchors.push({...last,track:null,x:last.x+200,segLen:800});
+    this.selAnch=cab.anchors.length-1;
+    this._renderChips();this._loadAnchorEdit();this.refresh();
   }
 
   delAnchor(){
     const cab=this._cables[this.selCab];if(cab.anchors.length<=2)return;
-    cab.anchors.splice(this.selAnch,1);this.selAnch=Math.min(this.selAnch,cab.anchors.length-1);
+    cab.anchors.splice(this.selAnch,1);
+    this.selAnch=Math.min(this.selAnch,cab.anchors.length-1);
     this._renderChips();this._loadAnchorEdit();this.refresh();
   }
 
-  // ─── 13. Sichtbarkeit + Fehler-Banner ────────────────────────────────────────
+  // ─── Sichtbarkeit (3D-Kabel, nicht Editor) ───────────────────────────────────
 
-  setVisible(v){
-    this.visible=v;
-    if(!this.viewerOnly&&this._panel)this._panel.style.display=v?'flex':'none';
-    this.refresh();
-  }
+  setVisible(v){this.visible=v;this.refresh();}
   toggleVisible(){this.setVisible(!this.visible);}
+
+  _buildErrorBanner(){
+    if(document.getElementById('cs-err'))return;
+    this._injectStyles();
+  }
 
   _updateErrorBanner(broken){
     const el=document.getElementById('cs-err');if(!el)return;
