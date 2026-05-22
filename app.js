@@ -315,13 +315,13 @@ let _camAnim=null; // laufende Kamera-Überblendung
 function animate() {
   requestAnimationFrame(animate);
   if(_camAnim){
-    _camAnim.t=Math.min(_camAnim.t+0.06,1);
+    _camAnim.t=Math.min(_camAnim.t+0.055,1);
     const k=1-Math.pow(1-_camAnim.t,3); // ease-out cubic
     camera.position.lerpVectors(_camAnim.fp,_camAnim.tp,k);
     controls.target.lerpVectors(_camAnim.fl,_camAnim.tl,k);
     camera.up.lerpVectors(_camAnim.fu,_camAnim.tu,k).normalize();
-    controls.update();
-    if(_camAnim.t>=1)_camAnim=null;
+    camera.lookAt(controls.target); // Kamera-Matrix aktualisieren ohne OrbitControls zu stören
+    if(_camAnim.t>=1){_camAnim=null;controls.update();} // einmalig sync am Ende
   }
   renderer.render(scene,camera);
 }
