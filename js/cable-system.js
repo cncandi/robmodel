@@ -42,7 +42,6 @@ class CableSystem {
     this._tcDragging= false;
     this._capsules  = [];
     this._tv1 = null; this._tv2 = null; this._tv3 = null;
-    this.useMeshCollision = false;  // Mesh-Kollision aus – aktivieren: window.cableSystem.useMeshCollision=true
   }
 
   get cables() { return this._cables; }
@@ -59,8 +58,6 @@ class CableSystem {
     this._tv1       = new THREE.Vector3();
     this._tv2       = new THREE.Vector3();
     this._tv3       = new THREE.Vector3();
-    this._tmpDir    = new THREE.Vector3();
-    this._raycaster = new THREE.Raycaster();
 
     if (!this.viewerOnly) {
       this._cables = [];   // Leer – Benutzer fügt Kabel manuell hinzu
@@ -85,13 +82,7 @@ class CableSystem {
     for (let i=0; i<joints.length-1; i++) {
       const o1=this._trackMap[joints[i]], o2=this._trackMap[joints[i+1]];
       if(!o1||!o2) continue;
-      // STL-Meshes dieses Glieds (Kinder von o1, aber NICHT der Unter-Pivot o2)
-      const meshList=[];
-      for(const child of o1.children){
-        if(child===o2) continue;
-        child.traverse(obj=>{ if(obj.isMesh&&obj.geometry) meshList.push(obj); });
-      }
-      this._capsules.push({obj1:o1, obj2:o2, r:radii[i]||60, meshes:meshList});
+      this._capsules.push({obj1:o1, obj2:o2, r:radii[i]||60});
     }
 
     this._updateRefDropdown();
@@ -192,7 +183,7 @@ class CableSystem {
     const caps=this._capsules.map(c=>{
       const q1=new T.Vector3(),q2=new T.Vector3();
       c.obj1.getWorldPosition(q1); c.obj2.getWorldPosition(q2);
-      return{p1:q1,p2:q2,r:c.r,meshes:c.meshes||[]};
+      return{p1:q1,p2:q2,r:c.r};
     });
 
     for(let s=0;s<STEPS;s++){
@@ -207,75 +198,9 @@ class CableSystem {
       }
     }
 
-    // ── Post-PBD: Mesh-Kollision (nur wenn explizit aktiviert – ressourcenintensiv) ──
-    // Aktivieren: window.cableSystem.useMeshCollision = true
-    const hasMeshes=this.useMeshCollision&&caps.some(c=>c.meshes.length>0);
-    if(this._raycaster&&hasMeshes){
-      // Alle relevanten Meshes kurz auf DoubleSide schalten (für Innen-Erkennung)
-      const allM=caps.flatMap(c=>c.meshes);
-      const origS=allM.map(m=>Array.isArray(m.material)?null:m.material?.side);
-      allM.forEach((m,i)=>{if(origS[i]!=null)m.material.side=T.DoubleSide;});
-
-      for(let mc=0;mc<3;mc++){
-        for(let i=1;i<N;i++){
-          for(const cap of caps){
-            if(!cap.meshes.length)continue;
-            this._resolveMeshCollision(pos[i],cap,8);
-          }
-        }
-        // Längen-Constraints nach Mesh-Korrektur erneut anwenden
-        for(let c=0;c<4;c++){
-          for(let i=0;i<N;i++){const d=pos[i].distanceTo(pos[i+1]);if(d<1e-4)continue;const cr=new T.Vector3().subVectors(pos[i+1],pos[i]).multiplyScalar((d-rL)/(d*2));if(i>0)pos[i].add(cr);if(i<N)pos[i+1].sub(cr);}
-          pos[0].copy(p1);pos[N].copy(p2);
-        }
-      }
-
-      // Material-Side wiederherstellen
-      allM.forEach((m,i)=>{if(origS[i]!=null)m.material.side=origS[i];});
-    }
-
     return{taut:false,ratio:chord/L,pts:pos};
   }
 
-  /**
-   * _resolveMeshCollision: Schiebt einen Kabelpunkt aus einem STL-Mesh heraus.
-   * Strahlt vom Punkt zur Kapsel-Achse; trifft er eine Vorderfläche (außen) oder
-   * Rückfläche (innen) des Meshes, wird der Punkt auf die Oberfläche + clearance gesetzt.
-   */
-  _resolveMeshCollision(p, cap, clearance){
-    const T=this.THREE;
-    // Vorfilter: Abstand zur Kapselachse
-    this._tv1.subVectors(cap.p2,cap.p1);
-    const len2=this._tv1.lengthSq(); if(len2<1)return;
-    this._tv2.subVectors(p,cap.p1);
-    const t=Math.max(0,Math.min(1,this._tv2.dot(this._tv1)/len2));
-    this._tv3.copy(cap.p1).addScaledVector(this._tv1,t);
-    if(p.distanceTo(this._tv3)>cap.r*1.8)return;
-
-    // Richtung: Punkt → Kapselachse (nach innen)
-    this._tmpDir.subVectors(this._tv3,p);
-    const d=this._tmpDir.length(); if(d<0.1)return;
-    this._tmpDir.divideScalar(d);
-
-    this._raycaster.set(p,this._tmpDir);
-    this._raycaster.near=0;
-    this._raycaster.far=d+clearance;
-    const hits=this._raycaster.intersectObjects(cap.meshes,false);
-    if(!hits.length)return;
-
-    const hit=hits[0];
-    const fn=new T.Vector3().copy(hit.face.normal)
-      .transformDirection(hit.object.matrixWorld).normalize();
-    const inside=fn.dot(this._tmpDir)>0; // Rückfläche getroffen → Punkt ist innen
-
-    if(inside){
-      // Innen: auf Oberfläche + clearance nach außen (entgegen Strahlrichtung)
-      p.copy(hit.point).addScaledVector(this._tmpDir,-clearance);
-    } else if(hit.distance<clearance+2){
-      // Außen aber zu nah: weg von der Fläche schieben
-      p.copy(hit.point).addScaledVector(fn,clearance);
-    }
-  }
 
   // ─── 3D-Rendering ───────────────────────────────────────────────────────────
 
@@ -717,18 +642,6 @@ class CableSystem {
 
   // ─── Sichtbarkeit (3D-Kabel, nicht Editor) ───────────────────────────────────
 
-  toggleMeshCollision(on){
-    this.useMeshCollision=!!on;
-    const lbl=document.getElementById('cs-meshcol-lbl');
-    const track=document.getElementById('cs-meshcol-track');
-    const thumb=document.getElementById('cs-meshcol-thumb');
-    const cb=document.getElementById('cs-meshcol');
-    if(lbl)lbl.textContent=on?'An':'Aus';
-    if(track)track.style.background=on?'var(--acc,#f05500)':'var(--bdr)';
-    if(thumb)thumb.style.left=on?'18px':'2px';
-    if(cb)cb.checked=!!on;
-    this.refresh();
-  }
 
   setVisible(v){
     this.visible=v;
