@@ -182,10 +182,12 @@ function init3d() {
   if (window.cableSystem) {
     window.cableSystem.init(THREE, scene, { upAxis: 'z' });
     // Gimbal-Kontext übergeben: TransformControls + Kamera + OrbitControls
-    window.cableSystem.setGimbalContext({
-      THREE, camera: perspCamera, renderer,
-      orbitControls: controls, TransformControls
-    });
+    try {
+      window.cableSystem.setGimbalContext({
+        THREE, camera: perspCamera, renderer,
+        orbitControls: controls, TransformControls
+      });
+    } catch(e) { console.warn('[CableSystem] setGimbalContext:', e); }
   }
 }
 
@@ -480,17 +482,18 @@ function rebuildRobotKinematics() {
   (state.effektoren||[]).forEach((_,i)=>rebuildEffMesh(i));
   // Rebuild Umgebung meshes
   (state.umfElemente||[]).forEach((_,i)=>rebuildUmfMesh(i));
-  // Kabel-Trackingpunkte aktualisieren (Pivot-Gruppen werden bei jedem Rebuild neu erstellt)
-  if (window.cableSystem) {
-    window.cableSystem.setTrackObjects({
-      tcp: tcpMarker,
-      a1: axisPivotGroups[0]||null, a2: axisPivotGroups[1]||null,
-      a3: axisPivotGroups[2]||null, a4: axisPivotGroups[3]||null,
-      a5: axisPivotGroups[4]||null, a6: axisPivotGroups[5]||null,
-    });
-    // Segmentlängen nach echten Gelenkabständen setzen
-    window.cableSystem.autoLength();
-  }
+  // Kabel-Tracking – in try-catch damit ein Fehler den Roboter-Load nicht abbricht
+  try {
+    if (window.cableSystem) {
+      window.cableSystem.setTrackObjects({
+        tcp: tcpMarker,
+        a1: axisPivotGroups[0]||null, a2: axisPivotGroups[1]||null,
+        a3: axisPivotGroups[2]||null, a4: axisPivotGroups[3]||null,
+        a5: axisPivotGroups[4]||null, a6: axisPivotGroups[5]||null,
+      });
+      window.cableSystem.autoLength();
+    }
+  } catch(e) { console.warn('[CableSystem] setTrackObjects:', e); }
 }
 
 function applyJointRotations() {
@@ -507,7 +510,7 @@ function applyJointRotations() {
   });
   scene.updateMatrixWorld(true);
   updateSkeletonPositions();
-  window.cableSystem?.refresh();
+  try { window.cableSystem?.refresh(); } catch(e) { console.warn('[CableSystem] refresh:', e); }
 }
 
 function parseReferencePose() {
@@ -1347,7 +1350,7 @@ function applyJsonToState(j) {
   if(toolName)state.toolName=String(toolName).endsWith('.stl')?toolName:toolName+'.stl';
   normalizeKnownOffsets();
   // Kabel aus JSON wiederherstellen
-  if (Array.isArray(j.cables)) window.cableSystem?.loadCables(j.cables);
+  try { if (Array.isArray(j.cables)) window.cableSystem?.loadCables(j.cables); } catch(e) { console.warn('[CableSystem] loadCables:', e); }
 }
 
 function buildJson() {
@@ -1456,7 +1459,7 @@ function simulateAxis(axisIndex){
 }
 
 // ── Render-Funktionen ──────────────────────────────────────────────
-function renderAll(){window.cableSystem?._updateSideCard?.();renderAxisStlRows();renderRows();updateAxisPointVisuals();renderTcp();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';}
+function renderAll(){try{window.cableSystem?._updateSideCard?.();}catch(e){}renderAxisStlRows();renderRows();updateAxisPointVisuals();renderTcp();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';}
 
 
 function setParamTab(tab) {
