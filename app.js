@@ -178,6 +178,8 @@ function init3d() {
   new ResizeObserver(resize).observe(canvas.parentElement);
   resize();
   setTimeout(() => setView('iso'), 0);
+  // Kabel-System initialisieren (Z-Achse = oben in RobModel)
+  if (window.cableSystem) window.cableSystem.init(THREE, scene, { upAxis: 'z' });
 }
 
 // ── Endeffektor TCP-Marker ──────────────────────────────────────
