@@ -311,20 +311,7 @@ function toggleCameraMode() {
 }
 
 
-let _camAnim=null; // laufende Kamera-Überblendung
-function animate() {
-  requestAnimationFrame(animate);
-  if(_camAnim){
-    _camAnim.t=Math.min(_camAnim.t+0.055,1);
-    const k=1-Math.pow(1-_camAnim.t,3); // ease-out cubic
-    camera.position.lerpVectors(_camAnim.fp,_camAnim.tp,k);
-    controls.target.lerpVectors(_camAnim.fl,_camAnim.tl,k);
-    camera.up.lerpVectors(_camAnim.fu,_camAnim.tu,k).normalize();
-    camera.lookAt(controls.target); // Kamera-Matrix aktualisieren ohne OrbitControls zu stören
-    if(_camAnim.t>=1){_camAnim=null;controls.update();} // einmalig sync am Ende
-  }
-  renderer.render(scene,camera);
-}
+function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
 
 // ── Transforms ─────────────────────────────────────────────────────
 function defaultRobotTr() { return { x: 0, y: 0, z: 0, rx: -90, ry: 0, rz: -90 }; }
@@ -2408,8 +2395,9 @@ function setView(view){
   const dist=Math.max(size.length()*.85,1200);
   const pos={iso:new THREE.Vector3(center.x+dist,center.y-dist,center.z+dist*.65),top:new THREE.Vector3(center.x,center.y,center.z+dist),bottom:new THREE.Vector3(center.x,center.y,center.z-dist),front:new THREE.Vector3(center.x,center.y-dist,center.z),back:new THREE.Vector3(center.x,center.y+dist,center.z),left:new THREE.Vector3(center.x-dist,center.y,center.z),right:new THREE.Vector3(center.x+dist,center.y,center.z)}[view];
   if(!pos)return;
-  const tu=view==='top'?new THREE.Vector3(0,1,0):view==='bottom'?new THREE.Vector3(0,-1,0):new THREE.Vector3(0,0,1);
-  _camAnim={fp:camera.position.clone(),tp:pos,fl:controls.target.clone(),tl:center,fu:camera.up.clone(),tu,t:0};
+  camera.position.copy(pos);controls.target.copy(center);
+  if(view==='top')camera.up.set(0,1,0);else if(view==='bottom')camera.up.set(0,-1,0);else camera.up.set(0,0,1);
+  camera.updateProjectionMatrix();controls.update();
   qsa('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
 }
 
