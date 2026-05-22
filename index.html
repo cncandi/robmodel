@@ -210,6 +210,13 @@ header.top .title    { display: none !important; }
 .rib-btn svg.filled { fill: currentColor; stroke: none; }
 .rib-sep { width: 1px; background: var(--bdr); margin: 8px 3px; flex-shrink: 0; }
 
+
+/* Collapsible cards */
+.card.collapsed .card-body{display:none}
+.card-chev{background:none;border:none;color:var(--txt3);cursor:pointer;padding:0 2px;line-height:1;display:flex;align-items:center}
+.card-chev svg{transition:transform .18s;width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.card.collapsed .card-chev svg{transform:rotate(-90deg)}
+.card-chev:hover{color:var(--txt)}
 </style>
 
 </head>
@@ -245,6 +252,7 @@ header.top .title    { display: none !important; }
 <symbol id="i-pos"     viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" stroke-dasharray="2 2"/><path d="M8 3v2M8 11v2M3 8h2M11 8h2"/><circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"/></symbol>
 <symbol id="i-rail"    viewBox="0 0 16 16"><path d="M2 6h12M2 10h12"/><path d="M5 6v4M8 6v4M11 6v4"/></symbol>
 <symbol id="i-fixed"   viewBox="0 0 16 16"><rect x="3" y="6" width="10" height="8" rx="1"/><path d="M5 6V5a3 3 0 0 1 6 0v1"/></symbol>
+<symbol id="i-chev" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></symbol>
 <symbol id="i-obj"     viewBox="0 0 16 16"><rect x="2" y="5" width="9" height="9" rx="1"/><path d="M5 5V4a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1"/></symbol>
 <symbol id="i-points"  viewBox="0 0 16 16"><circle cx="4" cy="8" r="2"/><circle cx="12" cy="4" r="1.5"/><circle cx="10" cy="12" r="1"/></symbol>
 <symbol id="i-lib"     viewBox="0 0 16 16"><rect x="2" y="2" width="3" height="12" rx="1"/><rect x="7" y="4" width="3" height="10" rx="1"/><rect x="12" y="2" width="3" height="12" rx="1"/></symbol>
@@ -451,8 +459,10 @@ header.top .title    { display: none !important; }
             <span class="badge info" id="kabelBadge">0</span>
             <button onclick="window.cableSystem?.addCable()" title="Neues Kabel"
               style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#6ea8fe;font-size:13px;padding:3px 10px;cursor:pointer;border-radius:3px">+</button>
-            <button class="card-collapse-btn" title="Auf-/Zuklappen"
-              onclick="document.getElementById('kabel-section').classList.toggle('collapsed')">▾</button>
+            <button class="card-chev" title="Auf-/Zuklappen"
+              onclick="document.getElementById('kabel-section').classList.toggle('collapsed')">
+              <svg viewBox="0 0 16 16"><use href="#i-chev"/></svg>
+            </button>
           </div>
         </div>
         <div class="card-body">
