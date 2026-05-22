@@ -179,10 +179,7 @@ function init3d() {
   resize();
   setTimeout(() => setView('iso'), 0);
   // Kabel-System initialisieren (Z-Achse = oben in RobModel)
-  if (window.cableSystem) {
-    window.cableSystem.init(THREE, scene, { upAxis: 'z' });
-    window.cableSystem.setTrackObjects({ tcp: tcpMarker });
-  }
+  if (window.cableSystem) window.cableSystem.init(THREE, scene, { upAxis: 'z' });
 }
 
 // ── Endeffektor TCP-Marker ──────────────────────────────────────
@@ -476,6 +473,13 @@ function rebuildRobotKinematics() {
   (state.effektoren||[]).forEach((_,i)=>rebuildEffMesh(i));
   // Rebuild Umgebung meshes
   (state.umfElemente||[]).forEach((_,i)=>rebuildUmfMesh(i));
+  // Kabel-Trackingpunkte aktualisieren (Pivot-Gruppen werden bei jedem Rebuild neu erstellt)
+  if (window.cableSystem) window.cableSystem.setTrackObjects({
+    tcp: tcpMarker,
+    a1: axisPivotGroups[0]||null, a2: axisPivotGroups[1]||null,
+    a3: axisPivotGroups[2]||null, a4: axisPivotGroups[3]||null,
+    a5: axisPivotGroups[4]||null, a6: axisPivotGroups[5]||null,
+  });
 }
 
 function applyJointRotations() {
