@@ -369,21 +369,6 @@ class CableSystem {
       <!-- Ausgewähltes Kabel -->
       <div id="cs-det-head" style="font-size:13px;font-weight:700;color:var(--txt2);margin-bottom:8px;letter-spacing:.5px"></div>
 
-      <!-- Kollisionsprüfung -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:5px 7px;background:var(--bg3);border:1px solid var(--bdr);border-radius:2px">
-        <span style="font-size:13px;color:var(--txt2)">STL-Kollision</span>
-        <label style="display:flex;align-items:center;gap:7px;cursor:pointer">
-          <span id="cs-meshcol-lbl" style="font-size:12px;color:var(--txt3)">Aus</span>
-          <span style="position:relative;display:inline-block;width:34px;height:18px">
-            <input type="checkbox" id="cs-meshcol" onchange="window.cableSystem.toggleMeshCollision(this.checked)"
-              style="opacity:0;width:0;height:0;position:absolute">
-            <span id="cs-meshcol-track" style="position:absolute;inset:0;border-radius:9px;background:var(--bdr);transition:background .15s;cursor:pointer"
-              onclick="document.getElementById('cs-meshcol').click()"></span>
-            <span id="cs-meshcol-thumb" style="position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s;pointer-events:none"></span>
-          </span>
-        </label>
-      </div>
-
       <!-- Radius -->
       <div style="margin-bottom:8px">
         <div style="font-size:12px;color:var(--txt3);margin-bottom:3px">R</div>
