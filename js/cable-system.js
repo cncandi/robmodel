@@ -575,10 +575,10 @@ class CableSystem {
   }
 
   delCable(i){
-    if(this._cables.length<=1)return;
+    if(i<0||i>=this._cables.length)return;
     this._cables.splice(i,1);
-    this.selCab=Math.min(this.selCab,this._cables.length-1);
-    this.selAnch=Math.min(this.selAnch,this._cables[this.selCab].anchors.length-1);
+    this.selCab=Math.min(this.selCab,Math.max(0,this._cables.length-1));
+    this.selAnch=this._cables.length?Math.min(this.selAnch,this._cables[this.selCab].anchors.length-1):0;
     this._loadDetail();this.refresh();
   }
 
