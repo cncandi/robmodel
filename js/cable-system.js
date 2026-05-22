@@ -645,7 +645,11 @@ class CableSystem {
 
   setVisible(v){
     this.visible=v;
-    if(this._tc){this._tc.visible=false;if(this._gizmoObj)this._gizmoObj.visible=false;}
+    if(this._tc){
+      this._tc.visible=false;
+      this._tc.enabled=false;
+      if(this._gizmoObj)this._gizmoObj.visible=false;
+    }
     this.refresh();
     if(v)this._positionGimbal();
   }
@@ -669,27 +673,29 @@ class CableSystem {
     this._tc.setMode('translate');
     this._tc.attach(this._gizmoObj);
     this._tc.visible=false;
+    this._tc.enabled=false;   // ← kein Event-Handling bis Ankerpunkt aktiv
     this.scene.add(this._tc);
 
-    // Orbit-Controls beim Ziehen deaktivieren
     this._tc.addEventListener('dragging-changed', e=>{
       if(orbitControls) orbitControls.enabled=!e.value;
       this._tcDragging=e.value;
     });
-
-    // Ankerpunkt-Daten aus Gimbal-Position lesen
     this._tc.addEventListener('objectChange', ()=>this._gizmoToAnchor());
   }
 
   _positionGimbal(){
     if(!this._tc||!this._gizmoObj)return;
     if(!this.visible||!this._cables.length){
-      this._tc.visible=false; this._gizmoObj.visible=false; return;
+      this._tc.visible=false;
+      this._tc.enabled=false;
+      this._gizmoObj.visible=false;
+      return;
     }
     const pos=this._anchorWorldPos(this.selCab,this.selAnch);
     this._gizmoObj.position.copy(pos);
     this._gizmoObj.visible=true;
     this._tc.visible=true;
+    this._tc.enabled=true;    // ← Event-Handling nur wenn Gimbal sichtbar
   }
 
   _gizmoToAnchor(){
