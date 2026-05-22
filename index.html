@@ -442,18 +442,24 @@ header.top .title    { display: none !important; }
 
 
       <!-- Kabel -->
-      <section class="card" id="kabel-section">
+      <section class="card collapsed" id="kabel-section">
         <div class="card-head">
-          <h2><svg class="ico"><use href="#i-env"/></svg>Kabel</h2>
+          <h2 style="cursor:pointer" onclick="document.getElementById('kabel-section').classList.toggle('collapsed')">
+            <svg class="ico"><use href="#i-env"/></svg>Kabel
+          </h2>
           <div style="display:flex;gap:4px;align-items:center">
             <span class="badge info" id="kabelBadge">0</span>
             <button onclick="window.cableSystem?.addCable()" title="Neues Kabel"
               style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#6ea8fe;font-size:13px;padding:3px 10px;cursor:pointer;border-radius:3px">+</button>
+            <button class="card-collapse-btn" title="Auf-/Zuklappen"
+              onclick="document.getElementById('kabel-section').classList.toggle('collapsed')">▾</button>
           </div>
         </div>
-        <div id="kabel-rows"></div>
-        <!-- Inline-Editor wird von cable-system.js befüllt -->
-        <div id="cs-inline-editor"></div>
+        <div class="card-body">
+          <div id="kabel-rows"></div>
+          <!-- Inline-Editor wird von cable-system.js befüllt -->
+          <div id="cs-inline-editor"></div>
+        </div>
       </section>
 
       <!-- Positionierer -->
