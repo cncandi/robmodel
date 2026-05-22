@@ -40,8 +40,9 @@ class CableSystem {
     this._gizmoObj  = null;   // Object3D, an dem TransformControls hängt
     this._tc        = null;   // TransformControls-Instanz
     this._tcDragging= false;
-    this._capsules  = [];     // [{obj1,obj2,r}] – Roboter-Glieder als Kapseln
-    this._tv1 = null; this._tv2 = null; this._tv3 = null; // Reuse-Vektoren
+    this._capsules  = [];
+    this._tv1 = null; this._tv2 = null; this._tv3 = null;
+    this.useMeshCollision = false;  // Mesh-Kollision aus – aktivieren: window.cableSystem.useMeshCollision=true
   }
 
   get cables() { return this._cables; }
@@ -206,8 +207,9 @@ class CableSystem {
       }
     }
 
-    // ── Post-PBD: feinere Mesh-Kollision (läuft einmal nach PBD-Konvergenz) ──
-    const hasMeshes=caps.some(c=>c.meshes.length>0);
+    // ── Post-PBD: Mesh-Kollision (nur wenn explizit aktiviert – ressourcenintensiv) ──
+    // Aktivieren: window.cableSystem.useMeshCollision = true
+    const hasMeshes=this.useMeshCollision&&caps.some(c=>c.meshes.length>0);
     if(this._raycaster&&hasMeshes){
       // Alle relevanten Meshes kurz auf DoubleSide schalten (für Innen-Erkennung)
       const allM=caps.flatMap(c=>c.meshes);
