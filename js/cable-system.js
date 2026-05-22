@@ -286,8 +286,12 @@ class CableSystem {
 
   _tube(pts,col,r){
     const T=this.THREE;
-    const g=new T.TubeGeometry(new T.CatmullRomCurve3(pts,false,'centripetal'),Math.max(pts.length,5),r,8,false);
-    return new T.Mesh(g,new T.MeshStandardMaterial({roughness:.8,metalness:.1,...col}));
+    // Mindest-Distanz prüfen – TubeGeometry crasht bei identischen Punkten
+    if(pts[0].distanceTo(pts[pts.length-1])<0.5)return null;
+    try{
+      const g=new T.TubeGeometry(new T.CatmullRomCurve3(pts,false,'centripetal'),Math.max(pts.length,5),r,8,false);
+      return new T.Mesh(g,new T.MeshStandardMaterial({roughness:.8,metalness:.1,...col}));
+    }catch(e){return null;}
   }
 
   refresh() {
@@ -318,7 +322,7 @@ class CableSystem {
         if(res.taut)broken.push({ci,seg});
         const pts=res.pts??[0,1,2,3,4].map(k=>pos[seg].clone().lerp(pos[seg+1],k/4));
         const m=this._tube(pts,this._tCol(res.ratio),cab.thickness);
-        this.scene.add(m);obj.meshes.push(m);
+        if(m){this.scene.add(m);obj.meshes.push(m);}
       }
       this.sceneObjs.push(obj);this.cableMaxR.push(maxR);
     });
@@ -614,6 +618,10 @@ class CableSystem {
 
   addCable(){
     if(this._cables.length>=8)return;
+    this.visible=true;   // Kabel immer sichtbar wenn eines hinzugefügt wird
+    // Karte aufklappen damit der Benutzer das neue Kabel sieht
+    const sec=document.getElementById('kabel-section');
+    if(sec)sec.classList.remove('collapsed');
     const jointKeys=['a1','a2','a3','a4','a5','a6'];
     const hasJoints=jointKeys.some(k=>!!this._trackMap[k]);
     let newCable;
