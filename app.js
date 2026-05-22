@@ -179,7 +179,10 @@ function init3d() {
   resize();
   setTimeout(() => setView('iso'), 0);
   // Kabel-System initialisieren (Z-Achse = oben in RobModel)
-  if (window.cableSystem) window.cableSystem.init(THREE, scene, { upAxis: 'z' });
+  if (window.cableSystem) {
+    window.cableSystem.init(THREE, scene, { upAxis: 'z' });
+    window.cableSystem.setTrackObjects({ tcp: tcpMarker });
+  }
 }
 
 // ── Endeffektor TCP-Marker ──────────────────────────────────────
@@ -489,6 +492,7 @@ function applyJointRotations() {
   });
   scene.updateMatrixWorld(true);
   updateSkeletonPositions();
+  window.cableSystem?.refresh();
 }
 
 function parseReferencePose() {
@@ -1437,7 +1441,7 @@ function simulateAxis(axisIndex){
 }
 
 // ── Render-Funktionen ──────────────────────────────────────────────
-function renderAll(){renderAxisStlRows();renderRows();updateAxisPointVisuals();renderTcp();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';}
+function renderAll(){window.cableSystem?._updateSideCard?.();renderAxisStlRows();renderRows();updateAxisPointVisuals();renderTcp();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';}
 
 
 function setParamTab(tab) {
