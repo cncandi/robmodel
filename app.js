@@ -179,7 +179,14 @@ function init3d() {
   resize();
   setTimeout(() => setView('iso'), 0);
   // Kabel-System initialisieren (Z-Achse = oben in RobModel)
-  if (window.cableSystem) window.cableSystem.init(THREE, scene, { upAxis: 'z' });
+  if (window.cableSystem) {
+    window.cableSystem.init(THREE, scene, { upAxis: 'z' });
+    // Gimbal-Kontext übergeben: TransformControls + Kamera + OrbitControls
+    window.cableSystem.setGimbalContext({
+      THREE, camera: perspCamera, renderer,
+      orbitControls: controls, TransformControls
+    });
+  }
 }
 
 // ── Endeffektor TCP-Marker ──────────────────────────────────────
