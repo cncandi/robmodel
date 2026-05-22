@@ -37,6 +37,9 @@ class CableSystem {
     this._LABELS    = {
       a1:'A1',a2:'A2',a3:'A3',a4:'A4',a5:'A5',a6:'A6',tcp:'TCP'
     };
+    this._gizmoObj  = null;   // Object3D, an dem TransformControls hängt
+    this._tc        = null;   // TransformControls-Instanz
+    this._tcDragging= false;
   }
 
   get cables() { return this._cables; }
@@ -265,7 +268,11 @@ class CableSystem {
         <option value="">— Welt (X/Y/Z) —</option>
       </select>
 
-      <!-- XYZ (nur wenn kein Track) -->
+      <!-- XYZ (immer editierbar; bei Track = Offset vom Gelenkpunkt) -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+        <div style="font-size:12px;color:var(--txt3)">X / Y / Z</div>
+        <div id="cs-xyz-hint" style="font-size:11px;color:var(--txt3);font-style:italic"></div>
+      </div>
       <div id="cs-xyz-block">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
           <span style="font-size:13px;font-weight:700;color:#ff6666;min-width:14px;text-align:right">X</span>
@@ -423,11 +430,17 @@ class CableSystem {
     const sel=document.getElementById('cs-ref');
     if(sel){this._updateRefDropdown();sel.value=a.track||'';}
 
-    // XYZ sperren wenn Track aktiv
+    // XYZ: immer editierbar.
+    // Bei Track → zeigt/editiert ox/oy/oz (Offset vom Gelenkpunkt im lokalen Raum)
+    // Ohne Track → zeigt/editiert x/y/z (absolute Weltkoordinaten)
+    const hint=document.getElementById('cs-xyz-hint');
+    if(hint)hint.textContent=tracked?'(Offset vom Gelenkpunkt)':'(Weltkoordinaten)';
     const xyz=document.getElementById('cs-xyz-block');
-    if(xyz)xyz.style.opacity=tracked?'0.3':'1';
-    if(xyz)xyz.style.pointerEvents=tracked?'none':'auto';
-    [['cs-ax',a.x||0],['cs-ay',a.y||0],['cs-az',a.z||0]].forEach(([id,v])=>{
+    if(xyz){xyz.style.opacity='1';xyz.style.pointerEvents='auto';}
+    const vals=tracked
+      ?[['cs-ax',a.ox||0],['cs-ay',a.oy||0],['cs-az',a.oz||0]]
+      :[['cs-ax',a.x||0], ['cs-ay',a.y||0], ['cs-az',a.z||0]];
+    vals.forEach(([id,v])=>{
       const el=document.getElementById(id);if(el)el.value=v;
       const vd=document.getElementById(id+'v');if(vd)vd.textContent=v;
     });
@@ -456,7 +469,13 @@ class CableSystem {
     this._loadDetail();this.refresh();
   }
 
-  selA(i){this.selAnch=i;this._renderChips();this._loadAnchorEdit();this.refresh();}
+  selA(i){
+    this.selAnch=i;
+    this._renderChips();
+    this._loadAnchorEdit();
+    this._positionGimbal();
+    this.refresh();
+  }
 
   addCable(){
     if(this._cables.length>=8)return;
@@ -489,13 +508,19 @@ class CableSystem {
 
   updA(){
     const a=this._cables[this.selCab].anchors[this.selAnch];
-    if(!a.track){
-      a.x=+document.getElementById('cs-ax').value; document.getElementById('cs-axv').textContent=a.x;
-      a.y=+document.getElementById('cs-ay').value; document.getElementById('cs-ayv').textContent=a.y;
-      a.z=+document.getElementById('cs-az').value; document.getElementById('cs-azv').textContent=a.z;
-    }
+    const tracked=!!(a.track);
+    // XYZ: schreibt ox/oy/oz (Offset) wenn Track aktiv, sonst x/y/z (Welt)
+    const xv=+document.getElementById('cs-ax').value;
+    const yv=+document.getElementById('cs-ay').value;
+    const zv=+document.getElementById('cs-az').value;
+    document.getElementById('cs-axv').textContent=xv;
+    document.getElementById('cs-ayv').textContent=yv;
+    document.getElementById('cs-azv').textContent=zv;
+    if(tracked){a.ox=xv;a.oy=yv;a.oz=zv;}
+    else       {a.x=xv; a.y=yv; a.z=zv;}
     a.segLen=+document.getElementById('cs-al').value;document.getElementById('cs-alv').textContent=a.segLen;
-    this._loadAnchorEdit();  // Abstandsanzeige aktualisieren
+    this._loadAnchorEdit();
+    this._positionGimbal();
     this.refresh();
   }
 
@@ -522,8 +547,78 @@ class CableSystem {
 
   // ─── Sichtbarkeit (3D-Kabel, nicht Editor) ───────────────────────────────────
 
-  setVisible(v){this.visible=v;this.refresh();}
+  setVisible(v){
+    this.visible=v;
+    if(this._tc){this._tc.visible=false;if(this._gizmoObj)this._gizmoObj.visible=false;}
+    this.refresh();
+    if(v)this._positionGimbal();
+  }
   toggleVisible(){this.setVisible(!this.visible);}
+
+  // ─── Gimbal (TransformControls) ─────────────────────────────────────────────
+  // setGimbalContext() wird aus app.js nach init3d() aufgerufen:
+  //   window.cableSystem.setGimbalContext({THREE, camera, renderer, orbitControls, TransformControls})
+  //
+  // Zeigt den Gimbal am aktuell gewählten Ankerpunkt.
+  // Bei Tracked-Ankern wird die Verschiebung als lokaler Offset (ox/oy/oz) gespeichert.
+
+  setGimbalContext({THREE: T, camera, renderer, orbitControls, TransformControls: TC}){
+    if(!T||!camera||!renderer||!TC)return;
+
+    this._gizmoObj=new T.Object3D();
+    this._gizmoObj.visible=false;
+    this.scene.add(this._gizmoObj);
+
+    this._tc=new TC(camera, renderer.domElement);
+    this._tc.setMode('translate');
+    this._tc.attach(this._gizmoObj);
+    this._tc.visible=false;
+    this.scene.add(this._tc);
+
+    // Orbit-Controls beim Ziehen deaktivieren
+    this._tc.addEventListener('dragging-changed', e=>{
+      if(orbitControls) orbitControls.enabled=!e.value;
+      this._tcDragging=e.value;
+    });
+
+    // Ankerpunkt-Daten aus Gimbal-Position lesen
+    this._tc.addEventListener('objectChange', ()=>this._gizmoToAnchor());
+  }
+
+  _positionGimbal(){
+    if(!this._tc||!this._gizmoObj)return;
+    if(!this.visible||!this._cables.length){
+      this._tc.visible=false; this._gizmoObj.visible=false; return;
+    }
+    const pos=this._anchorWorldPos(this.selCab,this.selAnch);
+    this._gizmoObj.position.copy(pos);
+    this._gizmoObj.visible=true;
+    this._tc.visible=true;
+  }
+
+  _gizmoToAnchor(){
+    if(!this._cables[this.selCab])return;
+    const T=this.THREE;
+    const a=this._cables[this.selCab].anchors[this.selAnch];
+    const newWorld=this._gizmoObj.position.clone();
+
+    if(a.track&&this._trackMap[a.track]){
+      // Welt-Position → lokaler Offset im Gelenkraum
+      const obj=this._trackMap[a.track];
+      const jointWP=new T.Vector3(); obj.getWorldPosition(jointWP);
+      const jointWQ=new T.Quaternion(); obj.getWorldQuaternion(jointWQ);
+      const localOff=newWorld.clone().sub(jointWP).applyQuaternion(jointWQ.clone().invert());
+      a.ox=Math.round(localOff.x);
+      a.oy=Math.round(localOff.y);
+      a.oz=Math.round(localOff.z);
+    } else {
+      a.x=Math.round(newWorld.x);
+      a.y=Math.round(newWorld.y);
+      a.z=Math.round(newWorld.z);
+    }
+    this._loadAnchorEdit();
+    this.refresh();
+  }
 
   _buildErrorBanner(){
     if(document.getElementById('cs-err'))return;
