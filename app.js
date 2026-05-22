@@ -474,12 +474,16 @@ function rebuildRobotKinematics() {
   // Rebuild Umgebung meshes
   (state.umfElemente||[]).forEach((_,i)=>rebuildUmfMesh(i));
   // Kabel-Trackingpunkte aktualisieren (Pivot-Gruppen werden bei jedem Rebuild neu erstellt)
-  if (window.cableSystem) window.cableSystem.setTrackObjects({
-    tcp: tcpMarker,
-    a1: axisPivotGroups[0]||null, a2: axisPivotGroups[1]||null,
-    a3: axisPivotGroups[2]||null, a4: axisPivotGroups[3]||null,
-    a5: axisPivotGroups[4]||null, a6: axisPivotGroups[5]||null,
-  });
+  if (window.cableSystem) {
+    window.cableSystem.setTrackObjects({
+      tcp: tcpMarker,
+      a1: axisPivotGroups[0]||null, a2: axisPivotGroups[1]||null,
+      a3: axisPivotGroups[2]||null, a4: axisPivotGroups[3]||null,
+      a5: axisPivotGroups[4]||null, a6: axisPivotGroups[5]||null,
+    });
+    // Segmentlängen nach echten Gelenkabständen setzen
+    window.cableSystem.autoLength();
+  }
 }
 
 function applyJointRotations() {
