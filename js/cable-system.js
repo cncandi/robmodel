@@ -664,38 +664,41 @@ class CableSystem {
 
   setGimbalContext({THREE: T, camera, renderer, orbitControls, TransformControls: TC}){
     if(!T||!camera||!renderer||!TC)return;
+    // Parameter speichern – TC wird erst beim ersten Ankerpunkt-Anwählen erstellt
+    this._gcCtx={T,camera,renderer,orbitControls,TC};
+  }
 
+  _ensureTC(){
+    if(this._tc||!this._gcCtx)return;
+    const{T,camera,renderer,orbitControls,TC}=this._gcCtx;
     this._gizmoObj=new T.Object3D();
     this._gizmoObj.visible=false;
     this.scene.add(this._gizmoObj);
-
-    this._tc=new TC(camera, renderer.domElement);
+    this._tc=new TC(camera,renderer.domElement);
     this._tc.setMode('translate');
     this._tc.attach(this._gizmoObj);
     this._tc.visible=false;
-    this._tc.enabled=false;   // ← kein Event-Handling bis Ankerpunkt aktiv
+    this._tc.enabled=false;
     this.scene.add(this._tc);
-
-    this._tc.addEventListener('dragging-changed', e=>{
-      if(orbitControls) orbitControls.enabled=!e.value;
+    this._tc.addEventListener('dragging-changed',e=>{
+      if(orbitControls)orbitControls.enabled=!e.value;
       this._tcDragging=e.value;
     });
-    this._tc.addEventListener('objectChange', ()=>this._gizmoToAnchor());
+    this._tc.addEventListener('objectChange',()=>this._gizmoToAnchor());
   }
 
   _positionGimbal(){
-    if(!this._tc||!this._gizmoObj)return;
     if(!this.visible||!this._cables.length){
-      this._tc.visible=false;
-      this._tc.enabled=false;
-      this._gizmoObj.visible=false;
+      if(this._tc){this._tc.visible=false;this._tc.enabled=false;if(this._gizmoObj)this._gizmoObj.visible=false;}
       return;
     }
+    this._ensureTC();
+    if(!this._tc||!this._gizmoObj)return;
     const pos=this._anchorWorldPos(this.selCab,this.selAnch);
     this._gizmoObj.position.copy(pos);
     this._gizmoObj.visible=true;
     this._tc.visible=true;
-    this._tc.enabled=true;    // ← Event-Handling nur wenn Gimbal sichtbar
+    this._tc.enabled=true;
   }
 
   _gizmoToAnchor(){
