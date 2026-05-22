@@ -1327,6 +1327,8 @@ function applyJsonToState(j) {
   const toolName=j.sceneModels?.tool?.name||j.tcp?.auftragen?.toolStl||j.tcp?.auftragen?.stlName;
   if(toolName)state.toolName=String(toolName).endsWith('.stl')?toolName:toolName+'.stl';
   normalizeKnownOffsets();
+  // Kabel aus JSON wiederherstellen
+  if (Array.isArray(j.cables)) window.cableSystem?.loadCables(j.cables);
 }
 
 function buildJson() {
@@ -1378,6 +1380,10 @@ function buildJson() {
     const parts = (state.axisStlParts[eAx]||[]).map(p=>({name:norm(p.name),color:p.color||'#2563eb'}));
     return { name:r.name||'Rail', length_mm:r.length_mm||2000, height_mm:r.height_mm||200, width_mm:r.width_mm||400, axis:r.axis||'X+', eNumber:r.eNumber||1, eMin:r.eMin??0, eMax:r.eMax??r.length_mm??2000, stlFiles: parts.length ? {[eAx]: parts} : undefined };
   });
+  // Kabel aus dem CableSystem in die JSON-Datei einschliessen
+  result.cables = (window.cableSystem?.cables?.length > 0)
+    ? JSON.parse(JSON.stringify(window.cableSystem.cables))
+    : [];
   return result;
 }
 
