@@ -40,6 +40,8 @@ class CableSystem {
     this._gizmoObj  = null;   // Object3D, an dem TransformControls hängt
     this._tc        = null;   // TransformControls-Instanz
     this._tcDragging= false;
+    this._capsules  = [];     // [{obj1,obj2,r}] – Roboter-Glieder als Kapseln
+    this._tv1 = null; this._tv2 = null; this._tv3 = null; // Reuse-Vektoren
   }
 
   get cables() { return this._cables; }
@@ -53,19 +55,13 @@ class CableSystem {
     this.viewerOnly = opts.viewerOnly || false;
     this._sGeoSm    = new THREE.SphereGeometry(7,  14, 10);
     this._sGeoLg    = new THREE.SphereGeometry(11, 16, 12);
+    this._tv1       = new THREE.Vector3();
+    this._tv2       = new THREE.Vector3();
+    this._tv3       = new THREE.Vector3();
 
     if (!this.viewerOnly) {
-      // Standard: 1 Kabel, 6 Anker A1–A6
-      this._cables = [{
-        thickness: 6,
-        anchors: ['a1','a2','a3','a4','a5','a6'].map((t,i) => ({
-          x:0, y:0, z:0, ox:0, oy:0, oz:0,
-          segLen: 200,   // wird bei setTrackObjects() durch auto-Länge ersetzt
-          track: t
-        }))
-      }];
+      this._cables = [];   // Leer – Benutzer fügt Kabel manuell hinzu
       this._injectStyles();
-      // Editor wird nach DOM-Ready aufgebaut (index.html muss cs-inline-editor enthalten)
       setTimeout(() => { this._buildInlineEditor(); this.refresh(); }, 0);
     } else {
       this._buildErrorBanner();
@@ -77,9 +73,28 @@ class CableSystem {
   setTrackObjects(map) {
     this._trackMap = {};
     for (const [k,v] of Object.entries(map)) { if(v) this._trackMap[k]=v; }
+
+    // Roboter-Glieder als Kapseln für Kollisionserkennung
+    // Radien: grob für KUKA-Arme (mm). Kann über setCapsuleRadii() angepasst werden.
+    const joints  = ['a1','a2','a3','a4','a5','a6'];
+    const radii   = this._capRadii || [90,80,70,60,50,40];
+    this._capsules = [];
+    for (let i=0; i<joints.length-1; i++) {
+      const o1=this._trackMap[joints[i]], o2=this._trackMap[joints[i+1]];
+      if(o1&&o2) this._capsules.push({obj1:o1,obj2:o2,r:radii[i]||60});
+    }
+
     this._updateRefDropdown();
-    this.autoLength();   // Segmentlängen nach echten Gelenkabständen setzen
+    this.autoLength();
     this.refresh();
+  }
+
+  /** Kapsel-Radien der Roboter-Glieder überschreiben (mm).
+   *  Beispiel: cableSystem.setCapsuleRadii([100,90,80,70,60,50])  */
+  setCapsuleRadii(arr) {
+    this._capRadii = arr;
+    // Kapseln sofort neu berechnen falls trackMap schon gesetzt
+    if(Object.keys(this._trackMap).length) this.setTrackObjects(this._trackMap);
   }
 
   /**
@@ -137,19 +152,48 @@ class CableSystem {
     return false;
   }
 
+  /** Kapsel-Kollision (kein Heap-Alloc, nutzt pre-allozierte Vektoren).
+   *  Schiebt p heraus wenn es sich innerhalb der Kapsel zwischen p1 und p2 befindet. */
+  _resolveCapsule(p, p1, p2, radius) {
+    this._tv1.subVectors(p2, p1);
+    const len2 = this._tv1.lengthSq();
+    if (len2 < 1e-8) return false;
+    this._tv2.subVectors(p, p1);
+    const t = Math.max(0, Math.min(1, this._tv2.dot(this._tv1) / len2));
+    this._tv3.copy(p1).addScaledVector(this._tv1, t);  // nächster Punkt auf Segment
+    this._tv2.subVectors(p, this._tv3);                // Richtung von Segment zu p
+    const dist = this._tv2.length();
+    if (dist < radius && dist > 1e-8) {
+      p.copy(this._tv3).addScaledVector(this._tv2.normalize(), radius + 2);
+      return true;
+    }
+    return false;
+  }
+
   _simCable(p1,p2,L) {
     const T=this.THREE,chord=p1.distanceTo(p2);
     if(chord>=L-0.01)return{taut:true, ratio:Math.min(chord/L,1),pts:null};
     if(chord<0.5)     return{taut:false,ratio:0,pts:null};
     const N=this.N_PTS,rL=L/N,pos=[],old=[];
     for(let i=0;i<=N;i++){const p=p1.clone().lerp(p2,i/N);pos.push(p);old.push(p.clone());}
-    const GY=0.14,DM=0.85,STEPS=280,CP=8,up=this.upAxis;
+    const GY=0.14,DM=0.85,STEPS=180,CP=6,up=this.upAxis;
+
+    // Kapsel-Positionen einmalig vor der Simulation berechnen (Roboter bewegt sich nicht während sim)
+    const caps=this._capsules.map(c=>{
+      const q1=new T.Vector3(),q2=new T.Vector3();
+      c.obj1.getWorldPosition(q1); c.obj2.getWorldPosition(q2);
+      return{p1:q1,p2:q2,r:c.r};
+    });
+
     for(let s=0;s<STEPS;s++){
       for(let i=1;i<N;i++){const v=pos[i].clone().sub(old[i]).multiplyScalar(DM);old[i].copy(pos[i]);pos[i].add(v);if(up==='z')pos[i].z-=GY;else pos[i].y-=GY;}
       for(let c=0;c<CP;c++){
         for(let i=0;i<N;i++){const d=pos[i].distanceTo(pos[i+1]);if(d<1e-4)continue;const cr=new T.Vector3().subVectors(pos[i+1],pos[i]).multiplyScalar((d-rL)/(d*2));if(i>0)pos[i].add(cr);if(i<N)pos[i+1].sub(cr);}
         pos[0].copy(p1);pos[N].copy(p2);
-        for(let i=1;i<N;i++)this._resolveFloor(pos[i]);
+        for(let i=1;i<N;i++){
+          this._resolveFloor(pos[i]);
+          for(const cap of caps) this._resolveCapsule(pos[i],cap.p1,cap.p2,cap.r);
+        }
       }
     }
     return{taut:false,ratio:chord/L,pts:pos};
@@ -212,7 +256,7 @@ class CableSystem {
     const div=document.getElementById('kabel-rows');if(!div)return;
     const b=document.getElementById('kabelBadge');if(b)b.textContent=this._cables.length;
     div.innerHTML=!this._cables.length
-      ?'<div style="font-size:13px;color:var(--txt3);padding:3px 0">–</div>'
+      ?'<div style="font-size:13px;color:var(--txt3);padding:3px 0">Kein Kabel — + drücken</div>'
       :this._cables.map((c,i)=>{
         const r=this.cableMaxR[i]||0,pct=Math.min(Math.round(r*100),100);
         const bc=r>=1?'#cc2222':r>.92?'#cc4400':r>.75?'#886600':'#1a6a2a';
@@ -384,8 +428,13 @@ class CableSystem {
   // ─── Editor-UI: Anker-Detail ─────────────────────────────────────────────────
 
   _loadDetail(){
-    const cab=this._cables[this.selCab];if(!cab)return;
+    const cab=this._cables[this.selCab];
     const dh=document.getElementById('cs-det-head');
+    if(!cab){
+      if(dh)dh.textContent='';
+      const achips=document.getElementById('cs-achips');if(achips)achips.innerHTML='';
+      return;
+    }
     if(dh)dh.textContent=`KABEL ${this.selCab+1}  ·  ${cab.anchors.length} ANKER`;
     const slt=document.getElementById('cs-slt');
     if(slt){slt.value=cab.thickness;document.getElementById('cs-sltv').textContent=cab.thickness+' mm';}
@@ -479,11 +528,28 @@ class CableSystem {
 
   addCable(){
     if(this._cables.length>=8)return;
-    const up=this.upAxis;
-    this._cables.push({thickness:6,anchors:[
-      {x:0,y:up==='z'?1200:500,z:up==='z'?-400:0,segLen:800,track:null,ox:0,oy:0,oz:0},
-      {x:0,y:up==='z'?1200:500,z:up==='z'? 400:0,segLen:800,track:null,ox:0,oy:0,oz:0}]});
+    const jointKeys=['a1','a2','a3','a4','a5','a6'];
+    const hasJoints=jointKeys.some(k=>!!this._trackMap[k]);
+    let newCable;
+    if(hasJoints){
+      // Standard: 6 Anker an A1–A6
+      newCable={
+        thickness:6,
+        anchors:jointKeys.map(t=>({
+          x:0,y:0,z:0,ox:0,oy:0,oz:0,segLen:200,
+          track:this._trackMap[t]?t:null
+        }))
+      };
+    } else {
+      // Fallback ohne Roboter: 2 Weltpunkte
+      const up=this.upAxis;
+      newCable={thickness:6,anchors:[
+        {x:0,y:up==='z'?1200:500,z:up==='z'?-400:0,segLen:800,track:null,ox:0,oy:0,oz:0},
+        {x:0,y:up==='z'?1200:500,z:up==='z'? 400:0,segLen:800,track:null,ox:0,oy:0,oz:0}]};
+    }
+    this._cables.push(newCable);
     this.selCab=this._cables.length-1;this.selAnch=0;
+    if(hasJoints)this.autoLength();
     this._loadDetail();this.refresh();
   }
 
