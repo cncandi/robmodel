@@ -291,7 +291,7 @@ class CableSystem {
       <div style="margin-bottom:8px">
         <div style="font-size:12px;color:var(--txt3);margin-bottom:3px">R</div>
         <div style="display:flex;align-items:center;gap:8px">
-          <input type="range" id="cs-slt" min="1" max="30" value="6" step="0.5" oninput="window.cableSystem.updThick()" style="flex:1">
+          <input type="range" id="cs-slt" min="1" max="50" value="6" step="0.5" oninput="window.cableSystem.updThick()" style="flex:1">
           <span id="cs-sltv" style="font-size:13px;color:var(--txt2);min-width:44px;text-align:right">6 mm</span>
         </div>
       </div>
@@ -442,13 +442,23 @@ class CableSystem {
     this._loadAnchorEdit();
   }
 
+  _nextSLabel(){
+    // Zählt vorhandene S-Anker über alle Kabel und gibt nächste freie Nummer zurück
+    let max=0;
+    this._cables.forEach(cab=>cab.anchors.forEach(a=>{
+      if(a.label&&/^S(\d+)$/.test(a.label)) max=Math.max(max,+a.label.slice(1));
+    }));
+    return 'S'+(max+1);
+  }
+
   _renderChips(){
     const div=document.getElementById('cs-achips');if(!div)return;
     div.innerHTML='';
     this._cables[this.selCab].anchors.forEach((a,i)=>{
       const btn=document.createElement('button');
       btn.className='cs-chip'+(i===this.selAnch?' on':'');
-      const lbl=a.track?this._LABELS[a.track]||a.track:`A${i+1}`;
+      // Priorität: eigenes Label > Track-Name > Fallback
+      const lbl=a.label||(a.track?this._LABELS[a.track]||a.track:null)||`A${i+1}`;
       btn.textContent=lbl;
       btn.onclick=()=>this.selA(i);
       div.appendChild(btn);
@@ -599,10 +609,14 @@ class CableSystem {
   addAnchor(){
     const cab=this._cables[this.selCab];if(!cab||cab.anchors.length>=8)return;
     const src=cab.anchors[this.selAnch];
-    // Neuer Anker wird NACH dem ausgewählten eingefügt (nicht ans Ende)
-    const neu={...src, track:null, ox:0, oy:0, oz:0};
-    // Etwas versetzt damit er nicht exakt deckungsgleich sitzt
-    if(!neu.track){ neu.x=(neu.x||0)+100; }
+    // Neuer Anker: kein Track, eigenes S-Label, nach dem selektierten einfügen
+    const neu={
+      x:src.x||0, y:src.y||0, z:src.z||0,
+      ox:0, oy:0, oz:0,
+      segLen:src.segLen||800,
+      track:null,
+      label:this._nextSLabel()
+    };
     cab.anchors.splice(this.selAnch+1, 0, neu);
     this.selAnch=this.selAnch+1;
     this._renderChips();this._loadAnchorEdit();this.refresh();
