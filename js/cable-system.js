@@ -597,10 +597,14 @@ class CableSystem {
   }
 
   addAnchor(){
-    const cab=this._cables[this.selCab];if(cab.anchors.length>=8)return;
-    const last=cab.anchors.at(-1);
-    cab.anchors.push({...last,track:null,x:last.x+200,segLen:800});
-    this.selAnch=cab.anchors.length-1;
+    const cab=this._cables[this.selCab];if(!cab||cab.anchors.length>=8)return;
+    const src=cab.anchors[this.selAnch];
+    // Neuer Anker wird NACH dem ausgewählten eingefügt (nicht ans Ende)
+    const neu={...src, track:null, ox:0, oy:0, oz:0};
+    // Etwas versetzt damit er nicht exakt deckungsgleich sitzt
+    if(!neu.track){ neu.x=(neu.x||0)+100; }
+    cab.anchors.splice(this.selAnch+1, 0, neu);
+    this.selAnch=this.selAnch+1;
     this._renderChips();this._loadAnchorEdit();this.refresh();
   }
 
