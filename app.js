@@ -2301,6 +2301,125 @@ $('gimbalModeBtn')?.addEventListener('click',()=>{
   requestRender();
 });
 
+// ── Löschen-Modus: Part/Element/Achs-STL per 3D-Klick entfernen ───
+var _deleteActive = false;
+
+function _deleteCandidateMeshes() {
+  const out = [];
+  for (const [, m] of meshes) if (m && m.isMesh) out.push(m);
+  const groups = [].concat(
+    objekteGroups||[], effektorGroups||[], umfGroups||[], festeGrps||[],
+    (positionerGroups||[]).map(p=>p&&p.containerGrp), [railGroup]
+  );
+  groups.forEach(g => { if (g && g.traverse) g.traverse(c => { if (c.isMesh) out.push(c); }); });
+  return out;
+}
+
+function _findPartByName(name) {
+  const n = norm(name);
+  for (const ax in state.axisStlParts) {
+    const arr = state.axisStlParts[ax] || [];
+    const idx = arr.findIndex(p => norm(p.name) === n);
+    if (idx >= 0) return { ax, idx, part: arr[idx] };
+  }
+  return null;
+}
+
+function _nameUsedElsewhere(name, exceptAx, exceptIdx) {
+  const n = norm(name);
+  for (const ax in state.axisStlParts) {
+    const arr = state.axisStlParts[ax] || [];
+    for (let i = 0; i < arr.length; i++) {
+      if (ax === exceptAx && i === exceptIdx) continue;
+      if (norm(arr[i].name) === n) return true;
+    }
+  }
+  return false;
+}
+
+function _rebuildAllAfterDelete() {
+  rebuildRobotKinematics(); applyTransforms();
+  (state.objekte||[]).forEach((_,i)=>rebuildObjektMesh(i));
+  (state.effektoren||[]).forEach((_,i)=>rebuildEffMesh(i));
+  (state.umfElemente||[]).forEach((_,i)=>rebuildUmfMesh(i));
+  if (typeof rebuildAllPositioners==='function') rebuildAllPositioners();
+  if (typeof rebuildRailMeshes==='function') rebuildRailMeshes();
+  renderAll();
+}
+
+function _deletePartAt(ax, idx) {
+  const arr = state.axisStlParts[ax]; if (!arr || !arr[idx]) return;
+  const part = arr[idx];
+  arr.splice(idx, 1);
+  if (state.axisStlMap && state.axisStlMap[ax] && norm(state.axisStlMap[ax]) === norm(part.name))
+    state.axisStlMap[ax] = arr[0] ? arr[0].name : null;
+  // verwaiste STL-Datei aufräumen, falls nirgends mehr referenziert
+  if (!_nameUsedElsewhere(part.name)) {
+    for (const [k,m] of meshes) if (norm(m.name)===norm(part.name)) {
+      if (m.parent) m.parent.remove(m);
+      if (m.geometry) m.geometry.dispose();
+      if (Array.isArray(m.material)) m.material.forEach(x=>x&&x.dispose&&x.dispose()); else if (m.material) m.material.dispose();
+      meshes.delete(k);
+    }
+    state.stls = (state.stls||[]).filter(f => norm(f.name)!==norm(part.name));
+    if (state.buffers && state.buffers.delete) state.buffers.delete(part.name);
+  }
+  _rebuildAllAfterDelete();
+}
+
+function _deleteElementOfMesh(mesh) {
+  const inG = (g,m) => { let f=false; if (g && g.traverse) g.traverse(c=>{ if(c===m) f=true; }); return f; };
+  let i;
+  i = (objekteGroups||[]).findIndex(g=>inG(g,mesh));
+  if (i>=0) { if(state.objekte[i]&&state.objekte[i]._simInterval) clearInterval(state.objekte[i]._simInterval); if(objekteGroups[i]){scene.remove(objekteGroups[i]);objekteGroups[i]=null;} state.objekte.splice(i,1); objekteGroups.splice(i,1); if(typeof renderObjRows==='function')renderObjRows(); renderAll(); return true; }
+  i = (effektorGroups||[]).findIndex(g=>inG(g,mesh));
+  if (i>=0) { if(effektorGroups[i]&&effektorGroups[i].parent) effektorGroups[i].parent.remove(effektorGroups[i]); effektorGroups.splice(i,1); state.effektoren.splice(i,1); if(typeof renderEffRow==='function')renderEffRow(); applyTransforms(); renderAll(); return true; }
+  i = (umfGroups||[]).findIndex(g=>inG(g,mesh));
+  if (i>=0) { if(umfGroups[i]&&umfGroups[i].parent) umfGroups[i].parent.remove(umfGroups[i]); umfGroups.splice(i,1); state.umfElemente.splice(i,1); if(typeof renderUmfRows==='function')renderUmfRows(); renderAll(); return true; }
+  i = (positionerGroups||[]).findIndex(g=>g&&g.containerGrp&&inG(g.containerGrp,mesh));
+  if (i>=0) { const g=positionerGroups[i]; if(g.containerGrp&&g.containerGrp.parent) g.containerGrp.parent.remove(g.containerGrp); positionerGroups.splice(i,1); state.positioners.splice(i,1); if(typeof renderPosRows==='function')renderPosRows(); renderAll(); return true; }
+  i = (festeGrps||[]).findIndex(g=>inG(g,mesh));
+  if (i>=0) { if(festeGrps[i]&&festeGrps[i].parent) festeGrps[i].parent.remove(festeGrps[i]); festeGrps.splice(i,1); state.festeObjekte.splice(i,1); if(typeof renderFixRows==='function')renderFixRows(); renderAll(); return true; }
+  return false;
+}
+
+function _deletePick(event) {
+  if (!_deleteActive) return;
+  if (event.button !== undefined && event.button !== 0) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  const cx = event.clientX != null ? event.clientX : (event.touches && event.touches[0] && event.touches[0].clientX);
+  if (cx == null) return;
+  const cy = event.clientY != null ? event.clientY : (event.touches[0] && event.touches[0].clientY);
+  const mx = ((cx-rect.left)/rect.width)*2-1, my = -((cy-rect.top)/rect.height)*2+1;
+  const rc = new THREE.Raycaster();
+  rc.setFromCamera(new THREE.Vector2(mx,my), camera);
+  const hits = rc.intersectObjects(_deleteCandidateMeshes(), false);
+  if (!hits.length) return;
+  const mesh = hits[0].object;
+  const found = _findPartByName(mesh.name);
+  const label = found ? (found.part.name + '  (' + found.ax + ')') : (mesh.name || 'Element');
+  if (!window.confirm('Löschen: ' + label + ' ?')) return;
+  if (found) _deletePartAt(found.ax, found.idx);
+  else if (!_deleteElementOfMesh(mesh)) { _rebuildAllAfterDelete(); }
+  requestRender();
+}
+
+$('deleteToggle')?.addEventListener('click', () => {
+  _deleteActive = !_deleteActive;
+  const btn = $('deleteToggle');
+  if (_deleteActive) {
+    if (_gimbalActive) $('gimbalToggle')?.click();           // andere Modi aus
+    if (typeof _measureActive !== 'undefined' && _measureActive) $('measureBtn')?.click();
+    if (btn){ btn.style.background='rgba(204,51,51,.3)'; btn.style.borderColor='rgba(204,51,51,.6)'; btn.style.color='#f87171'; }
+    renderer.domElement.style.cursor = 'crosshair';
+    renderer.domElement.addEventListener('pointerdown', _deletePick);
+  } else {
+    if (btn){ btn.style.background=''; btn.style.borderColor=''; btn.style.color=''; }
+    renderer.domElement.style.cursor = '';
+    renderer.domElement.removeEventListener('pointerdown', _deletePick);
+  }
+});
+
 // ── Messtool ──────────────────────────────────────────────────────
 var _measureActive = false;
 var _measureP1 = null;
