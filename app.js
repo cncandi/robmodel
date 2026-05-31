@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v38
+//  RobModel — Robot Kinematik Editor  v39
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -10,6 +10,8 @@ import { ColladaLoader }    from 'three/addons/loaders/ColladaLoader.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────
+// console.log nur mit ?debug in der URL (Produktiv: still; warn/error bleiben)
+if (!/[?&]debug\b/.test(location.search)) { const _n = function(){}; console.log = _n; console.debug = _n; }
 const $ = id => document.getElementById(id);
 const qsa = s => [...document.querySelectorAll(s)];
 const num = v => { if (v === null || v === undefined || v === '') return null; const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) ? n : null; };
@@ -75,6 +77,9 @@ const state = {
 // ── Three.js Variablen ────────────────────────────────────────────
 let scene, camera, perspCamera, orthoCamera, isOrtho=false, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot, railGroup;
 let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup;
+// On-Demand-Rendering: nur rendern wenn nötig (spart GPU/CPU/Akku im Leerlauf)
+let _renderFrames = 3;
+function requestRender(n) { _renderFrames = Math.max(_renderFrames, n || 2); }
 var objekteGroups = [];
 var effektorGroups = [];
 var positionerGroups = [];
@@ -166,6 +171,8 @@ function init3d() {
   transformControls.addEventListener('dragging-changed', e => controls.enabled = !e.value);
   transformControls.addEventListener('objectChange', onAxisObjectMoved);
   scene.add(transformControls);
+  controls.addEventListener('change', () => requestRender());
+  transformControls.addEventListener('change', () => requestRender());
 
   tcpMarker = new THREE.Group();
   tcpMarker.add(new THREE.Mesh(
@@ -273,6 +280,7 @@ function resize() {
     perspCamera.aspect = w / h;
     perspCamera.updateProjectionMatrix();
   }
+  requestRender();
 }
 function _orthoUpdateFrustum(aspect) {
   const dist = orthoCamera.position.distanceTo(controls.target);
@@ -311,7 +319,14 @@ function toggleCameraMode() {
 }
 
 
-function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
+function animate() {
+  requestAnimationFrame(animate);
+  const simActive = !!(state && state.simulation && state.simulation.active);
+  if (_renderFrames > 0 || simActive) {
+    renderer.render(scene, camera);
+    if (_renderFrames > 0) _renderFrames--;
+  }
+}
 
 // ── Transforms ─────────────────────────────────────────────────────
 function defaultRobotTr() { return { x: 0, y: 0, z: 0, rx: -90, ry: 0, rz: -90 }; }
@@ -511,6 +526,7 @@ function applyJointRotations() {
   scene.updateMatrixWorld(true);
   updateSkeletonPositions();
   try { window.cableSystem?.refresh(); } catch(e) { console.warn('[CableSystem] refresh:', e); }
+  requestRender();
 }
 
 function parseReferencePose() {
@@ -905,7 +921,13 @@ function partKey(n) {
 }
 function isTool(f) { const n = norm(f.name||f); const tool = norm(state.tcp.auftragen.toolStl||state.toolName); return n===tool||/tool1_tcp|tool|tcp|meltio/.test(n); }
 function findStl(stem) { const s = norm(stem); return state.stls.find(f=>norm(f.name)===s)?.name || state.stls.find(f=>norm(f.name).includes(s)||s.includes(norm(f.name)))?.name || null; }
-function clearGroup(g) { while (g.children.length) g.remove(g.children[0]); }
+function clearGroup(g) {
+  while (g.children.length) {
+    const c = g.children[0];
+    if (c.traverse) c.traverse(o => { if (o.geometry && o.geometry.dispose) o.geometry.dispose(); });
+    g.remove(c);
+  }
+}
 
 async function loadStls() {
   Object.entries(state.axisStlParts||{}).forEach(([ax,parts]) => {
@@ -1459,7 +1481,7 @@ function simulateAxis(axisIndex){
 }
 
 // ── Render-Funktionen ──────────────────────────────────────────────
-function renderAll(){try{window.cableSystem?._updateSideCard?.();}catch(e){}renderAxisStlRows();renderRows();updateAxisPointVisuals();renderTcp();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';}
+function renderAll(){try{window.cableSystem?._updateSideCard?.();}catch(e){}renderAxisStlRows();renderRows();updateAxisPointVisuals();renderTcp();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';requestRender();}
 
 
 function setParamTab(tab) {
