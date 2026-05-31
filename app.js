@@ -1902,6 +1902,9 @@ $('om-submit')?.addEventListener('click',()=>{
   rebuildObjektMesh(idx);
   renderObjRows(); renderRows();
   $('objModal').style.display='none';
+  if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
+  if (typeof requestRender === 'function') requestRender(3);
+  try { if (renderer && scene && camera) renderer.render(scene, camera); } catch(e){}
 });
 
 // ── Positionierer ─────────────────────────────────────────────────
