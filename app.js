@@ -2409,20 +2409,107 @@ function _deleteElementOfMesh(mesh) {
   return false;
 }
 
-// Entf-Taste: aktuell per Gimbal angeklicktes Element/Part löschen (mit Bestätigung)
-document.addEventListener('keydown', e => {
-  if (e.key !== 'Delete') return;
-  const t = e.target, tag = (t && t.tagName) || '';
-  if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (t && t.isContentEditable)) return;
-  if (!_gimbalActive || !_gimbalPickedMesh || !transformControls.object) return;
-  const mesh = _gimbalPickedMesh;
+// Element/Part löschen (mit Bestätigung) – wiederverwendbar für Entf-Taste und Struktur-Baum
+function _deleteMesh(mesh) {
+  if (!mesh) return;
   const found = _findPartByName(mesh.name);
   const label = found ? (found.part.name + '  (' + found.ax + ')') : (mesh.name || 'Element');
   if (!window.confirm('Löschen: ' + label + ' ?')) return;
   transformControls.detach(); _gimbalTarget = null; _gimbalPickedMesh = null; _clearSelHighlight();
   if (found) _deletePartAt(found.ax, found.idx);
   else if (!_deleteElementOfMesh(mesh)) { _rebuildAllAfterDelete(); }
+  if (_treeOpen) _renderBodyTree();
   requestRender();
+}
+
+// Entf-Taste: aktuell per Gimbal angeklicktes Element/Part löschen
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Delete') return;
+  const t = e.target, tag = (t && t.tagName) || '';
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (t && t.isContentEditable)) return;
+  if (!_gimbalActive || !_gimbalPickedMesh || !transformControls.object) return;
+  _deleteMesh(_gimbalPickedMesh);
+});
+
+// ── Körper-Struktur (Baum): ein-/ausblendbar, anklicken + löschen ──
+var _treeOpen = false;
+
+function _bodyTreeData() {
+  const all = _getGimbalMeshes();
+  const groups = new Map();
+  const labelFor = (type, idx) => {
+    if (type==='obj'){ const o=state.objekte[idx]; return 'Objekt Label'+(o&&o.labelNum||idx+1)+(o&&o.name?(' — '+o.name):''); }
+    if (type==='eff'){ const e=state.effektoren[idx]; return 'Effektor '+(idx+1)+(e&&e.name?(' — '+e.name):''); }
+    if (type==='umf'){ return 'Umgebung '+(idx+1); }
+    if (type==='pos'){ const p=state.positioners[idx]; return 'Positionierer '+(idx+1)+(p&&p.name?(' — '+p.name):''); }
+    if (type==='fix'){ const f=state.festeObjekte[idx]; return 'Festes Objekt '+(idx+1)+(f&&f.name?(' — '+f.name):''); }
+    if (type==='rail'){ return 'Schiene'; }
+    return type+' '+idx;
+  };
+  all.forEach(d => {
+    const key = d.type+':'+d.idx;
+    if (!groups.has(key)) groups.set(key, {type:d.type, idx:d.idx, grp:d.grp, label:labelFor(d.type,d.idx), meshes:[]});
+    groups.get(key).meshes.push(d);
+  });
+  return [...groups.values()];
+}
+
+function _selectDescriptor(desc, hlTarget) {
+  if (!_gimbalActive) $('gimbalToggle')?.click();   // Auswahl aktivieren
+  _gimbalTarget = {type:desc.type, idx:desc.idx, grp:desc.grp};
+  _gimbalPickedMesh = desc.mesh;
+  transformControls.setMode(_gimbalMode);
+  transformControls.setSize(0.8);
+  transformControls.attach(desc.grp);
+  _applySelHighlight(hlTarget || desc.grp);
+  requestRender();
+}
+
+function _renderBodyTree() {
+  const host = $('bodyTreeList'); if (!host) return;
+  host.innerHTML = '';
+  const data = _bodyTreeData();
+  if (!data.length) { host.innerHTML = '<div style="color:#4a6a8a;font-size:11px;padding:6px">Keine Körper erkannt</div>'; return; }
+  data.forEach(node => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:3px 2px';
+    const name = document.createElement('span');
+    name.textContent = node.label;
+    name.style.cssText = 'flex:1;cursor:pointer;color:#cfe3f0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    name.onclick = () => _selectDescriptor({mesh:node.meshes[0].mesh, type:node.type, idx:node.idx, grp:node.grp}, node.grp);
+    const del = document.createElement('button');
+    del.textContent = '✕'; del.title = 'Element löschen';
+    del.style.cssText = 'background:none;border:none;color:#f87171;cursor:pointer;font-size:12px;padding:0 2px';
+    del.onclick = ev => { ev.stopPropagation(); _deleteMesh(node.meshes[0].mesh); };
+    row.appendChild(name); row.appendChild(del); host.appendChild(row);
+    if (node.meshes.length > 1) {
+      node.meshes.forEach(d => {
+        const leaf = document.createElement('div');
+        leaf.style.cssText = 'display:flex;align-items:center;gap:6px;padding:2px 2px 2px 18px';
+        const ln = document.createElement('span');
+        ln.textContent = d.mesh.name || '(Teil)';
+        ln.style.cssText = 'flex:1;cursor:pointer;color:#9fb8c8;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+        ln.onclick = () => _selectDescriptor(d, d.mesh);
+        const ld = document.createElement('button');
+        ld.textContent = '✕'; ld.title = 'Teil löschen';
+        ld.style.cssText = 'background:none;border:none;color:#f87171;cursor:pointer;font-size:11px;padding:0 2px';
+        ld.onclick = ev => { ev.stopPropagation(); _deleteMesh(d.mesh); };
+        leaf.appendChild(ln); leaf.appendChild(ld); host.appendChild(leaf);
+      });
+    }
+  });
+}
+
+$('treeToggle')?.addEventListener('click', () => {
+  _treeOpen = !_treeOpen;
+  const p = $('bodyTreePanel'); if (p) p.style.display = _treeOpen ? '' : 'none';
+  $('treeToggle')?.classList.toggle('on', _treeOpen);
+  if (_treeOpen) _renderBodyTree();
+});
+$('bodyTreeClose')?.addEventListener('click', () => {
+  _treeOpen = false;
+  const p = $('bodyTreePanel'); if (p) p.style.display = 'none';
+  $('treeToggle')?.classList.remove('on');
 });
 
 // ── Messtool ──────────────────────────────────────────────────────

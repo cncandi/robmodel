@@ -319,6 +319,7 @@ header.top .title    { display: none !important; }
         <button id="gimbalToggle"><svg class="ico"><use href="#i-move"/></svg>Gimbal ein/aus</button>
         <button id="gimbalModeBtn"><svg class="ico"><use href="#i-reset"/></svg>Gimbal: T / R</button>
         <button id="measureBtn"><svg class="ico"><use href="#i-ruler"/></svg>Messen</button>
+        <button id="treeToggle"><svg class="ico"><use href="#i-points"/></svg>Struktur</button>
         <div class="mnusep"></div>
         <button id="axisLabelBtn"><svg class="ico"><use href="#i-tag"/></svg>Labels ein/aus</button>
         <button id="robotVisBtn"><svg class="ico"><use href="#i-eye"/></svg>Roboter ein/aus</button>
@@ -706,6 +707,13 @@ header.top .title    { display: none !important; }
 </div>
 
 <!-- ── Mess-Ergebnis Panel ──────────────────────────────────── -->
+<div id="bodyTreePanel" style="display:none;position:fixed;top:120px;right:16px;z-index:1200;background:rgba(5,11,20,.96);border:1px solid rgba(37,99,235,.5);border-radius:6px;padding:10px 12px;font-family:monospace;color:#d8e8f0;min-width:240px;max-width:340px;max-height:62vh;overflow:auto">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <span style="color:#60a5fa;font-size:10px;letter-spacing:.08em">KÖRPER-STRUKTUR</span>
+    <button id="bodyTreeClose" style="background:none;border:none;color:#6a8fa8;cursor:pointer;font-size:14px">✕</button>
+  </div>
+  <div id="bodyTreeList"></div>
+</div>
 <div id="measurePanel" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:1200;background:rgba(5,11,20,.95);border:1px solid rgba(37,99,235,.5);border-radius:6px;padding:14px 20px;font-family:monospace;font-size:12px;color:#d8e8f0;min-width:280px;pointer-events:none">
   <div style="color:#60a5fa;font-size:10px;letter-spacing:.08em;margin-bottom:8px">MESSUNG</div>
   <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:center">
@@ -1048,7 +1056,7 @@ header.top .title    { display: none !important; }
 
 </div><!-- .wrap -->
 
-<script type="module" src="app.js?v=20260531h"></script>
+<script type="module" src="app.js?v=20260531i"></script>
 <!-- ── ROBLIB UPLOAD MODAL ──────────────────────────────────── -->
 <div id="roblibModal" class="rl-overlay" style="display:none">
   <div class="rl-modal">
