@@ -780,6 +780,7 @@ function selectAxisPoint(i) {
   } else {
     transformControls.detach();
   }
+  requestRender();
 }
 
 // ── STEP / OCCT Import ─────────────────────────────────────────────
@@ -2211,13 +2212,14 @@ function _gimbalPick(event) {
   const allMeshes = _getGimbalMeshes();
   if(!allMeshes.length) return;
   const hits = rc.intersectObjects(allMeshes.map(m=>m.mesh), false);
-  if(!hits.length){ transformControls.detach(); _gimbalTarget=null; return; }
+  if(!hits.length){ transformControls.detach(); _gimbalTarget=null; requestRender(); return; }
   const hit = allMeshes.find(m=>m.mesh===hits[0].object);
   if(!hit) return;
   _gimbalTarget = hit;
   transformControls.setMode(_gimbalMode);
   transformControls.setSize(0.8);
   transformControls.attach(hit.grp);
+  requestRender();
 }
 
 function _gimbalChanged() {
@@ -2264,6 +2266,7 @@ function _gimbalChanged() {
       ['x','y','z','rx','ry','rz'].forEach(k=>{ const el=$('umf-'+k); if(el) el.value=bo[k]||0; });
     }
   }
+  requestRender();
 }
 
 // Wire up gimbal toggle
@@ -2287,6 +2290,7 @@ $('gimbalToggle')?.addEventListener('click',()=>{
     const selected = axisMeshes[state.selectedAxis];
     if(selected) transformControls.attach(selected);
   }
+  requestRender();
 });
 
 $('gimbalModeBtn')?.addEventListener('click',()=>{
@@ -2294,6 +2298,7 @@ $('gimbalModeBtn')?.addEventListener('click',()=>{
   const btn=$('gimbalModeBtn');
   btn.textContent = _gimbalMode==='translate' ? 'T' : 'R';
   if(_gimbalTarget) transformControls.setMode(_gimbalMode);
+  requestRender();
 });
 
 // ── Messtool ──────────────────────────────────────────────────────
