@@ -2336,9 +2336,9 @@ $('gimbalToggle')?.addEventListener('click',()=>{
 
 $('gimbalModeBtn')?.addEventListener('click',()=>{
   _gimbalMode = _gimbalMode==='translate' ? 'rotate' : 'translate';
-  const btn=$('gimbalModeBtn');
-  btn.textContent = _gimbalMode==='translate' ? 'T' : 'R';
-  if(_gimbalTarget) transformControls.setMode(_gimbalMode);
+  const lbl=$('gimbalModeLbl'); if(lbl) lbl.textContent = _gimbalMode==='rotate' ? 'Drehen' : 'Verschieben';
+  $('gimbalModeBtn')?.classList.toggle('on', _gimbalMode==='rotate');
+  if(transformControls) transformControls.setMode(_gimbalMode);
   requestRender();
 });
 
