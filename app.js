@@ -4466,7 +4466,7 @@ function applyStationConfig(cfg, stlBufs) {
   if (c.rail) applyRailConfig(c.rail, stlBufs);
   (c.positioners||[]).forEach(p => applyPositionerConfig(p, stlBufs));
   (c.labels||[]).forEach(l => applyLabelConfig(l, stlBufs));
-  (c.fixtures||[]).forEach(f => applyFixtureConfig(f));
+  (c.fixtures||[]).forEach(f => applyFixtureConfig(f, stlBufs));
   (c.effectors||[]).forEach(e => applyEffectorConfig(e, stlBufs));
   (c.environment||[]).forEach(e => applyEnvironmentConfig(e, stlBufs));
 }
