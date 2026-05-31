@@ -321,6 +321,7 @@ function toggleCameraMode() {
   });
   requestRender();
 }
+window.toggleCameraMode = toggleCameraMode;
 
 
 function animate() {
@@ -2482,7 +2483,7 @@ $('measureBtn')?.addEventListener('click',()=>{
   const btn = $('measureBtn');
   const panel = $('measurePanel');
   if(_measureActive){
-    btn.style.background='rgba(37,99,235,.3)'; btn.style.borderColor='rgba(37,99,235,.6)'; btn.style.color='#60a5fa';
+    btn?.classList.add('on'); $('rib-measure')?.classList.add('on');
     if(panel) panel.style.display='';
     _measureReset();
     renderer.domElement.addEventListener('pointerdown', _measurePick);
@@ -2490,7 +2491,7 @@ $('measureBtn')?.addEventListener('click',()=>{
     _gimbalWasOn = _gimbalActive;
     if(_gimbalActive) $('gimbalToggle').click();
   } else {
-    btn.style.background='rgba(255,255,255,.05)'; btn.style.borderColor='rgba(255,255,255,.15)'; btn.style.color='#6a8fa8';
+    btn?.classList.remove('on'); $('rib-measure')?.classList.remove('on');
     if(panel) panel.style.display='none';
     renderer.domElement.removeEventListener('pointerdown', _measurePick);
     _measureReset();
@@ -2526,8 +2527,10 @@ function setView(view){
   if(view==='top')camera.up.set(0,1,0);else if(view==='bottom')camera.up.set(0,-1,0);else camera.up.set(0,0,1);
   camera.updateProjectionMatrix();controls.update();
   qsa('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+  document.querySelectorAll('.rib-btn[data-view]').forEach(b=>b.classList.toggle('on', b.dataset.view===view));
   requestRender();
 }
+window.setView = setView;
 
 // Nächstgelegene Standard-Ansicht zur aktuellen Kamera ermitteln
 function _nearestView(){
