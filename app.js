@@ -1741,6 +1741,8 @@ function rebuildUmfMesh(i) {
     const geo=u.objectType==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
     grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:u.color||0x3a5a7a,shininess:60,transparent:true,opacity:0.85,side:THREE.DoubleSide})));
   }
+  if (typeof requestRender === 'function') requestRender();
+  if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
 }
 
 function rebuildObjektMesh(i) {
@@ -1818,6 +1820,8 @@ function rebuildEffMesh(effIdx) {
       grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:eff.color||0x607080,shininess:60,transparent:true,opacity:.85})));
     }
   }
+  if (typeof requestRender === 'function') requestRender();
+  if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
 }
 
 function openObjModal(editIdx) {
@@ -1990,6 +1994,8 @@ function rebuildPositionerMesh(i) {
     scene.add(containerGrp);
   }
   positionerGroups[i]={containerGrp, pivotGrp, meshGrp, pivotSphere:sphereGrp};
+  if (typeof requestRender === 'function') requestRender();
+  if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
 }
 
 function rebuildAllPositioners(){
@@ -2113,6 +2119,8 @@ function rebuildFixMesh(i) {
     const geo=o.type==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
     g.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:o.color||0x607080,transparent:true,opacity:0.6,side:THREE.DoubleSide})));
   }
+  if (typeof requestRender === 'function') requestRender();
+  if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
 }
 
 function openFixModal(editIdx) {
@@ -3357,6 +3365,8 @@ function rebuildRailMeshes() {
     updateAxisPointVisuals();
     updateSkeletonPositions();
   }
+  if (typeof requestRender === 'function') requestRender();
+  if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
 }
 
 $('railAddBtn')?.addEventListener('click',()=>{
