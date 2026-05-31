@@ -312,10 +312,11 @@ function toggleCameraMode() {
   const lbl = isOrtho ? 'Ortho' : 'Perspektive';
   ['camModeBtn','rib-cammode'].forEach(id => {
     const b = $(id); if(!b) return;
-    b.classList.toggle('on', !isOrtho);
+    b.classList.toggle('on', isOrtho);
     const t = [...b.childNodes].find(n => n.nodeType===3 && n.textContent.trim());
     if(t) t.textContent = lbl;
   });
+  requestRender();
 }
 
 
@@ -2545,6 +2546,26 @@ function setView(view){
   if(view==='top')camera.up.set(0,1,0);else if(view==='bottom')camera.up.set(0,-1,0);else camera.up.set(0,0,1);
   camera.updateProjectionMatrix();controls.update();
   qsa('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+  requestRender();
+}
+
+// Nächstgelegene Standard-Ansicht zur aktuellen Kamera ermitteln
+function _nearestView(){
+  if(!camera || !controls) return 'top';
+  const v = camera.position.clone().sub(controls.target);
+  if (v.lengthSq() < 1e-9) return 'top';
+  v.normalize();
+  const cand = [
+    ['top',    new THREE.Vector3(0,0,1)],
+    ['bottom', new THREE.Vector3(0,0,-1)],
+    ['front',  new THREE.Vector3(0,-1,0)],
+    ['back',   new THREE.Vector3(0,1,0)],
+    ['left',   new THREE.Vector3(-1,0,0)],
+    ['right',  new THREE.Vector3(1,0,0)],
+  ];
+  let best='top', bd=-Infinity;
+  for (const [name,dir] of cand){ const d=v.dot(dir); if(d>bd){bd=d;best=name;} }
+  return best;
 }
 
 // ── Achsen-STL UI ──────────────────────────────────────────────
@@ -4341,7 +4362,7 @@ $('applyStlRotBtn').onclick = () => {
   meshes.clear();
   loadStls().then(() => { renderRows(); });
 };
-$('toggleGrid').onclick   = () => grid.visible = !grid.visible;
+$('toggleGrid').onclick   = () => { grid.visible = !grid.visible; const on=grid.visible; $('toggleGrid').classList.toggle('on',on); $('rib-grid')?.classList.toggle('on',on); requestRender(); };
 
 // camera mode init: ortho default
 toggleCameraMode();
@@ -4411,13 +4432,15 @@ $('robotVisBtn')?.addEventListener('click', () => {
 $('axisLabelBtn')?.addEventListener('click', () => {
   _axisLabelsVisible = !_axisLabelsVisible;
   axisPointGroup.traverse(o => { if (o.userData.isAxisLabel) o.visible = _axisLabelsVisible; });
-  const btn = $('axisLabelBtn');
-  if (btn) {
-    btn.style.background = _axisLabelsVisible ? 'rgba(37,99,235,.2)' : 'rgba(255,255,255,.05)';
-    btn.style.borderColor = _axisLabelsVisible ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.15)';
-    btn.style.color = _axisLabelsVisible ? '#60a5fa' : '#6a8fa8';
-  }
+  $('axisLabelBtn')?.classList.toggle('on', _axisLabelsVisible);
+  $('rib-labels')?.classList.toggle('on', _axisLabelsVisible);
+  requestRender();
 });
+// Initiale Aktiv-Farbe für Toggle-Buttons (Grid/Label standardmäßig an)
+$('toggleGrid')?.classList.toggle('on', !!(grid && grid.visible));
+$('rib-grid')?.classList.toggle('on', !!(grid && grid.visible));
+$('axisLabelBtn')?.classList.toggle('on', _axisLabelsVisible);
+$('rib-labels')?.classList.toggle('on', _axisLabelsVisible);
 initAxisStlEvents();
 // Theme laden + Button
 try { const saved = localStorage.getItem('robmodel_theme'); if(saved !== null) applyTheme(parseInt(saved)); } catch(e){}
@@ -4446,6 +4469,22 @@ if($('refPose'))$('refPose').addEventListener('input',()=>{setJointAnglesToRefer
 ['rX','rY','rZ','rRx','rRy','rRz','tX','tY','tZ','tRx','tRy','tRz'].forEach(id=>{const el=$(id);if(el)el.addEventListener('input',applyTransforms);});
 qsa('.tab').forEach(t=>t.onclick=()=>{state.activeTcp=t.dataset.mode;renderTcp();});
 qsa('[data-view]').forEach(b=>{b.addEventListener('click',e=>{if(e.button===0)setView(b.dataset.view);});b.addEventListener('mousedown',e=>{if(e.button!==0)e.preventDefault();});});
+
+// Mittlere Maustaste: Klick (kein Ziehen) → zur nächstgelegenen Standardansicht springen
+(function(){
+  let mid=null;
+  const el = renderer && renderer.domElement;
+  if(!el) return;
+  el.addEventListener('pointerdown', e=>{ if(e.button===1){ mid={x:e.clientX,y:e.clientY}; e.preventDefault(); } });
+  el.addEventListener('pointerup', e=>{
+    if(e.button===1 && mid){
+      const dx=Math.abs(e.clientX-mid.x), dy=Math.abs(e.clientY-mid.y);
+      mid=null;
+      if(dx<5 && dy<5) setView(_nearestView());
+    }
+  });
+  el.addEventListener('auxclick', e=>{ if(e.button===1) e.preventDefault(); });
+})();
 
 document.addEventListener('input',e=>{
   const t=e.target;
