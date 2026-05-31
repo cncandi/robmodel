@@ -2185,6 +2185,7 @@ $('fm-submit')?.addEventListener('click',()=>{
 var _gimbalActive = false;
 var _gimbalMode = 'translate'; // 'translate' | 'rotate'
 var _gimbalTarget = null; // {type, idx, grp}
+var _gimbalPickedMesh = null; // zuletzt angeklicktes Mesh (für Entf-Löschen)
 
 function _getGimbalMeshes() {
   const result = [];
@@ -2213,10 +2214,11 @@ function _gimbalPick(event) {
   const allMeshes = _getGimbalMeshes();
   if(!allMeshes.length) return;
   const hits = rc.intersectObjects(allMeshes.map(m=>m.mesh), false);
-  if(!hits.length){ transformControls.detach(); _gimbalTarget=null; requestRender(); return; }
+  if(!hits.length){ return; } // Leertreffer: Auswahl unverändert lassen (Achspunkt nicht stören)
   const hit = allMeshes.find(m=>m.mesh===hits[0].object);
   if(!hit) return;
   _gimbalTarget = hit;
+  _gimbalPickedMesh = hits[0].object;
   transformControls.setMode(_gimbalMode);
   transformControls.setSize(0.8);
   transformControls.attach(hit.grp);
@@ -2287,7 +2289,7 @@ $('gimbalToggle')?.addEventListener('click',()=>{
     transformControls.removeEventListener('objectChange', _gimbalChanged);
     transformControls.addEventListener('objectChange', onAxisObjectMoved); // restore axis listener
     renderer.domElement.removeEventListener('pointerdown', _gimbalPick);
-    transformControls.detach(); _gimbalTarget=null;
+    transformControls.detach(); _gimbalTarget=null; _gimbalPickedMesh=null;
     const selected = axisMeshes[state.selectedAxis];
     if(selected) transformControls.attach(selected);
   }
@@ -2384,41 +2386,20 @@ function _deleteElementOfMesh(mesh) {
   return false;
 }
 
-function _deletePick(event) {
-  if (!_deleteActive) return;
-  if (event.button !== undefined && event.button !== 0) return;
-  const rect = renderer.domElement.getBoundingClientRect();
-  const cx = event.clientX != null ? event.clientX : (event.touches && event.touches[0] && event.touches[0].clientX);
-  if (cx == null) return;
-  const cy = event.clientY != null ? event.clientY : (event.touches[0] && event.touches[0].clientY);
-  const mx = ((cx-rect.left)/rect.width)*2-1, my = -((cy-rect.top)/rect.height)*2+1;
-  const rc = new THREE.Raycaster();
-  rc.setFromCamera(new THREE.Vector2(mx,my), camera);
-  const hits = rc.intersectObjects(_deleteCandidateMeshes(), false);
-  if (!hits.length) return;
-  const mesh = hits[0].object;
+// Entf-Taste: aktuell per Gimbal angeklicktes Element/Part löschen (mit Bestätigung)
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Delete') return;
+  const t = e.target, tag = (t && t.tagName) || '';
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (t && t.isContentEditable)) return;
+  if (!_gimbalActive || !_gimbalPickedMesh || !transformControls.object) return;
+  const mesh = _gimbalPickedMesh;
   const found = _findPartByName(mesh.name);
   const label = found ? (found.part.name + '  (' + found.ax + ')') : (mesh.name || 'Element');
   if (!window.confirm('Löschen: ' + label + ' ?')) return;
+  transformControls.detach(); _gimbalTarget = null; _gimbalPickedMesh = null;
   if (found) _deletePartAt(found.ax, found.idx);
   else if (!_deleteElementOfMesh(mesh)) { _rebuildAllAfterDelete(); }
   requestRender();
-}
-
-$('deleteToggle')?.addEventListener('click', () => {
-  _deleteActive = !_deleteActive;
-  const btn = $('deleteToggle');
-  if (_deleteActive) {
-    if (_gimbalActive) $('gimbalToggle')?.click();           // andere Modi aus
-    if (typeof _measureActive !== 'undefined' && _measureActive) $('measureBtn')?.click();
-    if (btn){ btn.style.background='rgba(204,51,51,.3)'; btn.style.borderColor='rgba(204,51,51,.6)'; btn.style.color='#f87171'; }
-    renderer.domElement.style.cursor = 'crosshair';
-    renderer.domElement.addEventListener('pointerdown', _deletePick);
-  } else {
-    if (btn){ btn.style.background=''; btn.style.borderColor=''; btn.style.color=''; }
-    renderer.domElement.style.cursor = '';
-    renderer.domElement.removeEventListener('pointerdown', _deletePick);
-  }
 });
 
 // ── Messtool ──────────────────────────────────────────────────────
