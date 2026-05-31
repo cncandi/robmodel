@@ -2545,13 +2545,32 @@ function _uniquePartName(base, ax) {
   return cand;
 }
 
+function _cloneEntryKeepBuf(o) {
+  const c = { ...o };
+  if (o.boxOffset) c.boxOffset = { ...o.boxOffset };
+  if (o.offset)    c.offset    = { ...o.offset };
+  if (o.stlFile)   c.stlFile   = { ...o.stlFile };       // buf-Referenz bleibt
+  if (Array.isArray(o.teile)) c.teile = o.teile.map(t => ({ ...t, offset: t.offset ? { ...t.offset } : undefined, stlFile: t.stlFile ? { ...t.stlFile } : undefined }));
+  return c;
+}
+
 $('stlCopyBtn')?.addEventListener('click', () => {
-  if (_gimbalTarget && _gimbalTarget.type === 'obj' && state.objekte[_gimbalTarget.idx]) {
-    const idx = _gimbalTarget.idx, o = state.objekte[idx];
-    const lbl = 'Label' + (o.labelNum || idx + 1);
-    _stlClipboard = { kind: 'obj', entry: JSON.parse(JSON.stringify(o)),
-      parts: (state.axisStlParts[lbl] || []).map(p => ({ name: p.name, color: p.color, buf: p.buf })) };
-    return;
+  const t = _gimbalTarget;
+  if (t && t.type != null) {
+    const i = t.idx;
+    if (t.type === 'obj' && state.objekte[i]) {
+      const o = state.objekte[i], lbl = 'Label' + (o.labelNum || i + 1);
+      _stlClipboard = { kind: 'obj', entry: _cloneEntryKeepBuf(o), parts: (state.axisStlParts[lbl] || []).map(p => ({ name: p.name, color: p.color, buf: p.buf })) };
+      return;
+    }
+    if (t.type === 'fix' && state.festeObjekte[i]) { _stlClipboard = { kind: 'fix', entry: _cloneEntryKeepBuf(state.festeObjekte[i]) }; return; }
+    if (t.type === 'umf' && state.umfElemente[i]) { _stlClipboard = { kind: 'umf', entry: _cloneEntryKeepBuf(state.umfElemente[i]) }; return; }
+    if (t.type === 'eff' && state.effektoren[i]) { _stlClipboard = { kind: 'eff', entry: _cloneEntryKeepBuf(state.effektoren[i]) }; return; }
+    if (t.type === 'pos' && state.positioners[i]) {
+      const p = state.positioners[i], eAx = 'E' + (p.eNum || i + 2);
+      _stlClipboard = { kind: 'pos', entry: _cloneEntryKeepBuf(p), parts: (state.axisStlParts[eAx] || []).map(pp => ({ name: pp.name, color: pp.color, buf: pp.buf })) };
+      return;
+    }
   }
   const mesh = _gimbalPickedMesh, found = mesh ? _findPartByName(mesh.name) : null;
   if (found) { _stlClipboard = { kind: 'part', ax: found.ax, part: { name: found.part.name, color: found.part.color, buf: found.part.buf } }; return; }
@@ -2559,25 +2578,58 @@ $('stlCopyBtn')?.addEventListener('click', () => {
 });
 
 $('stlPasteBtn')?.addEventListener('click', () => {
-  if (!_stlClipboard) { alert('Nichts zum Einfügen. Erst „Kopieren".'); return; }
-  if (_stlClipboard.kind === 'obj') {
+  const cb = _stlClipboard;
+  if (!cb) { alert('Nichts zum Einfügen. Erst „Kopieren".'); return; }
+  if (cb.kind === 'obj') {
     const used = new Set((state.objekte || []).map(o => o.labelNum || 0));
     let nl = 1; while (used.has(nl)) nl++;
-    const entry = JSON.parse(JSON.stringify(_stlClipboard.entry));
+    const entry = _cloneEntryKeepBuf(cb.entry);
     entry.labelNum = nl;
     entry.name = (entry.name || 'Objekt') + ' Kopie';
     entry.boxOffset = entry.boxOffset || { x:0,y:0,z:0,rx:0,ry:0,rz:0 };
-    entry.boxOffset.x = (entry.boxOffset.x || 0) + 100;   // versetzt einfügen
+    entry.boxOffset.x = (entry.boxOffset.x || 0) + 100;
     const lbl = 'Label' + nl;
-    state.axisStlParts[lbl] = _stlClipboard.parts.map(p => ({ name: _uniquePartName(p.name, lbl), color: p.color, buf: p.buf }));
+    state.axisStlParts[lbl] = (cb.parts || []).map(p => ({ name: _uniquePartName(p.name, lbl), color: p.color, buf: p.buf }));
     state.objekte.push(entry); objekteGroups.push(null);
     rebuildObjektMesh(state.objekte.length - 1);
     if (typeof renderObjRows === 'function') renderObjRows();
     if (typeof renderRows === 'function') renderRows();
-  } else if (_stlClipboard.kind === 'part') {
-    const ax = _stlClipboard.ax;
+  } else if (cb.kind === 'fix') {
+    const e = _cloneEntryKeepBuf(cb.entry);
+    e.name = (e.name || 'Objekt') + ' Kopie';
+    e.x = (e.x || 0) + 100;
+    state.festeObjekte.push(e); festeGrps.push(null);
+    rebuildFixMesh(state.festeObjekte.length - 1);
+    if (typeof renderFixRows === 'function') renderFixRows();
+  } else if (cb.kind === 'umf') {
+    const e = _cloneEntryKeepBuf(cb.entry);
+    e.name = (e.name || 'Umgebung') + ' Kopie';
+    e.offset = e.offset || { x:0,y:0,z:0,rx:0,ry:0,rz:0 }; e.offset.x = (e.offset.x || 0) + 100;
+    state.umfElemente.push(e); umfGroups.push(null);
+    rebuildUmfMesh(state.umfElemente.length - 1);
+    if (typeof renderUmfRows === 'function') renderUmfRows();
+  } else if (cb.kind === 'eff') {
+    const e = _cloneEntryKeepBuf(cb.entry);
+    e.name = (e.name || 'Effektor') + ' Kopie';
+    e.offset = e.offset || { x:0,y:0,z:0,rx:0,ry:0,rz:0 }; e.offset.x = (e.offset.x || 0) + 100;
+    state.effektoren.push(e); effektorGroups.push(null);
+    rebuildEffMesh(state.effektoren.length - 1);
+    if (typeof renderEffRow === 'function') renderEffRow();
+  } else if (cb.kind === 'pos') {
+    const used = new Set((state.positioners || []).map(p => p.eNum || 0));
+    let en = 2; while (used.has(en)) en++;
+    const e = _cloneEntryKeepBuf(cb.entry); e.eNum = en;
+    e.name = (e.name || 'Positionierer') + ' Kopie';
+    e.boxOffset = e.boxOffset || { x:0,y:0,z:0,rx:0,ry:0,rz:0 }; e.boxOffset.x = (e.boxOffset.x || 0) + 100;
+    const eAx = 'E' + en;
+    state.axisStlParts[eAx] = (cb.parts || []).map(p => ({ name: _uniquePartName(p.name, eAx), color: p.color, buf: p.buf }));
+    state.positioners.push(e); positionerGroups.push(null);
+    rebuildPositionerMesh(state.positioners.length - 1);
+    if (typeof renderPosRows === 'function') renderPosRows();
+  } else if (cb.kind === 'part') {
+    const ax = cb.ax;
     if (!state.axisStlParts[ax]) state.axisStlParts[ax] = [];
-    state.axisStlParts[ax].push({ name: _uniquePartName(_stlClipboard.part.name, ax), color: _stlClipboard.part.color, buf: _stlClipboard.part.buf });
+    state.axisStlParts[ax].push({ name: _uniquePartName(cb.part.name, ax), color: cb.part.color, buf: cb.part.buf });
     _rebuildAllAfterDelete();
   }
   if (_treeOpen) _renderBodyTree();
