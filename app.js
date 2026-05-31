@@ -964,6 +964,8 @@ async function loadStls() {
     } catch (e) { console.warn(e); }
   }
   rebuildRobotKinematics(); applyTransforms(); fitCamera();
+  if (typeof requestRender === 'function') requestRender();
+  if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
 }
 
 // ── ZIP / JSON ─────────────────────────────────────────────────────
@@ -1765,6 +1767,8 @@ function rebuildObjektMesh(i) {
   else if(ax==='X+')cx=p; else if(ax==='X-')cx=-p; else if(ax==='Y+')cy=p; else if(ax==='Y-')cy=-p; else if(ax==='Z+')cz=p; else cz=-p;
   grp.position.set((bo.x||0)+cx,(bo.y||0)+cy,(bo.z||0)+cz);
   grp.rotation.set((bo.rx||0)*deg,(bo.ry||0)*deg,(bo.rz||0)*deg,'XYZ');
+  if (typeof requestRender === 'function') requestRender();
+  if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
 }
 
 function rebuildEffMesh(effIdx) {
