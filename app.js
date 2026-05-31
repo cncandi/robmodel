@@ -2469,17 +2469,17 @@ function _renderBodyTree() {
   const host = $('bodyTreeList'); if (!host) return;
   host.innerHTML = '';
   const data = _bodyTreeData();
-  if (!data.length) { host.innerHTML = '<div style="color:#4a6a8a;font-size:11px;padding:6px">Keine Körper erkannt</div>'; return; }
+  if (!data.length) { host.innerHTML = '<div style="color:var(--txt3);font-size:11px;padding:6px">Keine Körper erkannt</div>'; return; }
   data.forEach(node => {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:3px 2px';
     const name = document.createElement('span');
     name.textContent = node.label;
-    name.style.cssText = 'flex:1;cursor:pointer;color:#cfe3f0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    name.style.cssText = 'flex:1;cursor:pointer;color:var(--txt);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
     name.onclick = () => _selectDescriptor({mesh:node.meshes[0].mesh, type:node.type, idx:node.idx, grp:node.grp}, node.grp);
     const del = document.createElement('button');
     del.textContent = '✕'; del.title = 'Element löschen';
-    del.style.cssText = 'background:none;border:none;color:#f87171;cursor:pointer;font-size:12px;padding:0 2px';
+    del.style.cssText = 'background:none;border:none;color:#cc3333;cursor:pointer;font-size:12px;padding:0 2px';
     del.onclick = ev => { ev.stopPropagation(); _deleteMesh(node.meshes[0].mesh); };
     row.appendChild(name); row.appendChild(del); host.appendChild(row);
     if (node.meshes.length > 1) {
@@ -2488,11 +2488,11 @@ function _renderBodyTree() {
         leaf.style.cssText = 'display:flex;align-items:center;gap:6px;padding:2px 2px 2px 18px';
         const ln = document.createElement('span');
         ln.textContent = d.mesh.name || '(Teil)';
-        ln.style.cssText = 'flex:1;cursor:pointer;color:#9fb8c8;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+        ln.style.cssText = 'flex:1;cursor:pointer;color:var(--txt2);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
         ln.onclick = () => _selectDescriptor(d, d.mesh);
         const ld = document.createElement('button');
         ld.textContent = '✕'; ld.title = 'Teil löschen';
-        ld.style.cssText = 'background:none;border:none;color:#f87171;cursor:pointer;font-size:11px;padding:0 2px';
+        ld.style.cssText = 'background:none;border:none;color:#cc3333;cursor:pointer;font-size:11px;padding:0 2px';
         ld.onclick = ev => { ev.stopPropagation(); _deleteMesh(d.mesh); };
         leaf.appendChild(ln); leaf.appendChild(ld); host.appendChild(leaf);
       });
