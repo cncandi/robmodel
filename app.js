@@ -696,6 +696,7 @@ function pickAxisPoint(event) {
   if (transformControls && transformControls.dragging) return;
   // TransformControls vorher lösen damit er den Klick nicht schluckt
   if (transformControls) transformControls.detach();
+  _clearSelHighlight();
 
   const rect = renderer.domElement.getBoundingClientRect();
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -2192,6 +2193,30 @@ var _gimbalWasOn = false;  // Merker für Messtool
 var _gimbalMode = 'translate'; // 'translate' | 'rotate'
 var _gimbalTarget = null; // {type, idx, grp}
 var _gimbalPickedMesh = null; // zuletzt angeklicktes Mesh (für Entf-Löschen)
+var _selHighlight = []; // [{mat, emissive, intensity}] für Auswahl-Hervorhebung
+
+function _clearSelHighlight() {
+  _selHighlight.forEach(o => { try { o.mat.emissive.copy(o.emissive); o.mat.emissiveIntensity = o.intensity; } catch(e){} });
+  _selHighlight = [];
+}
+
+function _applySelHighlight(grp) {
+  _clearSelHighlight();
+  if (!grp || !grp.traverse) return;
+  grp.traverse(c => {
+    if (c.isMesh && c.material) {
+      const mats = Array.isArray(c.material) ? c.material : [c.material];
+      mats.forEach(mat => {
+        if (mat && mat.emissive) {
+          _selHighlight.push({ mat, emissive: mat.emissive.clone(), intensity: mat.emissiveIntensity });
+          mat.emissive.setHex(0x2563eb);
+          mat.emissiveIntensity = 0.6;
+        }
+      });
+    }
+  });
+  requestRender();
+}
 
 function _getGimbalMeshes() {
   const result = [];
@@ -2228,6 +2253,7 @@ function _gimbalPick(event) {
   transformControls.setMode(_gimbalMode);
   transformControls.setSize(0.8);
   transformControls.attach(hit.grp);
+  _applySelHighlight(hit.grp);
   requestRender();
 }
 
@@ -2288,7 +2314,7 @@ $('gimbalToggle')?.addEventListener('click',()=>{
   } else {
     btn?.classList.remove('on'); $('rib-gimbal')?.classList.remove('on');
     if(modeBtn) modeBtn.style.display='none';
-    transformControls.detach(); _gimbalTarget=null; _gimbalPickedMesh=null;
+    transformControls.detach(); _gimbalTarget=null; _gimbalPickedMesh=null; _clearSelHighlight();
   }
   requestRender();
 });
@@ -2393,7 +2419,7 @@ document.addEventListener('keydown', e => {
   const found = _findPartByName(mesh.name);
   const label = found ? (found.part.name + '  (' + found.ax + ')') : (mesh.name || 'Element');
   if (!window.confirm('Löschen: ' + label + ' ?')) return;
-  transformControls.detach(); _gimbalTarget = null; _gimbalPickedMesh = null;
+  transformControls.detach(); _gimbalTarget = null; _gimbalPickedMesh = null; _clearSelHighlight();
   if (found) _deletePartAt(found.ax, found.idx);
   else if (!_deleteElementOfMesh(mesh)) { _rebuildAllAfterDelete(); }
   requestRender();
