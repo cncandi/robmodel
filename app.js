@@ -2512,6 +2512,68 @@ $('bodyTreeClose')?.addEventListener('click', () => {
   $('treeToggle')?.classList.remove('on');
 });
 
+// ── Bearbeiten: Kopieren / Einfügen / Löschen von STL-Körpern ──────
+var _stlClipboard = null;
+
+function _uniquePartName(base, ax) {
+  const exists = (nm) => {
+    const n = norm(nm);
+    if ((state.axisStlParts[ax] || []).some(p => norm(p.name) === n)) return true;
+    if ((state.stls || []).some(f => norm(f.name) === n)) return true;
+    if (state.buffers && state.buffers.has && state.buffers.has(nm)) return true;
+    return false;
+  };
+  let stem = base || 'teil', ext = '';
+  const m = (base || '').match(/^(.*)(\.[^.]+)$/); if (m) { stem = m[1]; ext = m[2]; }
+  let cand = stem + '_kopie' + ext, i = 2;
+  while (exists(cand)) { cand = stem + '_kopie' + i + ext; i++; }
+  return cand;
+}
+
+$('stlCopyBtn')?.addEventListener('click', () => {
+  if (_gimbalTarget && _gimbalTarget.type === 'obj' && state.objekte[_gimbalTarget.idx]) {
+    const idx = _gimbalTarget.idx, o = state.objekte[idx];
+    const lbl = 'Label' + (o.labelNum || idx + 1);
+    _stlClipboard = { kind: 'obj', entry: JSON.parse(JSON.stringify(o)),
+      parts: (state.axisStlParts[lbl] || []).map(p => ({ name: p.name, color: p.color, buf: p.buf })) };
+    return;
+  }
+  const mesh = _gimbalPickedMesh, found = mesh ? _findPartByName(mesh.name) : null;
+  if (found) { _stlClipboard = { kind: 'part', ax: found.ax, part: { name: found.part.name, color: found.part.color, buf: found.part.buf } }; return; }
+  alert('Bitte zuerst einen Körper auswählen (anklicken).');
+});
+
+$('stlPasteBtn')?.addEventListener('click', () => {
+  if (!_stlClipboard) { alert('Nichts zum Einfügen. Erst „Kopieren".'); return; }
+  if (_stlClipboard.kind === 'obj') {
+    const used = new Set((state.objekte || []).map(o => o.labelNum || 0));
+    let nl = 1; while (used.has(nl)) nl++;
+    const entry = JSON.parse(JSON.stringify(_stlClipboard.entry));
+    entry.labelNum = nl;
+    entry.name = (entry.name || 'Objekt') + ' Kopie';
+    entry.boxOffset = entry.boxOffset || { x:0,y:0,z:0,rx:0,ry:0,rz:0 };
+    entry.boxOffset.x = (entry.boxOffset.x || 0) + 100;   // versetzt einfügen
+    const lbl = 'Label' + nl;
+    state.axisStlParts[lbl] = _stlClipboard.parts.map(p => ({ name: _uniquePartName(p.name, lbl), color: p.color, buf: p.buf }));
+    state.objekte.push(entry); objekteGroups.push(null);
+    rebuildObjektMesh(state.objekte.length - 1);
+    if (typeof renderObjRows === 'function') renderObjRows();
+    if (typeof renderRows === 'function') renderRows();
+  } else if (_stlClipboard.kind === 'part') {
+    const ax = _stlClipboard.ax;
+    if (!state.axisStlParts[ax]) state.axisStlParts[ax] = [];
+    state.axisStlParts[ax].push({ name: _uniquePartName(_stlClipboard.part.name, ax), color: _stlClipboard.part.color, buf: _stlClipboard.part.buf });
+    _rebuildAllAfterDelete();
+  }
+  if (_treeOpen) _renderBodyTree();
+  requestRender();
+});
+
+$('stlDeleteBtn')?.addEventListener('click', () => {
+  if (!_gimbalPickedMesh) { alert('Bitte zuerst einen Körper auswählen (anklicken).'); return; }
+  _deleteMesh(_gimbalPickedMesh);
+});
+
 // ── Messtool ──────────────────────────────────────────────────────
 var _measureActive = false;
 var _measureP1 = null;
@@ -4523,6 +4585,7 @@ $('robotVisBtn')?.addEventListener('click', () => {
     btn.style.color       = cols[_robotVisState];
     btn.title             = tips[_robotVisState];
   }
+  requestRender();
 });
 
 $('axisLabelBtn')?.addEventListener('click', () => {
