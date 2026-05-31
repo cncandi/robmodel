@@ -169,7 +169,10 @@ function init3d() {
 
   transformControls = new TransformControls(camera, renderer.domElement);
   transformControls.addEventListener('dragging-changed', e => controls.enabled = !e.value);
-  transformControls.addEventListener('objectChange', onAxisObjectMoved);
+  transformControls.addEventListener('objectChange', () => {
+    if (_gimbalTarget && transformControls.object === _gimbalTarget.grp) _gimbalChanged();
+    else onAxisObjectMoved();
+  });
   scene.add(transformControls);
   controls.addEventListener('change', () => requestRender());
   transformControls.addEventListener('change', () => requestRender());
@@ -702,6 +705,7 @@ function pickAxisPoint(event) {
   const hit = raycaster.intersectObjects(axisMeshes, false)[0];
   raycaster.layers.mask = _prevLayers;
   if (hit) {
+    _gimbalTarget = null; _gimbalPickedMesh = null;  // Element-Auswahl aufheben
     state.selectedAxis = hit.object.userData.axisIndex;
     selectAxisPoint(state.selectedAxis);
     event.preventDefault();
@@ -2182,7 +2186,8 @@ $('fm-submit')?.addEventListener('click',()=>{
   renderFixRows();
   $('fixModal').style.display='none';
 });
-var _gimbalActive = false;
+var _gimbalActive = true;  // Auswahl/Verschieben standardmäßig aktiv
+var _gimbalWasOn = false;  // Merker für Messtool
 var _gimbalMode = 'translate'; // 'translate' | 'rotate'
 var _gimbalTarget = null; // {type, idx, grp}
 var _gimbalPickedMesh = null; // zuletzt angeklicktes Mesh (für Entf-Löschen)
@@ -2277,21 +2282,12 @@ $('gimbalToggle')?.addEventListener('click',()=>{
   _gimbalActive = !_gimbalActive;
   const btn=$('gimbalToggle'), modeBtn=$('gimbalModeBtn');
   if(_gimbalActive){
-    btn.style.background='rgba(37,99,235,.3)'; btn.style.borderColor='rgba(37,99,235,.6)'; btn.style.color='#60a5fa';
+    btn?.classList.add('on'); $('rib-gimbal')?.classList.add('on');
     if(modeBtn) modeBtn.style.display='';
-    transformControls.detach();
-    transformControls.removeEventListener('objectChange', onAxisObjectMoved); // pause axis listener
-    transformControls.addEventListener('objectChange', _gimbalChanged);
-    renderer.domElement.addEventListener('pointerdown', _gimbalPick);
   } else {
-    btn.style.background='rgba(255,255,255,.05)'; btn.style.borderColor='rgba(255,255,255,.15)'; btn.style.color='#6a8fa8';
+    btn?.classList.remove('on'); $('rib-gimbal')?.classList.remove('on');
     if(modeBtn) modeBtn.style.display='none';
-    transformControls.removeEventListener('objectChange', _gimbalChanged);
-    transformControls.addEventListener('objectChange', onAxisObjectMoved); // restore axis listener
-    renderer.domElement.removeEventListener('pointerdown', _gimbalPick);
     transformControls.detach(); _gimbalTarget=null; _gimbalPickedMesh=null;
-    const selected = axisMeshes[state.selectedAxis];
-    if(selected) transformControls.attach(selected);
   }
   requestRender();
 });
@@ -2490,13 +2486,16 @@ $('measureBtn')?.addEventListener('click',()=>{
     if(panel) panel.style.display='';
     _measureReset();
     renderer.domElement.addEventListener('pointerdown', _measurePick);
-    // Pause gimbal if active
+    // Gimbal/Auswahl während des Messens pausieren
+    _gimbalWasOn = _gimbalActive;
     if(_gimbalActive) $('gimbalToggle').click();
   } else {
     btn.style.background='rgba(255,255,255,.05)'; btn.style.borderColor='rgba(255,255,255,.15)'; btn.style.color='#6a8fa8';
     if(panel) panel.style.display='none';
     renderer.domElement.removeEventListener('pointerdown', _measurePick);
     _measureReset();
+    // Auswahl wiederherstellen, falls vorher aktiv
+    if(_gimbalWasOn && !_gimbalActive) $('gimbalToggle').click();
   }
 });
 
@@ -4422,6 +4421,8 @@ $('toggleGrid')?.classList.toggle('on', !!(grid && grid.visible));
 $('rib-grid')?.classList.toggle('on', !!(grid && grid.visible));
 $('axisLabelBtn')?.classList.toggle('on', _axisLabelsVisible);
 $('rib-labels')?.classList.toggle('on', _axisLabelsVisible);
+$('gimbalToggle')?.classList.toggle('on', _gimbalActive);
+$('rib-gimbal')?.classList.toggle('on', _gimbalActive);
 initAxisStlEvents();
 // Theme laden + Button
 try { const saved = localStorage.getItem('robmodel_theme'); if(saved !== null) applyTheme(parseInt(saved)); } catch(e){}
@@ -4523,6 +4524,7 @@ document.addEventListener('change', e => {
 });
 
 renderer.domElement.addEventListener('pointerdown', pickAxisPoint);
+renderer.domElement.addEventListener('pointerdown', _gimbalPick);
 
 // Drag & Drop auf Viewer
 const dz=$('dropZone');
