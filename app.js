@@ -1491,7 +1491,7 @@ function simulateAxis(axisIndex){
 }
 
 // ── Render-Funktionen ──────────────────────────────────────────────
-function renderAll(){try{window.cableSystem?._updateSideCard?.();}catch(e){}renderAxisStlRows();renderRows();updateAxisPointVisuals();renderTcp();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';requestRender();}
+function renderAll(){try{window.cableSystem?._updateSideCard?.();}catch(e){}renderAxisStlRows();renderRows();updateAxisPointVisuals();renderTcp();const b=$('fileBadge');b.textContent=state.files.length?`${state.stls.length} STL · ${state.xmls.length} XML · ${state.jsons.length} JSON`:state.mode==='package'?'Package geladen':'Keine Datei geladen';requestRender();if(typeof _treeOpen!=='undefined'&&_treeOpen&&typeof _renderBodyTree==='function'){try{_renderBodyTree();}catch(e){}}}
 
 
 function setParamTab(tab) {
@@ -4840,6 +4840,9 @@ async function _dropAssignStl(file, cat) {
       objekteGroups.push(null); rebuildObjektMesh(oidx); renderObjRows?.();
     }
     renderAll();enableSave?.();
+    if (typeof requestRender === 'function') requestRender(3);
+    if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
+    try { if (renderer && scene && camera) renderer.render(scene, camera); } catch(e){}
   } catch(err){alert('Fehler: '+err.message);}
   _dropPendingStls.shift();_dropNextStl();
 }
