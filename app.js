@@ -1006,6 +1006,8 @@ function resetData() {
   ['A1','A2','A3','A4','A5','A6'].forEach(ax => { state.axisStlMap[ax]=null; state.axisStlParts[ax]=[]; });
   updateEffTcpMarker();
   renderEffRow?.(); renderUmfRows?.();
+  if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
+  if (typeof requestRender === 'function') requestRender();
 }
 
 function enableSave()  { $('downloadJson').disabled=false; $('downloadZip').disabled=false; $('roblibBtn').disabled=false; }
@@ -1050,6 +1052,7 @@ clearAll._inner = function(clearSkeleton) {
   // Render minimal
   renderRailRows(); renderObjRows(); renderPosRows(); renderFixRows();
   renderAxisStlRows(); renderRows(); renderTcp();
+  if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
   setView('iso');
 }
 
