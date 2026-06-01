@@ -2313,12 +2313,14 @@ function _gimbalPick(event) {
 
 function _gimbalChanged() {
   if(!_gimbalTarget || !transformControls.object) return;
-  const grp = transformControls.object;
+  // Bei translate-Modus ist transformControls.object der Proxy (Bbox-Mitte), nicht die echte Gruppe.
+  // Die echte Gruppen-Position wurde im objectChange-Handler bereits in _gimbalTarget.grp geschrieben.
+  const realGrp = _gimbalTarget.grp;
   const deg = 180/Math.PI;
   const {type, idx} = _gimbalTarget;
   const bo = {
-    x: Math.round(grp.position.x), y: Math.round(grp.position.y), z: Math.round(grp.position.z),
-    rx: Math.round(grp.rotation.x*deg), ry: Math.round(grp.rotation.y*deg), rz: Math.round(grp.rotation.z*deg)
+    x: Math.round(realGrp.position.x), y: Math.round(realGrp.position.y), z: Math.round(realGrp.position.z),
+    rx: Math.round(realGrp.rotation.x*deg), ry: Math.round(realGrp.rotation.y*deg), rz: Math.round(realGrp.rotation.z*deg)
   };
 
   function fillModal(prefix) {
