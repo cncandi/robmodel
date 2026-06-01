@@ -169,21 +169,27 @@ function init3d() {
   mouse = new THREE.Vector2();
 
   transformControls = new TransformControls(camera, renderer.domElement);
-  transformControls.addEventListener('dragging-changed', e => controls.enabled = !e.value);
+  transformControls.addEventListener('dragging-changed', e => {
+    controls.enabled = !e.value;
+    if (e.value && _gimbalMode === 'translate' && _gimbalProxy) {
+      // Drag-Start: aktuelle Positionen merken
+      _proxyStartPos.copy(_gimbalProxy.position);
+      _groupStartPositions = _gimbalTargets.map(t => ({ grp: t.grp, startPos: t.grp.position.clone() }));
+    }
+  });
   transformControls.addEventListener('objectChange', () => {
     if (_gimbalTarget && transformControls.object === _gimbalProxy) {
-      // Proxy bewegt → Gruppe mitziehen (translate) bzw. Rotation direkt übertragen
-      const grp = _gimbalTarget.grp;
       if (_gimbalMode === 'translate') {
-        // Gruppe = Proxy-WorldPos - Offset
-        const pw = new THREE.Vector3();
-        _gimbalProxy.getWorldPosition(pw);
-        grp.position.copy(pw.sub(_gimbalProxyOffset));
-        _gimbalProxy.rotation.copy(grp.rotation); // Proxy-Rotation nicht driften lassen
+        // Delta = aktuelle Proxy-Pos - Start-Proxy-Pos
+        const delta = new THREE.Vector3().subVectors(_gimbalProxy.position, _proxyStartPos);
+        _groupStartPositions.forEach(({grp, startPos}) => {
+          grp.position.copy(startPos).add(delta);
+        });
       } else {
-        grp.rotation.copy(_gimbalProxy.rotation);
+        if (_gimbalTarget) _gimbalTarget.grp.rotation.copy(_gimbalProxy.rotation);
       }
-      _gimbalChanged();
+      _gimbalTargets.forEach(t => { _gimbalTarget = t; _gimbalChanged(); });
+      _gimbalTarget = _gimbalTargets[_gimbalTargets.length - 1] || null;
     } else if (_gimbalTarget && transformControls.object === _gimbalTarget.grp) {
       _gimbalChanged();
     } else {
@@ -2234,6 +2240,9 @@ var _gimbalPickedMesh = null; // zuletzt angeklicktes Mesh (für Entf-Löschen)
 var _gimbalProxy = null; // Proxy-Object3D: Gimbal sitzt an Bbox-Mitte
 var _gimbalProxyOffset = new THREE.Vector3(); // Offset Proxy-World-Pos → Gruppe-Origin
 var _selHighlight = []; // [{mat, emissive, intensity}] für Auswahl-Hervorhebung
+var _gimbalTargets = []; // Multi-Selektion: alle aktuell selektierten Targets
+var _proxyStartPos = new THREE.Vector3(); // Proxy-Position beim Drag-Start
+var _groupStartPositions = []; // [{grp, startPos}] beim Drag-Start
 
 function _clearSelHighlight() {
   _selHighlight.forEach(o => { try { o.mat.emissive.copy(o.emissive); o.mat.emissiveIntensity = o.intensity; } catch(e){} });
@@ -2242,18 +2251,41 @@ function _clearSelHighlight() {
 
 function _applySelHighlight(grp) {
   _clearSelHighlight();
-  if (!grp || !grp.traverse) return;
-  grp.traverse(c => {
-    if (c.isMesh && c.material) {
-      const mats = Array.isArray(c.material) ? c.material : [c.material];
-      mats.forEach(mat => {
-        if (mat && mat.emissive) {
-          _selHighlight.push({ mat, emissive: mat.emissive.clone(), intensity: mat.emissiveIntensity });
-          mat.emissive.setHex(0x2563eb);
-          mat.emissiveIntensity = 0.6;
-        }
-      });
-    }
+  const grps = grp ? [grp] : [];
+  grps.forEach(g => {
+    if (!g || !g.traverse) return;
+    g.traverse(c => {
+      if (c.isMesh && c.material) {
+        const mats = Array.isArray(c.material) ? c.material : [c.material];
+        mats.forEach(mat => {
+          if (mat && mat.emissive) {
+            _selHighlight.push({ mat, emissive: mat.emissive.clone(), intensity: mat.emissiveIntensity });
+            mat.emissive.setHex(0x2563eb);
+            mat.emissiveIntensity = 0.6;
+          }
+        });
+      }
+    });
+  });
+  requestRender();
+}
+
+function _applySelHighlightAll() {
+  _clearSelHighlight();
+  _gimbalTargets.forEach(t => {
+    if (!t.grp || !t.grp.traverse) return;
+    t.grp.traverse(c => {
+      if (c.isMesh && c.material) {
+        const mats = Array.isArray(c.material) ? c.material : [c.material];
+        mats.forEach(mat => {
+          if (mat && mat.emissive) {
+            _selHighlight.push({ mat, emissive: mat.emissive.clone(), intensity: mat.emissiveIntensity });
+            mat.emissive.setHex(0x2563eb);
+            mat.emissiveIntensity = 0.6;
+          }
+        });
+      }
+    });
   });
   requestRender();
 }
@@ -2270,6 +2302,29 @@ function _getGimbalMeshes() {
   return result;
 }
 
+function _attachGimbalToTargets() {
+  if (!_gimbalTargets.length) return;
+  transformControls.setMode(_gimbalMode);
+  transformControls.setSize(0.8);
+  if (_gimbalMode === 'translate') {
+    // Proxy an Bbox-Mitte aller selektierten Gruppen
+    const combinedBox = new THREE.Box3();
+    _gimbalTargets.forEach(t => combinedBox.expandByObject(t.grp));
+    const center = new THREE.Vector3();
+    combinedBox.getCenter(center);
+    if (!_gimbalProxy) { _gimbalProxy = new THREE.Object3D(); scene.add(_gimbalProxy); }
+    _gimbalProxy.position.copy(center);
+    _gimbalProxy.rotation.set(0,0,0);
+    _proxyStartPos.copy(center);
+    _groupStartPositions = _gimbalTargets.map(t => ({ grp: t.grp, startPos: t.grp.position.clone() }));
+    transformControls.attach(_gimbalProxy);
+  } else {
+    // Rotate: nur an primärem Target
+    transformControls.attach(_gimbalTarget.grp);
+  }
+  _applySelHighlightAll();
+}
+
 function _gimbalPick(event) {
   if(!_gimbalActive) return;
   if(event.button !== undefined && event.button !== 0) return; // left click only
@@ -2284,30 +2339,35 @@ function _gimbalPick(event) {
   const allMeshes = _getGimbalMeshes();
   if(!allMeshes.length) return;
   const hits = rc.intersectObjects(allMeshes.map(m=>m.mesh), false);
-  if(!hits.length){ return; } // Leertreffer: Auswahl unverändert lassen (Achspunkt nicht stören)
+  if(!hits.length){ return; } // Leertreffer: Auswahl unverändert lassen
   const hit = allMeshes.find(m=>m.mesh===hits[0].object);
   if(!hit) return;
-  _gimbalTarget = hit;
-  _gimbalPickedMesh = hits[0].object;
-  transformControls.setMode(_gimbalMode);
-  transformControls.setSize(0.8);
-  if (_gimbalMode === 'translate') {
-    // Gimbal-Proxy an Bbox-Mittelpunkt der Gruppe setzen
-    const _bbox = new THREE.Box3().setFromObject(hit.grp);
-    const _center = new THREE.Vector3();
-    _bbox.getCenter(_center);
-    const _grpWorld = new THREE.Vector3();
-    hit.grp.getWorldPosition(_grpWorld);
-    _gimbalProxyOffset.subVectors(_center, _grpWorld);
-    if (!_gimbalProxy) { _gimbalProxy = new THREE.Object3D(); scene.add(_gimbalProxy); }
-    _gimbalProxy.position.copy(_center);
-    _gimbalProxy.rotation.copy(hit.grp.rotation);
-    transformControls.attach(_gimbalProxy);
+
+  if (event.ctrlKey || event.metaKey) {
+    // Strg+Klick: Toggle in Multiselection
+    const existingIdx = _gimbalTargets.findIndex(t => t.grp === hit.grp);
+    if (existingIdx >= 0) {
+      _gimbalTargets.splice(existingIdx, 1);
+    } else {
+      _gimbalTargets.push(hit);
+    }
+    if (!_gimbalTargets.length) {
+      transformControls.detach();
+      _gimbalTarget = null;
+      _gimbalPickedMesh = null;
+      _clearSelHighlight();
+      requestRender();
+      return;
+    }
+    _gimbalTarget = _gimbalTargets[_gimbalTargets.length - 1];
   } else {
-    // Rotate: direkt an Gruppe attachen
-    transformControls.attach(hit.grp);
+    // Normaler Klick: Einzelselektion
+    _gimbalTargets = [hit];
+    _gimbalTarget = hit;
   }
-  _applySelHighlight(hit.grp);
+
+  _gimbalPickedMesh = hits[0].object;
+  _attachGimbalToTargets();
   requestRender();
 }
 
