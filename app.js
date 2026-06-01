@@ -76,6 +76,7 @@ const state = {
 
 // ── Three.js Variablen ────────────────────────────────────────────
 let scene, camera, perspCamera, orthoCamera, isOrtho=false, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot, railGroup;
+let railFixGrp, railMovGrp;
 let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup;
 // On-Demand-Rendering: nur rendern wenn nötig (spart GPU/CPU/Akku im Leerlauf)
 let _renderFrames = 3;
@@ -2259,9 +2260,8 @@ function _applySelHighlight(grp) {
 
 function _getGimbalMeshes() {
   const result = [];
-  if(typeof railGroup!=='undefined' && railGroup) {
-    railGroup.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'rail', idx:0, grp:railGroup}); });
-  }
+  if(railFixGrp) railFixGrp.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'rail-fix', idx:0, grp:railFixGrp}); });
+  if(railMovGrp) railMovGrp.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'rail-mov', idx:0, grp:railMovGrp}); });
   (objekteGroups||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'obj', idx:i, grp:g}); }); });
   (positionerGroups||[]).forEach((g,i)=>{ if(g?.containerGrp) g.containerGrp.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'pos', idx:i, grp:g.containerGrp}); }); });
   (festeGrps||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'fix', idx:i, grp:g}); }); });
@@ -2334,6 +2334,34 @@ function _gimbalChanged() {
     // Rail panel inputs
     const panel=$('rail-panel');
     if(panel){ ['x','y','z','rx','ry','rz'].forEach(k=>{ const inp=panel.querySelector(`#rail-${k}`); if(inp) inp.value=bo[k]||0; }); }
+  } else if((type==='rail-fix'||type==='rail-mov') && state.schienen[0]){
+    // Koordinaten relativ zum Roboter-Base
+    const bx=state.robotTr?.x||0, by=state.robotTr?.y||0, bz=state.robotTr?.z||0;
+    const part = type==='rail-fix' ? 'fixedPart' : 'movingPart';
+    const r = state.schienen[0];
+    // Beim beweglichen Teil: Verfahrvektor herausrechnen
+    var cx=0,cy=0,cz=0;
+    if(type==='rail-mov'){
+      const ax=r.axis||'Y+', p=r.ePos||0;
+      if(ax==='X+') cx=p; else if(ax==='X-') cx=-p;
+      else if(ax==='Y+') cy=p; else if(ax==='Y-') cy=-p;
+      else if(ax==='Z+') cz=p; else cz=-p;
+    }
+    const pos = {
+      x: Math.round(grp.position.x - cx),
+      y: Math.round(grp.position.y - cy),
+      z: Math.round(grp.position.z - cz),
+      rx: Math.round(grp.rotation.x*deg),
+      ry: Math.round(grp.rotation.y*deg),
+      rz: Math.round(grp.rotation.z*deg)
+    };
+    if(!r[part]) r[part]={};
+    Object.assign(r[part], pos);
+    // Modal-Felder updaten
+    const pfx = type==='rail-fix' ? 'rm-fix' : 'rm-mov';
+    if($('railModal')?.style.display!=='none'){
+      ['x','y','z','rx','ry','rz'].forEach(k=>{ const el=$(pfx+'-'+k); if(el) el.value=pos[k]||0; });
+    }
   } else if(type==='obj' && state.objekte[idx]){
     state.objekte[idx].boxOffset=bo;
     if($('objModal')?.style.display!=='none') fillModal('om');
@@ -3407,6 +3435,7 @@ function renderRailRows() {
 function rebuildRailMeshes() {
   if(!railGroup) return;
   clearGroup(railGroup);
+  railFixGrp=null; railMovGrp=null;
   const r = (state.schienen||[])[0];
   if(!r) return;
   const ax=r.axis||'Y+', p=r.ePos||0, deg=Math.PI/180;
@@ -3430,8 +3459,6 @@ function rebuildRailMeshes() {
       mesh=new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:color||0x2563eb,transparent:true,opacity:0.4}));
     }
     if(!mesh) return null;
-    mesh.position.set(part.x||0, part.y||0, part.z||0);
-    mesh.rotation.set((part.rx||0)*deg,(part.ry||0)*deg,(part.rz||0)*deg,'XYZ');
     return mesh;
   }
 
@@ -3441,16 +3468,21 @@ function rebuildRailMeshes() {
   else if (ax==='Y+') cy= p; else if(ax==='Y-') cy=-p;
   else if (ax==='Z+') cz= p; else             cz=-p;
 
-  // Festes Bauteil → bleibt an fixem Ort
+  // Festes Bauteil → eigene Gruppe, bleibt an fixem Ort
+  if(!railFixGrp){ railFixGrp=new THREE.Group(); railGroup.add(railFixGrp); }
+  clearGroup(railFixGrp);
   const fixMesh=buildPartMesh(r.fixedPart, 0x607080);
-  if(fixMesh){ fixMesh.position.set((r.fixedPart.x||0),(r.fixedPart.y||0),(r.fixedPart.z||0)); railGroup.add(fixMesh); }
+  if(fixMesh){ railFixGrp.add(fixMesh); }
+  railFixGrp.position.set(r.fixedPart?.x||0, r.fixedPart?.y||0, r.fixedPart?.z||0);
+  railFixGrp.rotation.set((r.fixedPart?.rx||0)*deg,(r.fixedPart?.ry||0)*deg,(r.fixedPart?.rz||0)*deg,'XYZ');
 
-  // Bewegliches Bauteil → fährt mit
+  // Bewegliches Bauteil → eigene Gruppe, fährt mit
+  if(!railMovGrp){ railMovGrp=new THREE.Group(); railGroup.add(railMovGrp); }
+  clearGroup(railMovGrp);
   const movMesh=buildPartMesh(r.movingPart, 0x2563eb);
-  if(movMesh){
-    movMesh.position.set((r.movingPart.x||0)+cx,(r.movingPart.y||0)+cy,(r.movingPart.z||0)+cz);
-    railGroup.add(movMesh);
-  }
+  if(movMesh){ railMovGrp.add(movMesh); }
+  railMovGrp.position.set((r.movingPart?.x||0)+cx,(r.movingPart?.y||0)+cy,(r.movingPart?.z||0)+cz);
+  railMovGrp.rotation.set((r.movingPart?.rx||0)*deg,(r.movingPart?.ry||0)*deg,(r.movingPart?.rz||0)*deg,'XYZ');
 
   railGroup.position.set(0,0,0);
   railGroup.rotation.set(0,0,0);
@@ -4381,6 +4413,7 @@ async function loadComponentFromZip(zip) {
     (festeGrps||[]).forEach(g=>{if(g?.parent) g.parent.remove(g);}); festeGrps.length=0; state.festeObjekte=[];
   } else if (type === 'rail') {
     if(railGroup) while(railGroup.children.length) railGroup.remove(railGroup.children[0]);
+    railFixGrp=null; railMovGrp=null;
     state.schienen=[];
   } else if (type === 'positioner') {
     // append, don't clear
