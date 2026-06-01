@@ -170,8 +170,24 @@ function init3d() {
   transformControls = new TransformControls(camera, renderer.domElement);
   transformControls.addEventListener('dragging-changed', e => controls.enabled = !e.value);
   transformControls.addEventListener('objectChange', () => {
-    if (_gimbalTarget && transformControls.object === _gimbalTarget.grp) _gimbalChanged();
-    else onAxisObjectMoved();
+    if (_gimbalTarget && transformControls.object === _gimbalProxy) {
+      // Proxy bewegt → Gruppe mitziehen (translate) bzw. Rotation direkt übertragen
+      const grp = _gimbalTarget.grp;
+      if (_gimbalMode === 'translate') {
+        // Gruppe = Proxy-WorldPos - Offset
+        const pw = new THREE.Vector3();
+        _gimbalProxy.getWorldPosition(pw);
+        grp.position.copy(pw.sub(_gimbalProxyOffset));
+        _gimbalProxy.rotation.copy(grp.rotation); // Proxy-Rotation nicht driften lassen
+      } else {
+        grp.rotation.copy(_gimbalProxy.rotation);
+      }
+      _gimbalChanged();
+    } else if (_gimbalTarget && transformControls.object === _gimbalTarget.grp) {
+      _gimbalChanged();
+    } else {
+      onAxisObjectMoved();
+    }
   });
   scene.add(transformControls);
   controls.addEventListener('change', () => requestRender());
@@ -2211,6 +2227,8 @@ var _gimbalWasOn = false;  // Merker für Messtool
 var _gimbalMode = 'translate'; // 'translate' | 'rotate'
 var _gimbalTarget = null; // {type, idx, grp}
 var _gimbalPickedMesh = null; // zuletzt angeklicktes Mesh (für Entf-Löschen)
+var _gimbalProxy = null; // Proxy-Object3D: Gimbal sitzt an Bbox-Mitte
+var _gimbalProxyOffset = new THREE.Vector3(); // Offset Proxy-World-Pos → Gruppe-Origin
 var _selHighlight = []; // [{mat, emissive, intensity}] für Auswahl-Hervorhebung
 
 function _clearSelHighlight() {
@@ -2270,7 +2288,22 @@ function _gimbalPick(event) {
   _gimbalPickedMesh = hits[0].object;
   transformControls.setMode(_gimbalMode);
   transformControls.setSize(0.8);
-  transformControls.attach(hit.grp);
+  if (_gimbalMode === 'translate') {
+    // Gimbal-Proxy an Bbox-Mittelpunkt der Gruppe setzen
+    const _bbox = new THREE.Box3().setFromObject(hit.grp);
+    const _center = new THREE.Vector3();
+    _bbox.getCenter(_center);
+    const _grpWorld = new THREE.Vector3();
+    hit.grp.getWorldPosition(_grpWorld);
+    _gimbalProxyOffset.subVectors(_center, _grpWorld);
+    if (!_gimbalProxy) { _gimbalProxy = new THREE.Object3D(); scene.add(_gimbalProxy); }
+    _gimbalProxy.position.copy(_center);
+    _gimbalProxy.rotation.copy(hit.grp.rotation);
+    transformControls.attach(_gimbalProxy);
+  } else {
+    // Rotate: direkt an Gruppe attachen
+    transformControls.attach(hit.grp);
+  }
   _applySelHighlight(hit.grp);
   requestRender();
 }
