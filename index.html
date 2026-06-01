@@ -950,7 +950,7 @@ header.top .title    { display: none !important; }
 
 <!-- ── Rail-Parametrik Modal ─────────────────────────────────── -->
 <div id="railModal" class="rl-overlay" style="display:none">
-  <div class="rl-modal" style="width:min(380px,96vw)">
+  <div class="rl-modal" style="width:min(440px,96vw);max-height:90vh;overflow-y:auto">
     <div class="rl-modal-head">
       <span>🛤️ Schiene definieren</span>
       <button class="rl-close" id="railModalClose">✕</button>
@@ -958,9 +958,6 @@ header.top .title    { display: none !important; }
     <div class="rl-modal-body">
       <div class="rl-grid">
         <label class="rl-span2">Name<input id="rm-name" type="text" placeholder="Linear Track 3m"></label>
-        <label>Länge (mm)<input id="rm-length" type="number" value="2000" step="100"></label>
-        <label>Höhe (mm)<input id="rm-height" type="number" value="200" step="10"></label>
-        <label>Breite (mm)<input id="rm-width" type="number" value="400" step="10"></label>
         <label>Min (mm)<input id="rm-min" type="number" value="0" step="1"></label>
         <label>Max (mm)<input id="rm-max" type="number" value="2000" step="1"></label>
         <label>Startposition (mm)<input id="rm-start" type="number" value="0" step="1"></label>
@@ -980,34 +977,91 @@ header.top .title    { display: none !important; }
             <button class="rm-axis-btn" data-ax="Z-" style="flex:1;padding:6px;font-family:monospace;font-size:12px;border-radius:3px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8">Z-</button>
           </div>
         </label>
-        <label class="rl-span2" style="font-size:11px;color:#6a8fa8;letter-spacing:.05em">BOX VERSCHIEBUNG
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px">
-            <label style="font-size:10px;color:#6a8fa8">X mm<input id="rm-ox" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Y mm<input id="rm-oy" type="number" value="1000" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Z mm<input id="rm-oz" type="number" value="-100" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Rx °<input id="rm-orx" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Ry °<input id="rm-ory" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Rz °<input id="rm-orz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-          </div>
-        </label>
       </div>
-        <label class="rl-span2" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" id="rm-robot-moves" style="accent-color:var(--acc);width:15px;height:15px">
-          <span>Roboter verfährt (sonst Rail)</span>
-        </label>
-        <label class="rl-span2" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" id="rm-show" checked style="accent-color:var(--acc);width:15px;height:15px">
-          <span>Parametrische Box anzeigen</span>
-        </label>
-        <div class="rl-span2" style="border-top:1px solid rgba(255,255,255,.08);padding-top:10px;margin-top:2px">
-          <div style="font-size:10px;color:#6a8fa8;letter-spacing:.05em;margin-bottom:6px">STL STATT PRIMITIV</div>
-          <div id="rm-stl-display" style="font-family:monospace;font-size:11px;color:#4499cc;margin-bottom:4px;min-height:14px"></div>
-          <div style="display:flex;gap:6px">
-            <button type="button" id="rm-stl-btn" style="flex:1;padding:6px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);color:#60a5fa;border-radius:4px;cursor:pointer;font-family:monospace;font-size:11px"><svg class="ico"><use href="#i-folder"/></svg>STL laden…</button>
-            <button type="button" id="rm-stl-clear" style="padding:6px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#6a8fa8;border-radius:4px;cursor:pointer;font-size:11px">✕</button>
+
+      <!-- ── Festes Bauteil (optional) ── -->
+      <div style="border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:10px;margin-top:10px">
+        <div style="font-size:10px;color:#6a8fa8;letter-spacing:.05em;margin-bottom:8px">FESTES BAUTEIL <span style="color:#4a6a8a">(optional)</span></div>
+        <div class="rl-grid">
+          <label class="rl-span2">Typ
+            <select id="rm-fix-type" onchange="rmTypeChanged('fix')" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:5px 8px;color:#d8e8f0;font-family:monospace;font-size:12px;outline:none;width:100%;margin-top:3px">
+              <option value="none">— keines —</option>
+              <option value="box">Box</option>
+              <option value="cylinder">Cylinder</option>
+              <option value="stl">STL / OSD</option>
+            </select>
+          </label>
+          <div id="rm-fix-box-fields" style="display:contents">
+            <label>Länge mm<input id="rm-fix-length" type="number" value="2000" step="10"></label>
+            <label>Breite mm<input id="rm-fix-width"  type="number" value="400"  step="10"></label>
+            <label>Höhe mm<input id="rm-fix-height" type="number" value="200"  step="10"></label>
           </div>
-          <input id="rm-stl-file" type="file" accept=".osd,.stl,.zip" style="display:none">
+          <div id="rm-fix-cyl-fields" style="display:none;contents">
+            <label>Radius mm<input id="rm-fix-radius" type="number" value="200" step="10"></label>
+            <label>Höhe mm<input id="rm-fix-cheight" type="number" value="400" step="10"></label>
+          </div>
+          <div id="rm-fix-stl-wrap" style="display:none;grid-column:1/-1">
+            <div id="rm-fix-stl-display" style="font-family:monospace;font-size:11px;color:#4499cc;margin-bottom:4px;min-height:14px"></div>
+            <div style="display:flex;gap:6px">
+              <button type="button" id="rm-fix-stl-btn" style="flex:1;padding:5px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);color:#60a5fa;border-radius:4px;cursor:pointer;font-size:11px">📂 STL / OSD…</button>
+              <button type="button" id="rm-fix-stl-clear" style="padding:5px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#6a8fa8;border-radius:4px;cursor:pointer;font-size:11px">✕</button>
+            </div>
+            <input id="rm-fix-stl-file" type="file" accept=".osd,.stl,.zip" style="display:none">
+          </div>
+          <label class="rl-span2" style="font-size:10px;color:#6a8fa8;letter-spacing:.05em;margin-top:4px">POSITION / ROTATION
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:3px">
+              <label style="font-size:10px;color:#6a8fa8">X mm<input id="rm-fix-x"  type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+              <label style="font-size:10px;color:#6a8fa8">Y mm<input id="rm-fix-y"  type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+              <label style="font-size:10px;color:#6a8fa8">Z mm<input id="rm-fix-z"  type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+              <label style="font-size:10px;color:#6a8fa8">Rx °<input id="rm-fix-rx" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+              <label style="font-size:10px;color:#6a8fa8">Ry °<input id="rm-fix-ry" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+              <label style="font-size:10px;color:#6a8fa8">Rz °<input id="rm-fix-rz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            </div>
+          </label>
         </div>
+      </div>
+
+      <!-- ── Bewegliches Bauteil (Pflicht) ── -->
+      <div style="border:1px solid rgba(37,99,235,.35);border-radius:5px;padding:10px;margin-top:10px">
+        <div style="font-size:10px;color:#60a5fa;letter-spacing:.05em;margin-bottom:8px">BEWEGLICHES BAUTEIL <span style="color:#4a6a8a">(Roboter verfährt mit)</span></div>
+        <div class="rl-grid">
+          <label class="rl-span2">Typ
+            <select id="rm-mov-type" onchange="rmTypeChanged('mov')" style="background:#0f2030;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:5px 8px;color:#d8e8f0;font-family:monospace;font-size:12px;outline:none;width:100%;margin-top:3px">
+              <option value="box">Box</option>
+              <option value="cylinder">Cylinder</option>
+              <option value="stl">STL / OSD</option>
+            </select>
+          </label>
+          <div id="rm-mov-box-fields" style="display:contents">
+            <label>Länge mm<input id="rm-mov-length" type="number" value="600" step="10"></label>
+            <label>Breite mm<input id="rm-mov-width"  type="number" value="400" step="10"></label>
+            <label>Höhe mm<input id="rm-mov-height" type="number" value="300" step="10"></label>
+          </div>
+          <div id="rm-mov-cyl-fields" style="display:none;contents">
+            <label>Radius mm<input id="rm-mov-radius" type="number" value="200" step="10"></label>
+            <label>Höhe mm<input id="rm-mov-cheight" type="number" value="300" step="10"></label>
+          </div>
+          <div id="rm-mov-stl-wrap" style="display:none;grid-column:1/-1">
+            <div id="rm-mov-stl-display" style="font-family:monospace;font-size:11px;color:#4499cc;margin-bottom:4px;min-height:14px"></div>
+            <div style="display:flex;gap:6px">
+              <button type="button" id="rm-mov-stl-btn" style="flex:1;padding:5px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);color:#60a5fa;border-radius:4px;cursor:pointer;font-size:11px">📂 STL / OSD…</button>
+              <button type="button" id="rm-mov-stl-clear" style="padding:5px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#6a8fa8;border-radius:4px;cursor:pointer;font-size:11px">✕</button>
+            </div>
+            <input id="rm-mov-stl-file" type="file" accept=".osd,.stl,.zip" style="display:none">
+          </div>
+          <label class="rl-span2" style="font-size:10px;color:#6a8fa8;letter-spacing:.05em;margin-top:4px">POSITION / ROTATION (Offset relativ zur Verfahrposition)
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:3px">
+              <label style="font-size:10px;color:#6a8fa8">X mm<input id="rm-mov-x"  type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+              <label style="font-size:10px;color:#6a8fa8">Y mm<input id="rm-mov-y"  type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+              <label style="font-size:10px;color:#6a8fa8">Z mm<input id="rm-mov-z"  type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+              <label style="font-size:10px;color:#6a8fa8">Rx °<input id="rm-mov-rx" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+              <label style="font-size:10px;color:#6a8fa8">Ry °<input id="rm-mov-ry" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+              <label style="font-size:10px;color:#6a8fa8">Rz °<input id="rm-mov-rz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            </div>
+          </label>
+        </div>
+      </div>
+
       <button id="rm-submit" class="rl-submit" style="margin-top:12px">Übernehmen</button>
     </div>
   </div>

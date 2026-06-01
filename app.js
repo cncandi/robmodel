@@ -2170,6 +2170,7 @@ window.openFixModal=openFixModal;
 
 // ── STL-in-Modal Logik für alle Komponentenmodals ─────────────────
 var _rmStlBuf=null, _pmStlBuf=null, _omStlBuf=null, _fmStlBuf=null;
+var _rmFixStlBuf=null, _rmMovStlBuf=null;
 
 function _wireModalStl(prefix, getBufVar, setBufVar) {
   const btn=$(prefix+'-stl-btn'), input=$(prefix+'-stl-file'), clear=$(prefix+'-stl-clear'), disp=$(prefix+'-stl-display');
@@ -2190,6 +2191,8 @@ _wireModalStl('rm', ()=>_rmStlBuf, v=>{ _rmStlBuf=v; });
 _wireModalStl('pm', ()=>_pmStlBuf, v=>{ _pmStlBuf=v; });
 _wireModalStl('om', ()=>_omStlBuf, v=>{ _omStlBuf=v; });
 _wireModalStl('fm', ()=>_fmStlBuf, v=>{ _fmStlBuf=v; });
+_wireModalStl('rm-fix', ()=>_rmFixStlBuf, v=>{ _rmFixStlBuf=v; });
+_wireModalStl('rm-mov', ()=>_rmMovStlBuf, v=>{ _rmMovStlBuf=v; });
 
 // Reset STL bufs when modals open
 const _origOpenObjModal = openObjModal;
@@ -3389,7 +3392,7 @@ function renderRailRows() {
       <span style="flex:1;font-family:monospace;font-size:12px;color:var(--txt)">${r.name||'Rail'}</span>
       <button id="railDelBtn" style="min-width:28px;height:28px;cursor:pointer;background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:3px;font-size:12px">✕</button>
     </div>
-    <div style="font-size:11px;color:#6a8fa8;font-family:monospace">${r.length_mm} × ${r.width_mm} × ${r.height_mm} mm | ${r.axis}</div>
+    <div style="font-size:11px;color:#6a8fa8;font-family:monospace">${r.axis} | E${r.eNumber||1} | ${r.eMin??0}–${r.eMax??2000} mm${r.fixedPart&&r.fixedPart.type!=='none'?' | fix+mov':' | mov only'}</div>
   </div>`;
   $('railDelBtn')?.addEventListener('click',()=>{
     state.schienen=[];
@@ -3406,75 +3409,79 @@ function rebuildRailMeshes() {
   clearGroup(railGroup);
   const r = (state.schienen||[])[0];
   if(!r) return;
-  const L=r.length_mm||2000, H=r.height_mm||200, W=r.width_mm||400, ax=r.axis||'X+';
-  const p=r.ePos||0, bo=r.boxOffset||{}, deg=Math.PI/180;
+  const ax=r.axis||'Y+', p=r.ePos||0, deg=Math.PI/180;
   const eAx = 'E'+(r.eNumber||1);
-  const parts = state.axisStlParts[eAx]||[];
-  if (parts.length) {
-    parts.forEach(pt=>{
-      if(!pt.buf) return;
-      const geo=loader.parse(pt.buf.buffer||pt.buf); geo.computeVertexNormals();
-      railGroup.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:pt.color||0x2563eb,shininess:60})));
-    });
-  }
-  if (r.showBox !== false && !parts.length) {
-    const geo=(ax==='X+'||ax==='X-')?new THREE.BoxGeometry(L,H,W):
-              (ax==='Y+'||ax==='Y-')?new THREE.BoxGeometry(W,L,H):
-                                     new THREE.BoxGeometry(W,H,L);
-    railGroup.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:0x2563eb,transparent:true,opacity:0.3,side:THREE.DoubleSide})));
-  }
-  // Rail stays fixed at boxOffset
-  railGroup.position.set(bo.x||0, bo.y||0, bo.z||0);
-  railGroup.rotation.set((bo.rx||0)*deg, (bo.ry||0)*deg, (bo.rz||0)*deg, 'XYZ');
-  // Movement direction
-  var cx=0, cy=0, cz=0;
-  if      (ax==='X+') cx =  p;
-  else if (ax==='X-') cx = -p;
-  else if (ax==='Y+') cy =  p;
-  else if (ax==='Y-') cy = -p;
-  else if (ax==='Z+') cz =  p;
-  else                cz = -p;
 
-  if (r.robotMoves === true) {
-    // Roboter verfährt, Rail bleibt
-    var bx=state.robotTr?.x||0, by=state.robotTr?.y||0, bz=state.robotTr?.z||0;
-    kinematicsRoot.position.set(bx+cx, by+cy, bz+cz);
-    robotGroup.position.set(bx+cx, by+cy, bz+cz);
-    scene.updateMatrixWorld(true);
-    updateAxisPointVisuals();
-    updateSkeletonPositions();
-  } else {
-    // Rail verfährt, Roboter bleibt
-    var bx=state.robotTr?.x||0, by=state.robotTr?.y||0, bz=state.robotTr?.z||0;
-    kinematicsRoot.position.set(bx, by, bz);
-    robotGroup.position.set(bx, by, bz);
-    railGroup.position.set((bo.x||0) - cx, (bo.y||0) - cy, (bo.z||0) - cz);
-    scene.updateMatrixWorld(true);
-    updateAxisPointVisuals();
-    updateSkeletonPositions();
+  // Helper: Bauteil-Mesh bauen
+  function buildPartMesh(part, color) {
+    if(!part || part.type==='none') return null;
+    let mesh;
+    if(part.type==='stl' && part.buf) {
+      const geo=loader.parse(part.buf.buffer||part.buf); geo.computeVertexNormals();
+      mesh=new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:color||0x2563eb,shininess:60}));
+    } else if(part.type==='cylinder') {
+      const geo=new THREE.CylinderGeometry(part.radius||200,part.radius||200,part.cheight||400,32);
+      mesh=new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:color||0x2563eb,transparent:true,opacity:0.4}));
+    } else { // box
+      const L=part.length||2000,W=part.width||400,H=part.height||200;
+      const geo=(ax==='X+'||ax==='X-')?new THREE.BoxGeometry(L,H,W):
+                (ax==='Y+'||ax==='Y-')?new THREE.BoxGeometry(W,L,H):
+                                       new THREE.BoxGeometry(W,H,L);
+      mesh=new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:color||0x2563eb,transparent:true,opacity:0.4}));
+    }
+    if(!mesh) return null;
+    mesh.position.set(part.x||0, part.y||0, part.z||0);
+    mesh.rotation.set((part.rx||0)*deg,(part.ry||0)*deg,(part.rz||0)*deg,'XYZ');
+    return mesh;
   }
-  if (typeof requestRender === 'function') requestRender();
-  if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
+
+  // Verfahrvektor
+  var cx=0,cy=0,cz=0;
+  if      (ax==='X+') cx= p; else if(ax==='X-') cx=-p;
+  else if (ax==='Y+') cy= p; else if(ax==='Y-') cy=-p;
+  else if (ax==='Z+') cz= p; else             cz=-p;
+
+  // Festes Bauteil → bleibt an fixem Ort
+  const fixMesh=buildPartMesh(r.fixedPart, 0x607080);
+  if(fixMesh){ fixMesh.position.set((r.fixedPart.x||0),(r.fixedPart.y||0),(r.fixedPart.z||0)); railGroup.add(fixMesh); }
+
+  // Bewegliches Bauteil → fährt mit
+  const movMesh=buildPartMesh(r.movingPart, 0x2563eb);
+  if(movMesh){
+    movMesh.position.set((r.movingPart.x||0)+cx,(r.movingPart.y||0)+cy,(r.movingPart.z||0)+cz);
+    railGroup.add(movMesh);
+  }
+
+  railGroup.position.set(0,0,0);
+  railGroup.rotation.set(0,0,0);
+
+  // Roboter verfährt immer mit beweglichem Teil
+  var bx=state.robotTr?.x||0, by=state.robotTr?.y||0, bz=state.robotTr?.z||0;
+  kinematicsRoot.position.set(bx+cx, by+cy, bz+cz);
+  robotGroup.position.set(bx+cx, by+cy, bz+cz);
+  scene.updateMatrixWorld(true);
+  updateAxisPointVisuals();
+  updateSkeletonPositions();
+  if(typeof requestRender==='function') requestRender();
+  if(typeof _treeOpen!=='undefined' && _treeOpen && typeof _renderBodyTree==='function') _renderBodyTree();
 }
 
+window.rmTypeChanged = function(which) {
+  const t = $('rm-'+which+'-type')?.value||'box';
+  const box=$('rm-'+which+'-box-fields'), cyl=$('rm-'+which+'-cyl-fields'), stlw=$('rm-'+which+'-stl-wrap');
+  if(box) box.style.display = t==='box'?'contents':'none';
+  if(cyl) cyl.style.display = t==='cylinder'?'contents':'none';
+  if(stlw) stlw.style.display = t==='stl'?'block':'none';
+};
+
 $('railAddBtn')?.addEventListener('click',()=>{
+  _rmFixStlBuf=null; _rmMovStlBuf=null;
   const existing = (state.schienen||[])[0];
-  $('rm-name').value   = existing?.name       || '';
-  $('rm-length').value = existing?.length_mm  || 2000;
-  $('rm-height').value = existing?.height_mm  || 200;
-  $('rm-width').value  = existing?.width_mm   || 400;
-  $('rm-min').value    = existing?.eMin       ?? 0;
-  $('rm-max').value    = existing?.eMax       ?? (existing?.length_mm || 2000);
-  $('rm-start').value  = existing?.ePos       ?? 0;
-  if($('rm-show')) $('rm-show').checked = existing?.showBox !== false;
-  if($('rm-robot-moves')) $('rm-robot-moves').checked = existing?.robotMoves !== false;
-  const bo = existing?.boxOffset||{};
-  if($('rm-ox'))  $('rm-ox').value  = bo.x  ||0;
-  if($('rm-oy'))  $('rm-oy').value  = bo.y  ||0;
-  if($('rm-oz'))  $('rm-oz').value  = bo.z  ||0;
-  if($('rm-orx')) $('rm-orx').value = bo.rx ||0;
-  if($('rm-ory')) $('rm-ory').value = bo.ry ||0;
-  if($('rm-orz')) $('rm-orz').value = bo.rz ||0;
+  $('rm-name').value   = existing?.name  || '';
+  $('rm-min').value    = existing?.eMin  ?? 0;
+  $('rm-max').value    = existing?.eMax  ?? 2000;
+  $('rm-start').value  = existing?.ePos  ?? 0;
+  if($('rm-enum')) $('rm-enum').value = existing?.eNumber||1;
   _rmAxis = existing?.axis || 'Y+';
   document.querySelectorAll('.rm-axis-btn').forEach(b=>{
     const on=b.dataset.ax===_rmAxis;
@@ -3482,6 +3489,38 @@ $('railAddBtn')?.addEventListener('click',()=>{
     b.style.border=on?'1px solid rgba(37,99,235,.6)':'1px solid rgba(255,255,255,.15)';
     b.style.color=on?'#60a5fa':'#6a8fa8';
   });
+  // Festes Bauteil befüllen
+  const fp=existing?.fixedPart||{};
+  if($('rm-fix-type')) $('rm-fix-type').value=fp.type||'none';
+  if($('rm-fix-length')) $('rm-fix-length').value=fp.length||2000;
+  if($('rm-fix-width'))  $('rm-fix-width').value =fp.width ||400;
+  if($('rm-fix-height')) $('rm-fix-height').value=fp.height||200;
+  if($('rm-fix-radius')) $('rm-fix-radius').value=fp.radius||200;
+  if($('rm-fix-cheight')) $('rm-fix-cheight').value=fp.cheight||400;
+  if($('rm-fix-x'))  $('rm-fix-x').value =fp.x ||0;
+  if($('rm-fix-y'))  $('rm-fix-y').value =fp.y ||0;
+  if($('rm-fix-z'))  $('rm-fix-z').value =fp.z ||0;
+  if($('rm-fix-rx')) $('rm-fix-rx').value=fp.rx||0;
+  if($('rm-fix-ry')) $('rm-fix-ry').value=fp.ry||0;
+  if($('rm-fix-rz')) $('rm-fix-rz').value=fp.rz||0;
+  if($('rm-fix-stl-display')) $('rm-fix-stl-display').textContent=fp.stlName||'';
+  rmTypeChanged('fix');
+  // Bewegliches Bauteil befüllen
+  const mp=existing?.movingPart||{};
+  if($('rm-mov-type')) $('rm-mov-type').value=mp.type||'box';
+  if($('rm-mov-length')) $('rm-mov-length').value=mp.length||600;
+  if($('rm-mov-width'))  $('rm-mov-width').value =mp.width ||400;
+  if($('rm-mov-height')) $('rm-mov-height').value=mp.height||300;
+  if($('rm-mov-radius')) $('rm-mov-radius').value=mp.radius||200;
+  if($('rm-mov-cheight')) $('rm-mov-cheight').value=mp.cheight||300;
+  if($('rm-mov-x'))  $('rm-mov-x').value =mp.x ||0;
+  if($('rm-mov-y'))  $('rm-mov-y').value =mp.y ||0;
+  if($('rm-mov-z'))  $('rm-mov-z').value =mp.z ||0;
+  if($('rm-mov-rx')) $('rm-mov-rx').value=mp.rx||0;
+  if($('rm-mov-ry')) $('rm-mov-ry').value=mp.ry||0;
+  if($('rm-mov-rz')) $('rm-mov-rz').value=mp.rz||0;
+  if($('rm-mov-stl-display')) $('rm-mov-stl-display').textContent=mp.stlName||'';
+  rmTypeChanged('mov');
   $('railModal').style.display='flex';
 });
 
@@ -3500,28 +3539,46 @@ document.querySelectorAll('.rm-axis-btn').forEach(b=>{
 
 $('rm-submit')?.addEventListener('click',()=>{
   if(!state.schienen) state.schienen=[];
+  const ftype=$('rm-fix-type')?.value||'none';
+  const mtype=$('rm-mov-type')?.value||'box';
+  const fixedPart = ftype==='none' ? null : {
+    type:ftype,
+    length: parseFloat($('rm-fix-length')?.value)||2000,
+    width:  parseFloat($('rm-fix-width')?.value) ||400,
+    height: parseFloat($('rm-fix-height')?.value)||200,
+    radius: parseFloat($('rm-fix-radius')?.value)||200,
+    cheight:parseFloat($('rm-fix-cheight')?.value)||400,
+    x: parseFloat($('rm-fix-x')?.value)||0, y:parseFloat($('rm-fix-y')?.value)||0, z:parseFloat($('rm-fix-z')?.value)||0,
+    rx:parseFloat($('rm-fix-rx')?.value)||0, ry:parseFloat($('rm-fix-ry')?.value)||0, rz:parseFloat($('rm-fix-rz')?.value)||0,
+    buf: _rmFixStlBuf || ((state.schienen[0]?.fixedPart?.type==='stl') ? state.schienen[0].fixedPart.buf : null),
+    stlName: _rmFixStlBuf ? ($('rm-fix-stl-display')?.textContent||'') : (state.schienen[0]?.fixedPart?.stlName||'')
+  };
+  const movingPart = {
+    type:mtype,
+    length: parseFloat($('rm-mov-length')?.value)||600,
+    width:  parseFloat($('rm-mov-width')?.value) ||400,
+    height: parseFloat($('rm-mov-height')?.value)||300,
+    radius: parseFloat($('rm-mov-radius')?.value)||200,
+    cheight:parseFloat($('rm-mov-cheight')?.value)||300,
+    x: parseFloat($('rm-mov-x')?.value)||0, y:parseFloat($('rm-mov-y')?.value)||0, z:parseFloat($('rm-mov-z')?.value)||0,
+    rx:parseFloat($('rm-mov-rx')?.value)||0, ry:parseFloat($('rm-mov-ry')?.value)||0, rz:parseFloat($('rm-mov-rz')?.value)||0,
+    buf: _rmMovStlBuf || ((state.schienen[0]?.movingPart?.type==='stl') ? state.schienen[0].movingPart.buf : null),
+    stlName: _rmMovStlBuf ? ($('rm-mov-stl-display')?.textContent||'') : (state.schienen[0]?.movingPart?.stlName||'')
+  };
   const entry = {
-    name: $('rm-name').value||('Rail 1'),
-    length_mm: parseFloat($('rm-length').value)||2000,
-    height_mm: parseFloat($('rm-height').value)||200,
-    width_mm:  parseFloat($('rm-width').value)||400,
+    name: $('rm-name').value||'Rail 1',
     axis: _rmAxis,
     eNumber: parseInt($('rm-enum')?.value)||1,
     eMin:  parseFloat($('rm-min')?.value)  || 0,
     eMax:  parseFloat($('rm-max')?.value)  || 2000,
     ePos:  parseFloat($('rm-start')?.value)|| 0,
-    boxOffset: {
-      x:  parseFloat($('rm-ox')?.value) ||0, y:  parseFloat($('rm-oy')?.value) ||0, z:  parseFloat($('rm-oz')?.value) ||0,
-      rx: parseFloat($('rm-orx')?.value)||0, ry: parseFloat($('rm-ory')?.value)||0, rz: parseFloat($('rm-orz')?.value)||0
-    },
-    showBox: $('rm-show')?.checked === true,
-    robotMoves: $('rm-robot-moves')?.checked === true
+    robotMoves: true,
+    fixedPart, movingPart
   };
-  const old = state.schienen[0];
+  const old=state.schienen[0];
   if(old?._simInterval){ clearInterval(old._simInterval); delete old._simInterval; }
-  state.schienen[0] = entry;
-  // STL → axisStlParts
-  if(_rmStlBuf){ const eAx='E'+(entry.eNumber||1); state.axisStlParts[eAx]=[{name:entry.name+'.stl',color:'#2563eb',buf:_rmStlBuf}]; _rmStlBuf=null; }
+  state.schienen[0]=entry;
+  _rmFixStlBuf=null; _rmMovStlBuf=null;
   renderRailRows(); rebuildRailMeshes(); renderRows();
   $('railModal').style.display='none';
 });
