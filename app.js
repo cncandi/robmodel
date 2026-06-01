@@ -171,17 +171,11 @@ function init3d() {
   transformControls.addEventListener('dragging-changed', e => controls.enabled = !e.value);
   transformControls.addEventListener('objectChange', () => {
     if (_gimbalTarget && transformControls.object === _gimbalProxy) {
-      // Proxy bewegt → Gruppe mitziehen (translate) bzw. Rotation direkt übertragen
+      // Proxy bewegt → Gruppe mitziehen
       const grp = _gimbalTarget.grp;
-      if (_gimbalMode === 'translate') {
-        // Gruppe = Proxy-WorldPos - Offset
-        const pw = new THREE.Vector3();
-        _gimbalProxy.getWorldPosition(pw);
-        grp.position.copy(pw.sub(_gimbalProxyOffset));
-        _gimbalProxy.rotation.copy(grp.rotation); // Proxy-Rotation nicht driften lassen
-      } else {
-        grp.rotation.copy(_gimbalProxy.rotation);
-      }
+      const pw = new THREE.Vector3();
+      _gimbalProxy.getWorldPosition(pw);
+      grp.position.copy(pw.sub(_gimbalProxyOffset));
       _gimbalChanged();
     } else if (_gimbalTarget && transformControls.object === _gimbalTarget.grp) {
       _gimbalChanged();
@@ -2310,7 +2304,7 @@ function _gimbalPick(event) {
 
 function _gimbalChanged() {
   if(!_gimbalTarget || !transformControls.object) return;
-  const grp = transformControls.object;
+  const grp = _gimbalTarget.grp; // immer echte Gruppe, nicht Proxy
   const deg = 180/Math.PI;
   const {type, idx} = _gimbalTarget;
   const bo = {
