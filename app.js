@@ -2337,11 +2337,8 @@ function _gimbalChanged() {
     const panel=$('rail-panel');
     if(panel){ ['x','y','z','rx','ry','rz'].forEach(k=>{ const inp=panel.querySelector(`#rail-${k}`); if(inp) inp.value=bo[k]||0; }); }
   } else if((type==='rail-fix'||type==='rail-mov') && state.schienen[0]){
-    // Koordinaten relativ zum Roboter-Base
-    const bx=state.robotTr?.x||0, by=state.robotTr?.y||0, bz=state.robotTr?.z||0;
     const part = type==='rail-fix' ? 'fixedPart' : 'movingPart';
     const r = state.schienen[0];
-    // Beim beweglichen Teil: Verfahrvektor herausrechnen
     var cx=0,cy=0,cz=0;
     if(type==='rail-mov'){
       const ax=r.axis||'Y+', p=r.ePos||0;
@@ -2350,20 +2347,17 @@ function _gimbalChanged() {
       else if(ax==='Z+') cz=p; else cz=-p;
     }
     const pos = {
-      x: Math.round(grp.position.x - cx),
-      y: Math.round(grp.position.y - cy),
-      z: Math.round(grp.position.z - cz),
-      rx: Math.round(grp.rotation.x*deg),
-      ry: Math.round(grp.rotation.y*deg),
-      rz: Math.round(grp.rotation.z*deg)
+      x: Math.round(realGrp.position.x - cx),
+      y: Math.round(realGrp.position.y - cy),
+      z: Math.round(realGrp.position.z - cz),
+      rx: Math.round(realGrp.rotation.x*deg),
+      ry: Math.round(realGrp.rotation.y*deg),
+      rz: Math.round(realGrp.rotation.z*deg)
     };
     if(!r[part]) r[part]={};
     Object.assign(r[part], pos);
-    // Modal-Felder updaten
     const pfx = type==='rail-fix' ? 'rm-fix' : 'rm-mov';
-    if($('railModal')?.style.display!=='none'){
-      ['x','y','z','rx','ry','rz'].forEach(k=>{ const el=$(pfx+'-'+k); if(el) el.value=pos[k]||0; });
-    }
+    ['x','y','z','rx','ry','rz'].forEach(k=>{ const el=$(pfx+'-'+k); if(el) el.value=pos[k]||0; });
   } else if(type==='obj' && state.objekte[idx]){
     state.objekte[idx].boxOffset=bo;
     if($('objModal')?.style.display!=='none') fillModal('om');
