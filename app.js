@@ -2665,7 +2665,7 @@ function _renderBodyTree() {
     const cats = ['A1','A2','A3','A4','A5','A6','Podest','Tool','Endeffektor','Positionierer','Schiene','Festes Obj.','Bew. Obj.'];
     for (const [name] of _unassignedMeshes) {
       const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:3px 2px';
+      row.style.cssText = 'display:flex;align-items:center;gap:5px;padding:2px 2px;border-radius:3px;transition:background .1s';row.onmouseover=()=>row.style.background='rgba(255,255,255,.07)';row.onmouseout=()=>row.style.background='';
       const nm = document.createElement('span');
       nm.textContent = name;
       nm.style.cssText = 'flex:1;color:#5588cc;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
@@ -6441,3 +6441,27 @@ window.openAssignMenu = function() {
   const rect = btn ? btn.getBoundingClientRect() : { left: 200, bottom: 80 };
   _showCtxMenu(rect.left, rect.bottom + 4);
 };
+
+// ── Strukturbaum draggable ─────────────────────────────────────────
+(function() {
+  const panel = document.getElementById('bodyTreePanel');
+  const handle = document.getElementById('bodyTreeDragHandle');
+  if (!panel || !handle) return;
+  let ox, oy, startX, startY;
+  handle.addEventListener('mousedown', e => {
+    if (e.target.id === 'bodyTreeClose') return;
+    ox = panel.offsetLeft; oy = panel.offsetTop;
+    startX = e.clientX; startY = e.clientY;
+    const onMove = e => {
+      panel.style.left = (ox + e.clientX - startX) + 'px';
+      panel.style.top  = (oy + e.clientY - startY) + 'px';
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    e.preventDefault();
+  });
+})();

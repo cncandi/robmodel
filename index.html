@@ -728,10 +728,10 @@ header.top .title    { display: none !important; }
 </div>
 
 <!-- ── Mess-Ergebnis Panel ──────────────────────────────────── -->
-<div id="bodyTreePanel" style="display:none;position:fixed;top:120px;left:16px;z-index:1200;background:var(--bg3);border:1px solid var(--bdr);border-radius:6px;padding:10px 12px;font-family:monospace;color:var(--txt);min-width:240px;max-width:340px;max-height:62vh;overflow:auto;box-shadow:0 6px 24px rgba(0,0,0,.35)">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-    <span style="color:var(--acc);font-size:10px;letter-spacing:.08em">KÖRPER-STRUKTUR</span>
-    <button id="bodyTreeClose" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:14px">✕</button>
+<div id="bodyTreePanel" style="display:none;position:fixed;top:100px;left:8px;z-index:1200;background:rgba(5,11,20,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.08);border-radius:4px;padding:6px 8px;font-family:monospace;color:#d0dce8;min-width:220px;max-width:320px;max-height:68vh;overflow:auto;box-shadow:0 4px 20px rgba(0,0,0,.4);resize:both">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;cursor:move" id="bodyTreeDragHandle">
+    <span style="color:rgba(255,138,0,.8);font-size:9px;letter-spacing:.1em;font-weight:700">STRUKTUR</span>
+    <button id="bodyTreeClose" style="background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:13px;line-height:1">✕</button>
   </div>
   <div id="bodyTreeList"></div>
 </div>
