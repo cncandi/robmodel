@@ -6521,37 +6521,30 @@ window._setMeasureMode = function(mode) {
   );
   _measureReset3c();
   _measureReset();
-  if (mode === '3c') $('msr-hint').textContent = 'Ebene 1 klicken (Fläche des ersten Kreises)';
+  if (mode === '3c') $('msr-hint').textContent = '3 Punkte auf Kreis 1 klicken';
+  if (mode === 'pp') $('msr-hint').textContent = 'Klick: P1 setzen';
 };
 
 function _measureReset3c() {
   _circle3pts = [];
   _circle3centers = [];
-  _circle3State = 0;
-  _circle3Planes = [null, null];
 }
 
 // Vertex-Snap: nächster Vertex innerhalb Pixel-Toleranz
-function _snapToVertex(hitPoint, hitMesh, planeNormal, planePt) {
+function _snapToVertex(hitPoint) {
   if (!_measureSnapEnabled) return hitPoint;
-  const snapR = parseFloat(document.getElementById('msr-snap-r')?.value || '30');
-  const planeTol = snapR * 0.5; // Ebenen-Toleranz = halber Snap-Radius
+  const snapR = parseFloat(document.getElementById('msr-snap-r')?.value || '50');
 
   let bestDist = snapR;
   let bestPt = null;
 
-  const plane = (planeNormal && planePt)
-    ? new THREE.Plane().setFromNormalAndCoplanarPoint(planeNormal, planePt)
-    : null;
-
-  // Alle sichtbaren Meshes durchsuchen
   const v = new THREE.Vector3();
   scene.traverse(obj => {
     if (!obj.isMesh || !obj.visible || !obj.geometry?.attributes?.position) return;
+    if (obj.userData.noRenderMode) return;
     const pos = obj.geometry.attributes.position;
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
-      if (plane && Math.abs(plane.distanceToPoint(v)) > planeTol) continue;
       const d = v.distanceTo(hitPoint);
       if (d < bestDist) { bestDist = d; bestPt = v.clone(); }
     }
@@ -6563,8 +6556,7 @@ function _snapToVertex(hitPoint, hitMesh, planeNormal, planePt) {
       new THREE.MeshBasicMaterial({ color: 0xffff00, depthTest: false })
     );
     ind.position.copy(bestPt); ind.renderOrder = 1000;
-    scene.add(ind);
-    setTimeout(() => scene.remove(ind), 600);
+    scene.add(ind); setTimeout(() => scene.remove(ind), 500);
   }
   return bestPt || hitPoint;
 }
@@ -6611,17 +6603,9 @@ function _measurePickExtended(event) {
   const hits = rc.intersectObjects(pickable, false);
   if (!hits.length) return;
 
-  const rawPt = hits[0].point.clone();
-  const hitMesh = hits[0].object;
-  // Flächennormale des getroffenen Dreiecks
-  const faceNormal = hits[0].face?.normal.clone().applyMatrix3(
-    new THREE.Matrix3().getNormalMatrix(hitMesh.matrixWorld)
-  ).normalize();
+  const pt = _snapToVertex(hits[0].point.clone());
 
   if (_measureMode === 'pp') {
-    const pt = _measureSnapEnabled
-      ? _snapToVertex(rawPt, hitMesh, faceNormal, rawPt)
-      : rawPt;
     if (!_measureP1) {
       _measureP1 = pt;
       _measureSphere(pt, 0xff4444);
@@ -6637,78 +6621,43 @@ function _measurePickExtended(event) {
     return;
   }
 
-  // ── 3-Punkt-Kreis Modus ──────────────────────────────────────────
-  // Phase: 0 = Ebene1 wählen, 1-3 = 3 Punkte Kreis1, 4 = Ebene2 wählen, 5-7 = 3 Punkte Kreis2
-  const phase = _circle3State;
-
-  if (phase === 0 || phase === 4) {
-    // Ebene wählen - Klick definiert Ebene über Flächennormale
-    _circle3Planes[phase === 0 ? 0 : 1] = {
-      normal: faceNormal || new THREE.Vector3(0,0,1),
-      point: rawPt.clone(),
-      mesh: hitMesh
-    };
-    // Ebenen-Indikator
-    const indColor = phase === 0 ? 0xff6600 : 0x00aaff;
-    _measureSphere(rawPt, indColor);
-    _circle3State = phase + 1;
-    const cn = phase === 0 ? 1 : 2;
-    $('msr-hint').textContent = `Ebene ${cn} gewählt — 3 Punkte auf Kreis ${cn} klicken`;
-    return;
-  }
-
-  // Punkte auf Ebene snappen
-  const planeIdx = phase <= 3 ? 0 : 1;
-  const pl = _circle3Planes[planeIdx];
-  const pt = _measureSnapEnabled
-    ? _snapToVertex(rawPt, hitMesh, pl?.normal, pl?.point || rawPt)
-    : rawPt;
-
+  // 3-Punkt-Kreis
   const colors = [0xff4444, 0xff8844, 0xffcc44, 0x44ff88, 0x44ccff, 0x8844ff];
   _measureSphere(pt, colors[_circle3pts.length] || 0xffffff);
   _circle3pts.push(pt);
-  _circle3State++;
 
-  const ptCount = _circle3pts.length;
-  if (ptCount === 3 || ptCount === 6) {
-    const base = ptCount - 3;
-    const p1 = _circle3pts[base], p2 = _circle3pts[base+1], p3 = _circle3pts[base+2];
-    const ctr = _circumcenter(p1, p2, p3);
+  const n = _circle3pts.length;
+  if (n === 3 || n === 6) {
+    const b = n - 3;
+    const ctr = _circumcenter(_circle3pts[b], _circle3pts[b+1], _circle3pts[b+2]);
     _circle3centers.push(ctr);
-    const cColor = ptCount === 3 ? 0xff4444 : 0x44ff88;
-    _measureSphere(ctr, cColor);
-
-    // Kreis zeichnen
-    const r = ctr.distanceTo(p1);
-    const n3 = p2.clone().sub(p1).cross(p3.clone().sub(p1)).normalize();
-    const u3 = p1.clone().sub(ctr).normalize();
-    const v3 = n3.clone().cross(u3);
+    const cCol = n === 3 ? 0xff4444 : 0x44ff88;
+    _measureSphere(ctr, cCol);
+    const r = ctr.distanceTo(_circle3pts[b]);
+    const nv = _circle3pts[b+1].clone().sub(_circle3pts[b]).cross(_circle3pts[b+2].clone().sub(_circle3pts[b])).normalize();
+    const u = _circle3pts[b].clone().sub(ctr).normalize();
+    const vv = nv.clone().cross(u);
     const pts3d = [];
     for (let i = 0; i <= 64; i++) {
       const a = (i/64)*Math.PI*2;
-      pts3d.push(ctr.clone().addScaledVector(u3, Math.cos(a)*r).addScaledVector(v3, Math.sin(a)*r));
+      pts3d.push(ctr.clone().addScaledVector(u, Math.cos(a)*r).addScaledVector(vv, Math.sin(a)*r));
     }
-    const cLine = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(pts3d),
-      new THREE.LineBasicMaterial({ color: cColor, depthTest: false })
-    );
-    cLine.renderOrder = 998;
-    scene.add(cLine); _measureSpheres.push(cLine);
+    const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts3d),
+      new THREE.LineBasicMaterial({ color: cCol, depthTest: false }));
+    ln.renderOrder = 998; scene.add(ln); _measureSpheres.push(ln);
 
-    if (ptCount === 3) {
-      _circle3State = 4; // → Ebene 2 wählen
-      $('msr-hint').textContent = `Kreis 1: r=${Math.round(r)}mm — Ebene 2 klicken`;
+    if (n === 3) {
+      $('msr-hint').textContent = `Kreis 1: r=${Math.round(r)}mm — 3 Punkte für Kreis 2`;
     } else {
-      // Fertig - Abstand messen
       _measureDrawLine(_circle3centers[0], _circle3centers[1]);
       _measureUpdate(_circle3centers[0], _circle3centers[1]);
-      $('msr-hint').textContent = `Abstand Mittelpunkte — Klick: neue Messung`;
+      $('msr-hint').textContent = 'Abstand Mittelpunkte — Klick: neue Messung';
       _measureReset3c();
     }
   } else {
-    const remaining = ptCount < 3 ? 3 - ptCount : 6 - ptCount;
-    const cn = ptCount < 3 ? 1 : 2;
-    $('msr-hint').textContent = `Kreis ${cn}: noch ${remaining} Punkt${remaining>1?'e':''}`;
+    const cn = n <= 3 ? 1 : 2;
+    const rem = n <= 3 ? 3 - n : 6 - n;
+    $('msr-hint').textContent = `Kreis ${cn}: noch ${rem} Punkt${rem>1?'e':''}`;
   }
 }
 
