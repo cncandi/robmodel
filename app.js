@@ -224,6 +224,7 @@ function init3d() {
     new THREE.MeshStandardMaterial({ color: '#8b5cf6', emissive: '#7c3aed', emissiveIntensity: .3 })
   ));
   tcpMarker.visible = false;
+  tcpMarker.userData.noRenderMode = true;
   toolGroup.add(tcpMarker);
 
   new ResizeObserver(resize).observe(canvas.parentElement);
@@ -2889,7 +2890,7 @@ $('measureBtn')?.addEventListener('click',()=>{
   }
 });
 
-function renderTcp(){qsa('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===state.activeTcp));const tcp=state.tcp[state.activeTcp];qsa('[data-tcp]').forEach(i=>i.value=tcp?.[i.dataset.tcp]??'');const x=num(tcp?.x),y=num(tcp?.y),z=num(tcp?.z);tcpMarker.visible=(x!==null||y!==null||z!==null)&&(x||y||z);tcpMarker.position.set(x||0,y||0,z||0);}
+function renderTcp(){qsa('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===state.activeTcp));const tcp=state.tcp[state.activeTcp];qsa('[data-tcp]').forEach(i=>i.value=tcp?.[i.dataset.tcp]??'');const x=num(tcp?.x),y=num(tcp?.y),z=num(tcp?.z);tcpMarker.visible=false;tcpMarker.position.set(x||0,y||0,z||0);}
 
 
 
