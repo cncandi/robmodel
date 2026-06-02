@@ -2992,32 +2992,7 @@ function _measurePick(event) {
   const hits = rc.intersectObjects(pickable, false);
   if(!hits.length) return;
 
-  // Snap: nächster Vertex im Radius
-  const rawPt = hits[0].point.clone();
-  let pt = rawPt.clone();
-  if (typeof _measureSnapEnabled !== 'undefined' && _measureSnapEnabled) {
-    const snapR = parseFloat(document.getElementById('msr-snap-r')?.value || '50');
-    let bestDist = snapR, bestPt = null;
-    const v = new THREE.Vector3();
-    scene.traverse(obj => {
-      if (!obj.isMesh || !obj.visible || !obj.geometry?.attributes?.position) return;
-      if (obj.userData.noRenderMode) return;
-      const pos = obj.geometry.attributes.position;
-      for (let i = 0; i < pos.count; i++) {
-        v.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
-        const d = v.distanceTo(rawPt);
-        if (d < bestDist) { bestDist = d; bestPt = v.clone(); }
-      }
-    });
-    if (bestPt) {
-      pt = bestPt;
-      const ind = new THREE.Mesh(new THREE.SphereGeometry(10,8,6),
-        new THREE.MeshBasicMaterial({color:0xffff00,depthTest:false}));
-      ind.position.copy(pt); ind.renderOrder=1000;
-      scene.add(ind); setTimeout(()=>scene.remove(ind),500);
-    }
-    console.log('[SNAP] raw→snap diff:', rawPt.distanceTo(pt).toFixed(1)+'mm', 'snapR:'+snapR);
-  }
+  const pt = hits[0].point.clone();
 
   const mode = typeof _measureMode !== 'undefined' ? _measureMode : 'pp';
 
