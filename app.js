@@ -2405,6 +2405,9 @@ function _gimbalPick(event) {
   }
 
   _gimbalPickedMesh = hits[0].object;
+  // Unassigned Mesh für Rechtsklick-Zuweisung merken
+  if (_gimbalPickedMesh?.userData?.isUnassigned) window._lastUnassignedSel = _gimbalPickedMesh;
+  else window._lastUnassignedSel = null;
   _attachGimbalToTargets();
   requestRender();
 }
@@ -6307,9 +6310,9 @@ renderer.domElement.addEventListener('contextmenu', e => {
   e.preventDefault();
   e.stopPropagation();
 
-  // Wenn ein unassigned Mesh per Gimbal selektiert ist, dieses verwenden
-  if (_gimbalPickedMesh && _gimbalPickedMesh.userData?.isUnassigned) {
-    _ctxMesh = _gimbalPickedMesh;
+  // Wenn ein unassigned Mesh selektiert ist, dieses verwenden
+  if (window._lastUnassignedSel) {
+    _ctxMesh = window._lastUnassignedSel;
     _ctxHighlight(_ctxMesh);
     _showCtxMenu(e.clientX, e.clientY);
     return;
