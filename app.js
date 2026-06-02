@@ -6310,15 +6310,6 @@ renderer.domElement.addEventListener('contextmenu', e => {
   e.preventDefault();
   e.stopPropagation();
 
-  // Wenn ein unassigned Mesh selektiert ist, dieses verwenden
-  if (window._lastUnassignedSel) {
-    _ctxMesh = window._lastUnassignedSel;
-    _ctxHighlight(_ctxMesh);
-    _showCtxMenu(e.clientX, e.clientY);
-    return;
-  }
-
-  // Sonst per Raycaster suchen
   const rect = renderer.domElement.getBoundingClientRect();
   const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -6327,11 +6318,32 @@ renderer.domElement.addEventListener('contextmenu', e => {
   const rc = new THREE.Raycaster();
   rc.setFromCamera(new THREE.Vector2(mx, my), camera);
 
-  const unassignedMeshList = [..._unassignedMeshes.values()].map(e => e.mesh).filter(Boolean);
-  if (unassignedMeshList.length) {
-    const hits = rc.intersectObjects(unassignedMeshList, false);
+  // Alle unassigned Meshes direkt prüfen
+  const unassignedList = [..._unassignedMeshes.values()].map(v => v.mesh).filter(Boolean);
+  console.log('[CTX] unassigned count:', unassignedList.length, 'mouse:', mx.toFixed(2), my.toFixed(2));
+
+  if (unassignedList.length) {
+    // BoundingSphere manuell prüfen als Fallback
+    for (const mesh of unassignedList) {
+      mesh.geometry.computeBoundingSphere();
+      const sphere = mesh.geometry.boundingSphere.clone();
+      sphere.applyMatrix4(mesh.matrixWorld);
+      const ray = rc.ray;
+      if (ray.intersectsSphere(sphere)) {
+        console.log('[CTX] sphere hit:', mesh.name);
+        _ctxMesh = mesh;
+        _ctxHighlight(_ctxMesh);
+        _showCtxMenu(e.clientX, e.clientY);
+        return;
+      }
+    }
+    // Auch normale intersectObjects versuchen
+    const hits = rc.intersectObjects(unassignedList, true);
+    console.log('[CTX] intersect hits:', hits.length);
     if (hits.length) {
-      _ctxMesh = hits[0].object;
+      let obj = hits[0].object;
+      while (obj.parent && !obj.userData.isUnassigned) obj = obj.parent;
+      _ctxMesh = obj;
       _ctxHighlight(_ctxMesh);
       _showCtxMenu(e.clientX, e.clientY);
       return;
