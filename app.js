@@ -6214,9 +6214,10 @@ document.getElementById('bgImageInput')?.addEventListener('change', e => {
   const target = viewerCard || canvas;
   if (target) {
     target.style.backgroundImage = 'url(' + url + ')';
-    target.style.backgroundSize = 'cover';
+    target.style.backgroundSize = 'auto 100%';
     target.style.backgroundPosition = 'center';
     target.style.backgroundRepeat = 'no-repeat';
+    target.style.backgroundColor = '#000000';
   }
   // Three.js background transparent
   if (_bgOrigColor === null && scene.background) _bgOrigColor = scene.background.clone();
