@@ -78,6 +78,7 @@ const state = {
 let scene, camera, perspCamera, orthoCamera, isOrtho=false, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot, railGroup;
 let railFixGrp, railMovGrp;
 let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup;
+let _axisLabelsVisible = true;
 // On-Demand-Rendering: nur rendern wenn nötig (spart GPU/CPU/Akku im Leerlauf)
 let _renderFrames = 3;
 function requestRender(n) { _renderFrames = Math.max(_renderFrames, n || 2); }
@@ -4799,7 +4800,7 @@ $('toggleGrid').onclick   = () => { grid.visible = !grid.visible; const on=grid.
 // camera mode init: ortho default
 toggleCameraMode();
 
-let _axisLabelsVisible = true;
+// _axisLabelsVisible moved to top
 // Robot-Visibility: 0=sichtbar, 1=durchsichtig, 2=unsichtbar
 var _robotVisState = 0; // legacy, nicht mehr genutzt
 
