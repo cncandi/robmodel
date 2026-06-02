@@ -5803,15 +5803,17 @@ function _renderMatEditor(f, idx) {
   ed.innerHTML = `
     <div style="font-size:13px;font-weight:600;color:#d0dce8;margin-bottom:12px">${f.name}</div>
 
-    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-      <label style="font-size:12px;color:#7a9ab8;display:flex;flex-direction:column;gap:4px">
-        Poly-Haven-ZIP
-        <input type="file" accept=".zip" id="mat-zip-${idx}" style="font-size:11px">
-      </label>
-      <label style="font-size:12px;color:#7a9ab8;display:flex;flex-direction:column;gap:4px">
-        Einzeltextur
-        <input type="file" accept="image/png,image/jpeg,image/webp" id="mat-tex-${idx}" style="font-size:11px">
-      </label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <input type="file" accept=".zip" id="mat-zip-${idx}" style="display:none">
+      <button onclick="document.getElementById('mat-zip-${idx}').click()"
+        style="font-size:12px;padding:6px 14px;background:rgba(255,255,255,.06);border:1px solid #2a4060;color:#b0c4d8;border-radius:4px;cursor:pointer">
+        📦 Poly Haven ZIP laden
+      </button>
+      <input type="file" accept="image/png,image/jpeg,image/webp" id="mat-tex-${idx}" style="display:none">
+      <button onclick="document.getElementById('mat-tex-${idx}').click()"
+        style="font-size:12px;padding:6px 14px;background:rgba(255,255,255,.06);border:1px solid #2a4060;color:#b0c4d8;border-radius:4px;cursor:pointer">
+        🖼 Einzeltextur laden
+      </button>
     </div>
 
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
