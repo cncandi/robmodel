@@ -273,6 +273,8 @@ header.top .title    { display: none !important; }
       <div class="mnudrop">
         <button id="clearAllBtn" title="Strg+Klick: nur STL leeren"><svg class="ico"><use href="#i-new"/></svg>Neu</button>
         <div class="mnusep"></div>
+        <label class="mnuitem" for="stlImportInput"><svg class="ico"><use href="#i-new"/></svg>STL importieren…</label>
+        <div class="mnusep"></div>
         <label class="mnuitem" for="sourceZip"><svg class="ico"><use href="#i-archive"/></svg>Archiv laden…</label>
         <label class="mnuitem" for="sourceFolder"><svg class="ico"><use href="#i-folder"/></svg>Ordner laden…</label>
         <div class="mnusep"></div>
@@ -364,6 +366,7 @@ header.top .title    { display: none !important; }
 
   <!-- hidden file inputs -->
   <input id="sourceZip"    type="file" accept=".zip,application/zip" style="display:none">
+  <input id="stlImportInput" type="file" accept=".stl,.osd,.stp,.step" multiple style="display:none">
   <input id="sourceFolder" type="file" webkitdirectory multiple style="display:none">
   <input id="jsonInput"    type="file" accept=".json,application/json" style="display:none">
   <input id="checkZip"     type="file" accept=".zip,application/zip" style="display:none">
@@ -1521,6 +1524,7 @@ function handleRibView(btn){
   </div>
 </div>
 <input type="file" id="bgImageInput" accept="image/*" style="display:none">
+<div id="ctx-menu" style="display:none;position:fixed;z-index:9999;background:#0d1825;border:1px solid #2a4060;border-radius:6px;padding:4px 0;min-width:180px;box-shadow:0 4px 16px rgba(0,0,0,.6)"></div>
 </body>
 </html>
 

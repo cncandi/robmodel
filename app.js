@@ -6260,3 +6260,133 @@ window.toggleSkeleton = function() {
   if (btn) btn.classList.toggle('on', _skeletonVisible);
   if (typeof requestRender === 'function') requestRender();
 };
+
+// ── STL Import (neutral, ohne sofortige Zuweisung) ─────────────────
+const _unassignedMeshes = new Map(); // name → {mesh, buf}
+
+document.getElementById('stlImportInput')?.addEventListener('change', async e => {
+  const files = [...e.target.files];
+  e.target.value = '';
+  for (const file of files) {
+    try {
+      const rawBuf = await file.arrayBuffer();
+      const fname = file.name;
+      const geom = await parseGeometry(rawBuf, fname);
+      geom.computeVertexNormals();
+      const mat = new THREE.MeshStandardMaterial({ color: 0x5588cc, roughness: .42, metalness: .55 });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.name = fname;
+      mesh.userData.isUnassigned = true;
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      // Kanten-Overlay
+      const edges = new THREE.EdgesGeometry(geom, 20);
+      mesh.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 })));
+      scene.add(mesh);
+      // Kamera auf Objekt ausrichten
+      const box = new THREE.Box3().setFromObject(mesh);
+      const center = new THREE.Vector3(); box.getCenter(center);
+      mesh.position.sub(center); // zentrieren
+      _unassignedMeshes.set(fname, { mesh, buf: new Uint8Array(rawBuf) });
+    } catch(err) {
+      alert('Fehler beim Laden: ' + file.name + '\n' + err.message);
+    }
+  }
+});
+
+// ── Kontextmenü via Rechtsklick ────────────────────────────────────
+let _ctxMesh = null;
+
+renderer.domElement.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const rect = renderer.domElement.getBoundingClientRect();
+  const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+  const rc = new THREE.Raycaster();
+  rc.setFromCamera(new THREE.Vector2(mx, my), camera);
+
+  // Alle Meshes in der Szene prüfen (unassigned + vorhandene)
+  const candidates = [];
+  scene.traverse(obj => { if (obj.isMesh && !obj.userData.noRenderMode) candidates.push(obj); });
+  const hit = rc.intersectObjects(candidates, false)[0];
+
+  if (!hit) { _hideCtxMenu(); return; }
+  _ctxMesh = hit.object;
+  _showCtxMenu(e.clientX, e.clientY);
+});
+
+document.addEventListener('pointerdown', e => {
+  if (!document.getElementById('ctx-menu')?.contains(e.target)) _hideCtxMenu();
+});
+
+function _showCtxMenu(x, y) {
+  const menu = document.getElementById('ctx-menu');
+  if (!menu) return;
+
+  const isUnassigned = _ctxMesh?.userData?.isUnassigned;
+  const name = _ctxMesh?.name || '';
+
+  const cats = ['A1','A2','A3','A4','A5','A6','Podest','Tool','Endeffektor','Positionierer','Schiene','Festes Obj.','Bew. Obj.'];
+
+  menu.innerHTML = `
+    <div style="padding:6px 12px;font-size:11px;color:#4a6a8a;border-bottom:1px solid #1e3450;margin-bottom:4px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
+    ${cats.map(c => `<div class="ctx-item" onclick="window._ctxAssign('${c}')"
+      style="padding:6px 14px;font-size:12px;color:#b0c4d8;cursor:pointer"
+      onmouseover="this.style.background='rgba(255,122,0,.15)';this.style.color='#fff'"
+      onmouseout="this.style.background='';this.style.color='#b0c4d8'">
+      Zuweisen als: ${c}
+    </div>`).join('')}
+    <div style="border-top:1px solid #1e3450;margin-top:4px">
+      <div class="ctx-item" onclick="window._ctxDelete()"
+        style="padding:6px 14px;font-size:12px;color:#f87171;cursor:pointer"
+        onmouseover="this.style.background='rgba(200,50,50,.15)'"
+        onmouseout="this.style.background=''">
+        Entfernen
+      </div>
+    </div>
+  `;
+
+  // Position korrigieren damit Menu nicht aus dem Fenster ragt
+  menu.style.display = 'block';
+  const mw = menu.offsetWidth, mh = menu.offsetHeight;
+  menu.style.left = (x + mw > window.innerWidth ? x - mw : x) + 'px';
+  menu.style.top  = (y + mh > window.innerHeight ? y - mh : y) + 'px';
+}
+
+function _hideCtxMenu() {
+  const menu = document.getElementById('ctx-menu');
+  if (menu) menu.style.display = 'none';
+  _ctxMesh = null;
+}
+
+window._ctxAssign = function(cat) {
+  _hideCtxMenu();
+  if (!_ctxMesh) return;
+  const name = _ctxMesh.name;
+
+  // Aus Szene entfernen falls unassigned
+  if (_ctxMesh.userData.isUnassigned) {
+    scene.remove(_ctxMesh);
+    _unassignedMeshes.delete(name);
+  }
+
+  // Buf holen
+  const entry = _unassignedMeshes.get(name);
+  const buf = entry?.buf || (meshes.get(name) ? exportBinaryStl(meshes.get(name)) : null);
+  if (!buf) return;
+
+  // Als File-ähnliches Objekt verpacken und _dropAssignStl aufrufen
+  const blob = new Blob([buf], { type: 'application/octet-stream' });
+  const file = new File([blob], name);
+  _dropAssignStl(file, cat);
+};
+
+window._ctxDelete = function() {
+  _hideCtxMenu();
+  if (!_ctxMesh) return;
+  if (_ctxMesh.userData.isUnassigned) {
+    scene.remove(_ctxMesh);
+    _unassignedMeshes.delete(_ctxMesh.name);
+  }
+  _ctxMesh = null;
+};
