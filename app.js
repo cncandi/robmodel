@@ -5663,7 +5663,7 @@ async function tryLoadAxisPng(buffers) {
 // ── Darstellungs-Modi ──────────────────────────────────────────────
 let _currentRenderMode = 2;
 
-function setRenderMode(mode) {
+window.setRenderMode = function setRenderMode(mode) {
   _currentRenderMode = mode;
   for (let i = 0; i <= 6; i++) {
     const btn = document.getElementById('renderMode' + i);
