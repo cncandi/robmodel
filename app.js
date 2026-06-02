@@ -253,7 +253,7 @@ function updateEffTcpMarker() {
     if (effTcpHelper.parent) effTcpHelper.parent.remove(effTcpHelper);
     effTcpHelper = null;
   }
-  const showMarker = toolMountMode === 'a6' || state.effektoren.length > 0;
+  const showMarker = (toolMountMode === 'a6' || state.effektoren.length > 0) && _csVisible;
   if (!showMarker || !scene) return;
   if (toolMountMode === 'a6' && (!axisPivotGroups || !axisPivotGroups[5])) return;
 
@@ -6189,6 +6189,8 @@ window.toggleCS = function() {
   if (csHelperGroup) csHelperGroup.visible = _csVisible;
   if (window._worldAxes) window._worldAxes.visible = _csVisible;
   if (axisPointGroup) axisPointGroup.visible = _csVisible;
+  if (effTcpHelper) effTcpHelper.visible = _csVisible;
+  updateEffTcpMarker();
   const btn = document.getElementById('rib-cs');
   if (btn) btn.classList.toggle('on', _csVisible);
   if (typeof requestRender === 'function') requestRender();
