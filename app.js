@@ -5825,15 +5825,17 @@ function _renderMatEditor(f, idx) {
           <option value="yz">YZ</option>
         </select>
       </label>
-      <label style="font-size:12px;color:#7a9ab8;display:flex;flex-direction:column;gap:4px">
-        Wiederholung
-        <input type="number" id="mat-rep-${idx}" min="0.1" step="0.1" value="1.0"
-          style="width:70px;font-size:12px;background:#0a1520;border:1px solid #1e3450;color:#d0dce8;padding:4px;border-radius:3px">
+      <label style="font-size:12px;color:#7a9ab8;display:flex;flex-direction:column;gap:4px;min-width:160px">
+        Wiederholung: <span id="mat-rep-val-${idx}" style="color:#d0dce8">1.0</span>
+        <input type="range" id="mat-rep-${idx}" min="0.1" max="20" step="0.1" value="1.0"
+          oninput="document.getElementById('mat-rep-val-${idx}').textContent=parseFloat(this.value).toFixed(1)"
+          style="width:160px;accent-color:var(--acc)">
       </label>
-      <label style="font-size:12px;color:#7a9ab8;display:flex;flex-direction:column;gap:4px">
-        Displacement
-        <input type="number" id="mat-disp-${idx}" step="0.01" value="0.00"
-          style="width:70px;font-size:12px;background:#0a1520;border:1px solid #1e3450;color:#d0dce8;padding:4px;border-radius:3px">
+      <label style="font-size:12px;color:#7a9ab8;display:flex;flex-direction:column;gap:4px;min-width:160px">
+        Displacement: <span id="mat-disp-val-${idx}" style="color:#d0dce8">0.00</span>
+        <input type="range" id="mat-disp-${idx}" min="0" max="50" step="0.5" value="0"
+          oninput="document.getElementById('mat-disp-val-${idx}').textContent=parseFloat(this.value).toFixed(2)"
+          style="width:160px;accent-color:var(--acc)">
       </label>
     </div>
 
