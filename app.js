@@ -83,7 +83,7 @@ let _skeletonVisible = true;
 let _csVisible = true;
 // On-Demand-Rendering: nur rendern wenn nötig (spart GPU/CPU/Akku im Leerlauf)
 let _renderFrames = 3;
-function requestRender(n) { _renderFrames = Math.max(_renderFrames, n || 2); }
+function requestRender(n) { _renderFrames = Math.max(_renderFrames, n || 5); }
 var objekteGroups = [];
 var effektorGroups = [];
 var positionerGroups = [];
@@ -142,9 +142,12 @@ function init3d() {
   controls.screenSpacePanning = true;
   controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
   // Rollrad-Richtung umkehren
+  let _wheelInvert = false;
   canvas.addEventListener('wheel', e => {
-    e.stopPropagation();
-    const fake = new WheelEvent('wheel', { deltaY: -e.deltaY, deltaMode: e.deltaMode, bubbles: false });
+    if (_wheelInvert) { _wheelInvert = false; return; }
+    e.preventDefault(); e.stopImmediatePropagation();
+    _wheelInvert = true;
+    const fake = new WheelEvent('wheel', { deltaY: -e.deltaY, deltaMode: e.deltaMode, bubbles: true, cancelable: true });
     canvas.dispatchEvent(fake);
   }, { capture: true, passive: false });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
