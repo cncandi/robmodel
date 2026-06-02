@@ -125,7 +125,7 @@ animate();
 // ── 3D-Szene ───────────────────────────────────────────────────────
 function init3d() {
   const canvas = $('viewer');
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0d1825);
@@ -6206,25 +6206,39 @@ document.getElementById('bgImageInput')?.addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
   const url = URL.createObjectURL(file);
-  new THREE.TextureLoader().loadAsync(url).then(tex => {
-    URL.revokeObjectURL(url);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    if (_bgOrigColor === null) _bgOrigColor = scene.background.clone();
-    if (_bgTexture) _bgTexture.dispose();
-    _bgTexture = tex;
-    scene.background = tex;
-    const btn = document.getElementById('rib-bg');
-    if (btn) {
-      btn.classList.add('on');
-      btn.title = 'Hintergrundbild entfernen';
-      btn.onclick = window.removeBg;
-    }
-    if (typeof requestRender === 'function') requestRender();
-  });
+  // CSS-Hintergrund statt Three.js background → kein Verzerren
+  const canvas = document.getElementById('viewer');
+  const viewerCard = document.getElementById('dropZone');
+  const target = viewerCard || canvas;
+  if (target) {
+    target.style.backgroundImage = 'url(' + url + ')';
+    target.style.backgroundSize = 'cover';
+    target.style.backgroundPosition = 'center';
+    target.style.backgroundRepeat = 'no-repeat';
+  }
+  // Three.js background transparent
+  if (_bgOrigColor === null && scene.background) _bgOrigColor = scene.background.clone();
+  scene.background = null;
+  renderer.setClearAlpha(0);
+  if (canvas) canvas.style.background = 'transparent';
+  _bgTexture = url; // URL merken für Cleanup
+  const btn = document.getElementById('rib-bg');
+  if (btn) {
+    btn.classList.add('on');
+    btn.title = 'Hintergrundbild entfernen';
+    btn.onclick = window.removeBg;
+  }
+  if (typeof requestRender === 'function') requestRender();
 });
 
 window.removeBg = function() {
-  if (_bgTexture) { _bgTexture.dispose(); _bgTexture = null; }
+  if (_bgTexture) { URL.revokeObjectURL(_bgTexture); _bgTexture = null; }
+  const viewerCard = document.getElementById('dropZone');
+  const canvas = document.getElementById('viewer');
+  const target = viewerCard || canvas;
+  if (target) { target.style.backgroundImage = ''; }
+  if (canvas) canvas.style.background = '';
+  renderer.setClearAlpha(1);
   if (_bgOrigColor) scene.background = _bgOrigColor;
   const btn = document.getElementById('rib-bg');
   if (btn) {
