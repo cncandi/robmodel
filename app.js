@@ -6506,8 +6506,10 @@ window.openAssignMenu = function() {
 // ── Erweitertes Messen: Vertex-Snap + 3-Punkt-Kreis ───────────────
 let _measureMode = 'pp';
 let _measureSnapEnabled = true; // 'pp' = Punkt zu Punkt, '3c' = 3-Punkt-Kreis
-let _circle3pts = []; // gesammelte Punkte für 3-Punkt-Modus
-let _circle3centers = []; // berechnete Mittelpunkte
+let _circle3pts = [];
+let _circle3centers = [];
+let _circle3State = 0; // 0=Ebene1, 1-3=Pts1, 4=Ebene2, 5-7=Pts2
+let _circle3Planes = [null, null];
 
 window._setMeasureMode = function(mode) {
   _measureMode = mode;
@@ -6519,15 +6521,19 @@ window._setMeasureMode = function(mode) {
   );
   _measureReset3c();
   _measureReset();
+  if (mode === '3c') $('msr-hint').textContent = 'Ebene 1 klicken (Fläche des ersten Kreises)';
 };
 
 function _measureReset3c() {
   _circle3pts = [];
   _circle3centers = [];
+  _circle3State = 0;
+  _circle3Planes = [null, null];
 }
 
 // Vertex-Snap: nächster Vertex innerhalb Pixel-Toleranz
-function _snapToVertex(hitPoint, hitMesh) {
+function _snapToVertex(hitPoint, hitMesh, planeNormal, planePt) {
+  if (!_measureSnapEnabled) return hitPoint;
   const geo = hitMesh.geometry;
   if (!geo?.attributes?.position) return hitPoint;
 
@@ -6535,28 +6541,31 @@ function _snapToVertex(hitPoint, hitMesh) {
   const pos = geo.attributes.position;
   const matWorld = hitMesh.matrixWorld;
 
-  let bestDist = snapR; // nur innerhalb Radius
+  let bestDist = snapR;
   let bestPt = null;
 
   const v = new THREE.Vector3();
+  const plane = planeNormal ? new THREE.Plane().setFromNormalAndCoplanarPoint(planeNormal, planePt) : null;
+
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i).applyMatrix4(matWorld);
+    // Nur Vertices auf der gewählten Ebene (Toleranz 5mm)
+    if (plane && Math.abs(plane.distanceToPoint(v)) > 5) continue;
     const d = v.distanceTo(hitPoint);
     if (d < bestDist) {
       bestDist = d;
       bestPt = v.clone();
     }
   }
-  // Snap-Indikator: Kugel kurz aufleuchten lassen
   if (bestPt) {
+    // Gelbe Snap-Kugel
     const ind = new THREE.Mesh(
       new THREE.SphereGeometry(8, 8, 6),
       new THREE.MeshBasicMaterial({ color: 0xffff00, depthTest: false })
     );
-    ind.position.copy(bestPt);
-    ind.renderOrder = 1000;
+    ind.position.copy(bestPt); ind.renderOrder = 1000;
     scene.add(ind);
-    setTimeout(() => scene.remove(ind), 500);
+    setTimeout(() => scene.remove(ind), 400);
   }
   return bestPt || hitPoint;
 }
@@ -6603,11 +6612,17 @@ function _measurePickExtended(event) {
   const hits = rc.intersectObjects(pickable, false);
   if (!hits.length) return;
 
-  // Vertex-Snap
-  const pt = _measureSnapEnabled ? _snapToVertex(hits[0].point, hits[0].object) : hits[0].point.clone();
+  const rawPt = hits[0].point.clone();
+  const hitMesh = hits[0].object;
+  // Flächennormale des getroffenen Dreiecks
+  const faceNormal = hits[0].face?.normal.clone().applyMatrix3(
+    new THREE.Matrix3().getNormalMatrix(hitMesh.matrixWorld)
+  ).normalize();
 
   if (_measureMode === 'pp') {
-    // Original Punkt-zu-Punkt Logik
+    const pt = _measureSnapEnabled
+      ? _snapToVertex(rawPt, hitMesh, faceNormal, rawPt)
+      : rawPt;
     if (!_measureP1) {
       _measureP1 = pt;
       _measureSphere(pt, 0xff4444);
@@ -6620,69 +6635,84 @@ function _measurePickExtended(event) {
       $('msr-hint').textContent = 'Neuer Klick: neue Messung';
       _measureP1 = null; _measureP2 = null;
     }
-  } else {
-    // 3-Punkt-Kreis Modus
-    const phase = _circle3pts.length; // 0-5: erst 3 für Kreis 1, dann 3 für Kreis 2
-    const colors = [0xff4444, 0xff8844, 0xffcc44, 0x44ff88, 0x44ccff, 0x8844ff];
-    _measureSphere(pt, colors[phase] || 0xffffff);
-    _circle3pts.push(pt);
+    return;
+  }
 
-    if (_circle3pts.length === 3) {
-      const c1 = _circumcenter(_circle3pts[0], _circle3pts[1], _circle3pts[2]);
-      _circle3centers.push(c1);
-      _measureSphere(c1, 0xff4444);
-      // Kreislinie zeichnen
-      const r = c1.distanceTo(_circle3pts[0]);
-      const pts3d = [];
-      const n = _circle3pts[1].clone().sub(_circle3pts[0]).cross(_circle3pts[2].clone().sub(_circle3pts[0])).normalize();
-      const u = _circle3pts[0].clone().sub(c1).normalize();
-      const v = n.clone().cross(u);
-      for (let i = 0; i <= 64; i++) {
-        const a = (i / 64) * Math.PI * 2;
-        pts3d.push(c1.clone().addScaledVector(u, Math.cos(a) * r).addScaledVector(v, Math.sin(a) * r));
-      }
-      const geo = new THREE.BufferGeometry().setFromPoints(pts3d);
-      const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xff4444, depthTest: false }));
-      line.renderOrder = 998;
-      scene.add(line); _measureSpheres.push(line);
-      $('msr-hint').textContent = 'Kreis 1 erkannt (r=' + Math.round(r) + 'mm) — 3 Punkte für Kreis 2';
+  // ── 3-Punkt-Kreis Modus ──────────────────────────────────────────
+  // Phase: 0 = Ebene1 wählen, 1-3 = 3 Punkte Kreis1, 4 = Ebene2 wählen, 5-7 = 3 Punkte Kreis2
+  const phase = _circle3State;
+
+  if (phase === 0 || phase === 4) {
+    // Ebene wählen - Klick definiert Ebene über Flächennormale
+    _circle3Planes[phase === 0 ? 0 : 1] = {
+      normal: faceNormal || new THREE.Vector3(0,0,1),
+      point: rawPt.clone(),
+      mesh: hitMesh
+    };
+    // Ebenen-Indikator
+    const indColor = phase === 0 ? 0xff6600 : 0x00aaff;
+    _measureSphere(rawPt, indColor);
+    _circle3State = phase + 1;
+    const cn = phase === 0 ? 1 : 2;
+    $('msr-hint').textContent = `Ebene ${cn} gewählt — 3 Punkte auf Kreis ${cn} klicken`;
+    return;
+  }
+
+  // Punkte auf Ebene snappen
+  const planeIdx = phase <= 3 ? 0 : 1;
+  const pl = _circle3Planes[planeIdx];
+  const pt = _measureSnapEnabled
+    ? _snapToVertex(rawPt, hitMesh, pl?.normal, pl?.point || rawPt)
+    : rawPt;
+
+  const colors = [0xff4444, 0xff8844, 0xffcc44, 0x44ff88, 0x44ccff, 0x8844ff];
+  _measureSphere(pt, colors[_circle3pts.length] || 0xffffff);
+  _circle3pts.push(pt);
+  _circle3State++;
+
+  const ptCount = _circle3pts.length;
+  if (ptCount === 3 || ptCount === 6) {
+    const base = ptCount - 3;
+    const p1 = _circle3pts[base], p2 = _circle3pts[base+1], p3 = _circle3pts[base+2];
+    const ctr = _circumcenter(p1, p2, p3);
+    _circle3centers.push(ctr);
+    const cColor = ptCount === 3 ? 0xff4444 : 0x44ff88;
+    _measureSphere(ctr, cColor);
+
+    // Kreis zeichnen
+    const r = ctr.distanceTo(p1);
+    const n3 = p2.clone().sub(p1).cross(p3.clone().sub(p1)).normalize();
+    const u3 = p1.clone().sub(ctr).normalize();
+    const v3 = n3.clone().cross(u3);
+    const pts3d = [];
+    for (let i = 0; i <= 64; i++) {
+      const a = (i/64)*Math.PI*2;
+      pts3d.push(ctr.clone().addScaledVector(u3, Math.cos(a)*r).addScaledVector(v3, Math.sin(a)*r));
     }
+    const cLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts3d),
+      new THREE.LineBasicMaterial({ color: cColor, depthTest: false })
+    );
+    cLine.renderOrder = 998;
+    scene.add(cLine); _measureSpheres.push(cLine);
 
-    if (_circle3pts.length === 6) {
-      const c2 = _circumcenter(_circle3pts[3], _circle3pts[4], _circle3pts[5]);
-      _circle3centers.push(c2);
-      _measureSphere(c2, 0x44ff88);
-      // Zweiter Kreis
-      const r2 = c2.distanceTo(_circle3pts[3]);
-      const n2 = _circle3pts[4].clone().sub(_circle3pts[3]).cross(_circle3pts[5].clone().sub(_circle3pts[3])).normalize();
-      const u2 = _circle3pts[3].clone().sub(c2).normalize();
-      const v2 = n2.clone().cross(u2);
-      const pts3d2 = [];
-      for (let i = 0; i <= 64; i++) {
-        const a = (i / 64) * Math.PI * 2;
-        pts3d2.push(c2.clone().addScaledVector(u2, Math.cos(a) * r2).addScaledVector(v2, Math.sin(a) * r2));
-      }
-      const geo2 = new THREE.BufferGeometry().setFromPoints(pts3d2);
-      const line2 = new THREE.Line(geo2, new THREE.LineBasicMaterial({ color: 0x44ff88, depthTest: false }));
-      line2.renderOrder = 998;
-      scene.add(line2); _measureSpheres.push(line2);
-
-      // Abstand zwischen Mittelpunkten
+    if (ptCount === 3) {
+      _circle3State = 4; // → Ebene 2 wählen
+      $('msr-hint').textContent = `Kreis 1: r=${Math.round(r)}mm — Ebene 2 klicken`;
+    } else {
+      // Fertig - Abstand messen
       _measureDrawLine(_circle3centers[0], _circle3centers[1]);
       _measureUpdate(_circle3centers[0], _circle3centers[1]);
-      $('msr-hint').textContent = 'Abstand Mittelpunkte — Klick: neue Messung';
+      $('msr-hint').textContent = `Abstand Mittelpunkte — Klick: neue Messung`;
       _measureReset3c();
-    } else if (_circle3pts.length < 3) {
-      $('msr-hint').textContent = `Punkt ${_circle3pts.length}/3 für Kreis 1 gesetzt`;
-    } else if (_circle3pts.length < 6) {
-      $('msr-hint').textContent = `Punkt ${_circle3pts.length - 3}/3 für Kreis 2 gesetzt`;
     }
-
-    if (_circle3pts.length >= 6) _circle3pts = [];
+  } else {
+    const remaining = ptCount < 3 ? 3 - ptCount : 6 - ptCount;
+    const cn = ptCount < 3 ? 1 : 2;
+    $('msr-hint').textContent = `Kreis ${cn}: noch ${remaining} Punkt${remaining>1?'e':''}`;
   }
 }
 
-// measurePickExtended is now wired directly in measureBtn handler
 
 window._toggleMeasureSnap = function() {
   _measureSnapEnabled = !_measureSnapEnabled;
