@@ -2695,11 +2695,15 @@ function _renderBodyTree() {
     name.textContent = node.label;
     name.style.cssText = 'flex:1;cursor:pointer;color:var(--txt);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
     name.onclick = () => _selectDescriptor({mesh:node.meshes[0].mesh, type:node.type, idx:node.idx, grp:node.grp}, node.grp);
+    const unassign = document.createElement('button');
+    unassign.textContent = '↩'; unassign.title = 'Zuweisung aufheben';
+    unassign.style.cssText = 'background:none;border:none;color:#60a5fa;cursor:pointer;font-size:12px;padding:0 2px';
+    unassign.onclick = ev => { ev.stopPropagation(); window._unassignNode(node); };
     const del = document.createElement('button');
     del.textContent = '✕'; del.title = 'Element löschen';
     del.style.cssText = 'background:none;border:none;color:#cc3333;cursor:pointer;font-size:12px;padding:0 2px';
     del.onclick = ev => { ev.stopPropagation(); _deleteMesh(node.meshes[0].mesh); };
-    row.appendChild(name); row.appendChild(del); host.appendChild(row);
+    row.appendChild(name); row.appendChild(unassign); row.appendChild(del); host.appendChild(row);
     if (node.meshes.length > 1) {
       node.meshes.forEach(d => {
         const leaf = document.createElement('div');
@@ -2718,6 +2722,61 @@ function _renderBodyTree() {
   });
 }
 
+
+// ── Zuweisung aufheben ─────────────────────────────────────────────
+window._unassignNode = async function(node) {
+  // STL-Buffer aus dem State holen
+  let buf = null, fname = null;
+
+  if (/^A[1-6]$/.test(node.type.toUpperCase()) || node.type === 'rail-fix' || node.type === 'rail-mov') {
+    // Achse oder Schiene: aus axisStlParts
+    const parts = state.axisStlParts[node.type] || [];
+    if (parts[0]) { buf = parts[0].buf; fname = parts[0].name; }
+  } else if (node.type === 'fix') {
+    const f = state.festeObjekte[node.idx];
+    if (f?.stlFile?.buf) { buf = f.stlFile.buf; fname = f.stlFile.name; }
+  } else if (node.type === 'eff') {
+    const e = state.effektoren[node.idx];
+    const t = e?.teile?.[0];
+    if (t?.stlFile?.buf) { buf = t.stlFile.buf; fname = t.stlFile.name; }
+  } else if (node.type === 'umf') {
+    const u = state.umfElemente[node.idx];
+    if (u?.stlFile?.buf) { buf = u.stlFile.buf; fname = u.stlFile.name; }
+  } else if (node.type === 'pos') {
+    const p = state.positioners[node.idx];
+    const eAx = 'E' + (p?.eNum || (node.idx + 2));
+    const parts = state.axisStlParts[eAx] || [];
+    if (parts[0]) { buf = parts[0].buf; fname = parts[0].name; }
+  } else if (node.type === 'obj') {
+    const o = state.objekte[node.idx];
+    const lbl = 'Label' + (o?.labelNum || (node.idx + 1));
+    const parts = state.axisStlParts[lbl] || [];
+    if (parts[0]) { buf = parts[0].buf; fname = parts[0].name; }
+  }
+
+  if (!buf || !fname) { alert('Kein STL-Buffer gefunden'); return; }
+
+  // Mesh neu erstellen und in Szene
+  try {
+    const geom = await parseGeometry(buf.buffer || buf, fname);
+    geom.computeVertexNormals();
+    geom.computeBoundingBox();
+    const center = new THREE.Vector3(); geom.boundingBox.getCenter(center);
+    geom.translate(-center.x, -center.y, -center.z);
+    geom.computeBoundingSphere();
+    const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: 0x5588cc, roughness: .42, metalness: .55 }));
+    mesh.name = fname;
+    mesh.userData.isUnassigned = true;
+    mesh.castShadow = true;
+    mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geom, 20), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 })));
+    scene.add(mesh);
+    _unassignedMeshes.set(fname, { mesh, buf: new Uint8Array(buf) });
+  } catch(e) { alert('Fehler: ' + e.message); return; }
+
+  // Element löschen ohne Bestätigung
+  _deleteMesh(node.meshes[0].mesh);
+  _renderBodyTree();
+};
 $('treeToggle')?.addEventListener('click', () => {
   _treeOpen = !_treeOpen;
   const p = $('bodyTreePanel'); if (p) p.style.display = _treeOpen ? '' : 'none';
