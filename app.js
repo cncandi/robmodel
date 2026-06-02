@@ -2682,7 +2682,7 @@ function _renderBodyTree() {
     hdr.textContent = 'IMPORTIERT — NICHT ZUGEWIESEN';
     host.appendChild(hdr);
 
-    const cats = ['A1','A2','A3','A4','A5','A6','Podest','Tool','Endeffektor','Positionierer','Schiene','Festes Obj.','Bew. Obj.'];
+    const cats = ['A1','A2','A3','A4','A5','A6','Podest','Tool','Endeffektor','Positionierer','Schiene (fest)','Schiene (bewegl.)','Festes Obj.','Bew. Obj.'];
     for (const [name] of _unassignedMeshes) {
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:5px;padding:2px 2px;border-radius:3px;transition:background .1s';row.onmouseover=()=>row.style.background='rgba(255,255,255,.07)';row.onmouseout=()=>row.style.background='';
@@ -5189,7 +5189,7 @@ function _dropNextStl() {
   if(/greifer|effekt|endeffektor/i.test(nm)) guess='Endeffektor';
   if(/umfeld|umgebung|fence|zaun/i.test(nm)) guess='Umgebung';
   if(/positionier|drehtisch/i.test(nm)) guess='Positionierer';
-  if(/schiene|rail|track/i.test(nm)) guess='Schiene';
+  if(/schiene.*fix|rail.*fix|track.*fix/i.test(nm)) guess='Schiene (fest)'; else if(/schiene|rail|track/i.test(nm)) guess='Schiene (fest)';
   if(/fest|fixture|tisch/i.test(nm)) guess='Festes Obj.';
   _showDropAxisPicker(file, guess);
 }
@@ -5207,7 +5207,7 @@ function _showDropAxisPicker(file, preselect) {
   document.getElementById('drop-skip-btn').onclick=_dropSkipStl;
   document.getElementById('drop-cancel-btn').onclick=_dropCancelAll;
   var btns=document.getElementById('drop-dlg-btns');
-  ['A1','A2','A3','A4','A5','A6','Podest','Tool','Endeffektor','Umgebung','Positionierer','Schiene','Festes Obj.','Bew. Obj.'].forEach(function(ax){
+  ['A1','A2','A3','A4','A5','A6','Podest','Tool','Endeffektor','Umgebung','Positionierer','Schiene (fest)','Schiene (bewegl.)','Festes Obj.','Bew. Obj.'].forEach(function(ax){
     var b=document.createElement('button');
     b.textContent=ax;
     b.style.cssText='padding:4px 6px;border-radius:3px;cursor:pointer;font-family:monospace;font-size:.78em;white-space:nowrap;'+(ax===preselect?'background:var(--acc);color:#000;border:none;font-weight:700;':'background:var(--bg3);border:1px solid var(--bdr);color:var(--txt2);');
@@ -5259,11 +5259,18 @@ async function _dropAssignStl(file, cat) {
       state.axisStlParts[eAx]=[{name:dn,color:'#e8a020',buf:stlBuf}];
       state.positioners.push(pos); positionerGroups.push(null);
       rebuildPositionerMesh?.(state.positioners.length-1); renderPosRows?.();
-    } else if(cat==='Schiene'){
+    } else if(cat==='Schiene (fest)'||cat==='Schiene'){
+      if(!state.schienen.length) state.schienen=[{name:dn.replace('.stl',''),length_mm:2000,height_mm:200,width_mm:400,axis:'X+',eNumber:1,eMin:0,eMax:2000,ePos:0,showBox:false,boxOffset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}}];
       const eAx='E1';
-      state.schienen=[{name:dn.replace('.stl',''),length_mm:2000,height_mm:200,width_mm:400,axis:'X+',
-        eNumber:1,eMin:0,eMax:2000,ePos:0,showBox:false,boxOffset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}}];
+      if(!state.axisStlParts[eAx]) state.axisStlParts[eAx]=[];
       state.axisStlParts[eAx]=[{name:dn,color:'#2563eb',buf:stlBuf}];
+      if(!state.schienen[0].fixedPart) state.schienen[0].fixedPart={x:0,y:0,z:0,rx:0,ry:0,rz:0};
+      state.schienen[0].fixedPart.stl=dn; state.schienen[0].fixedPart.buf=stlBuf;
+      rebuildRailMeshes(); renderRailRows?.();
+    } else if(cat==='Schiene (bewegl.)'){
+      if(!state.schienen.length) state.schienen=[{name:'Schiene',length_mm:2000,height_mm:200,width_mm:400,axis:'X+',eNumber:1,eMin:0,eMax:2000,ePos:0,showBox:false,boxOffset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}}];
+      if(!state.schienen[0].movingPart) state.schienen[0].movingPart={x:0,y:0,z:0,rx:0,ry:0,rz:0};
+      state.schienen[0].movingPart.stl=dn; state.schienen[0].movingPart.buf=stlBuf;
       rebuildRailMeshes(); renderRailRows?.();
     } else if(cat==='Festes Obj.'){
       const fidx=state.festeObjekte.length;
