@@ -782,6 +782,7 @@ function updateCSHelper() {
   // Altes CS-Helper entfernen
   while (csHelperGroup.children.length) csHelperGroup.children.pop();
   if (!axisMeshes.length) return;
+  if (!_csVisible) return;
 
   const pts = cumulativeAxisPositions();
   const pos = pts[state.selectedAxis] || new THREE.Vector3();
@@ -6187,7 +6188,6 @@ window.toggleCS = function() {
   if (csHelperGroup) csHelperGroup.visible = _csVisible;
   if (window._worldAxes) window._worldAxes.visible = _csVisible;
   if (axisPointGroup) axisPointGroup.visible = _csVisible;
-  if (tcpMarker) tcpMarker.visible = false; // immer aus
   const btn = document.getElementById('rib-cs');
   if (btn) btn.classList.toggle('on', _csVisible);
   if (typeof requestRender === 'function') requestRender();
