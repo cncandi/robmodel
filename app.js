@@ -6213,20 +6213,17 @@ document.getElementById('bgImageInput')?.addEventListener('change', e => {
   const url = URL.createObjectURL(file);
   // CSS-Hintergrund statt Three.js background → kein Verzerren
   const canvas = document.getElementById('viewer');
-  const viewerCard = document.getElementById('dropZone');
-  const target = viewerCard || canvas;
-  if (target) {
-    target.style.backgroundImage = 'url(' + url + ')';
-    target.style.backgroundSize = 'auto 100%';
-    target.style.backgroundPosition = 'center';
-    target.style.backgroundRepeat = 'no-repeat';
-    target.style.backgroundColor = '#000000';
+  if (canvas) {
+    canvas.style.backgroundImage = 'url(' + url + ')';
+    canvas.style.backgroundSize = 'auto 100%';
+    canvas.style.backgroundPosition = 'center';
+    canvas.style.backgroundRepeat = 'no-repeat';
+    canvas.style.backgroundColor = '#000000';
   }
   // Three.js background transparent
   if (_bgOrigColor === null && scene.background) _bgOrigColor = scene.background.clone();
   scene.background = null;
   renderer.setClearAlpha(0);
-  if (canvas) canvas.style.background = 'transparent';
   _bgTexture = url; // URL merken für Cleanup
   const btn = document.getElementById('rib-bg');
   if (btn) {
@@ -6239,11 +6236,8 @@ document.getElementById('bgImageInput')?.addEventListener('change', e => {
 
 window.removeBg = function() {
   if (_bgTexture) { URL.revokeObjectURL(_bgTexture); _bgTexture = null; }
-  const viewerCard = document.getElementById('dropZone');
   const canvas = document.getElementById('viewer');
-  const target = viewerCard || canvas;
-  if (target) { target.style.backgroundImage = ''; }
-  if (canvas) canvas.style.background = '';
+  if (canvas) { canvas.style.backgroundImage = ''; canvas.style.backgroundColor = ''; }
   renderer.setClearAlpha(1);
   if (_bgOrigColor) scene.background = _bgOrigColor;
   const btn = document.getElementById('rib-bg');
