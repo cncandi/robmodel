@@ -1510,8 +1510,12 @@ function handleRibView(btn){
       <!-- Elementliste links -->
       <div id="matPartList" style="width:220px;min-width:180px;border-right:1px solid #1e3450;overflow-y:auto;padding:8px"></div>
       <!-- Editor rechts -->
-      <div id="matEditor" style="flex:1;overflow-y:auto;padding:16px">
-        <div style="color:#4a6a8a;font-size:13px;margin-top:40px;text-align:center">Element links auswählen</div>
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+        <div id="matEditor" style="flex:1;overflow-y:auto;padding:16px">
+          <div style="color:#4a6a8a;font-size:13px;margin-top:40px;text-align:center">Element links auswählen</div>
+        </div>
+        <canvas id="mat-shared-preview" width="400" height="220"
+          style="width:100%;height:220px;border-top:1px solid #1e3450;background:#0a1520;flex-shrink:0"></canvas>
       </div>
     </div>
   </div>

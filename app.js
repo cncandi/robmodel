@@ -5865,9 +5865,7 @@ function _renderMatEditor(f, idx) {
       </button>` : ''}
     </div>
 
-    <canvas id="mat-preview-${idx}" width="400" height="280"
-      style="width:100%;max-width:400px;border:1px solid #1e3450;border-radius:4px;background:#0a1520"></canvas>
-  `;
+  \`;
 
   // Preview-Scene aufbauen
   _initMatPreview(idx, f);
@@ -5887,54 +5885,42 @@ function _renderMatEditor(f, idx) {
 }
 
 // ── Preview Three.js Scene pro Element ────────────────────────────
-const _matPreviews = new Map(); // idx → { renderer, scene, mesh, animId }
+// Einziger geteilter Preview-Renderer (verhindert WebGL-Kontext-Limit)
+let _sharedPreview = null; // { renderer, scene, camera, controls, mesh, animId, currentIdx }
+const _matPreviews = new Map(); // idx → material state (für Kompatibilität)
 
 function _initMatPreview(idx, f) {
-  const canvas = document.getElementById('mat-preview-' + idx);
+  const canvas = document.getElementById('mat-shared-preview');
   if (!canvas) return;
 
-  // Bestehende Preview wiederverwenden falls möglich (verhindert "too many WebGL contexts")
-  const existing = _matPreviews.get(idx);
-  if (existing && existing.canvas === canvas) {
-    // Mesh aktualisieren
-    const srcMesh = meshes.get(f.path);
-    if (srcMesh) {
-      existing.scene.remove(existing.mesh);
-      existing.mesh.geometry.dispose();
-      const geo = srcMesh.geometry.clone();
-      geo.computeVertexNormals();
-      existing.mesh = new THREE.Mesh(geo, existing.mesh.material);
-      existing.mesh.castShadow = true; existing.mesh.receiveShadow = true;
-      existing.scene.add(existing.mesh);
+  // Shared Preview: Mesh austauschen statt neuen Renderer erstellen
+  if (_sharedPreview) {
+    cancelAnimationFrame(_sharedPreview.animId);
+    if (_sharedPreview.mesh) {
+      _sharedPreview.scene.remove(_sharedPreview.mesh);
+      _sharedPreview.mesh.geometry.dispose();
     }
-    if (typeof _matApplyToPreview === 'function') {
-      const ms = _matState.get(f.path);
-      if (ms && Object.keys(ms.maps).length) _matApplyToPreview(idx, f);
-    }
-    return;
+  } else {
+    // Einmalig Renderer erstellen
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a1520);
+    const camera = new THREE.PerspectiveCamera(45, 400/220, 0.1, 100000);
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setSize(canvas.clientWidth || 400, canvas.clientHeight || 220, false);
+    renderer.shadowMap.enabled = true;
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const dl = new THREE.DirectionalLight(0xffffff, 1.8);
+    dl.position.set(200, 300, 250); dl.castShadow = true;
+    scene.add(dl);
+    scene.add(new THREE.GridHelper(300, 20, 0x1b3454, 0x0f2038));
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    _sharedPreview = { renderer, scene, camera, controls, mesh: null, animId: null, currentIdx: -1 };
   }
 
-  // Alte Preview aufräumen
-  if (existing) { cancelAnimationFrame(existing.animId); existing.renderer.dispose(); }
-
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a1520);
-
-  const camera = new THREE.PerspectiveCamera(45, 400/280, 0.1, 100000);
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setSize(canvas.clientWidth || 400, canvas.clientHeight || 280, false);
-  renderer.shadowMap.enabled = true;
-
-  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-  const dl = new THREE.DirectionalLight(0xffffff, 1.8);
-  dl.position.set(200, 300, 250); dl.castShadow = true;
-  scene.add(dl);
-  scene.add(new THREE.GridHelper(300, 20, 0x1b3454, 0x0f2038));
-
-  // Mesh aus meshes-Map oder effektorGroups/objekteGroups kopieren
+  // Mesh für dieses Element laden
   let srcMesh = meshes.get(f.path);
   if (!srcMesh) {
-    // In allen Gruppen suchen
     const allGroups = [...(effektorGroups||[]), ...(objekteGroups||[]), ...(umfGroups||[])];
     for (const grp of allGroups) {
       if (!grp) continue;
@@ -5951,7 +5937,9 @@ function _initMatPreview(idx, f) {
     mesh = new THREE.Mesh(new THREE.BoxGeometry(100,100,100), new THREE.MeshStandardMaterial({ color: 0xb8b8b8 }));
   }
   mesh.castShadow = true; mesh.receiveShadow = true;
-  scene.add(mesh);
+  _sharedPreview.scene.add(mesh);
+  _sharedPreview.mesh = mesh;
+  _sharedPreview.currentIdx = idx;
 
   // Kamera zentrieren
   const box = new THREE.Box3().setFromObject(mesh);
@@ -5959,23 +5947,22 @@ function _initMatPreview(idx, f) {
   const size = new THREE.Vector3(); box.getSize(size);
   mesh.position.sub(center);
   const dist = Math.max(size.x, size.y, size.z) * 2.2 || 300;
-  camera.position.set(dist, dist * 0.7, dist);
-  camera.lookAt(0, 0, 0);
+  _sharedPreview.camera.position.set(dist, dist * 0.7, dist);
+  _sharedPreview.camera.lookAt(0, 0, 0);
+  _sharedPreview.controls.target.set(0, 0, 0);
+  _sharedPreview.controls.update();
 
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
+  // _matPreviews für Kompatibilität mit _matApplyToPreview
+  _matPreviews.set(idx, _sharedPreview);
 
-  let animId;
   function animate() {
-    animId = requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
+    _sharedPreview.animId = requestAnimationFrame(animate);
+    _sharedPreview.controls.update();
+    _sharedPreview.renderer.render(_sharedPreview.scene, _sharedPreview.camera);
   }
   animate();
 
-  _matPreviews.set(idx, { renderer, scene, mesh, camera, controls, animId, canvas });
-
-  // Vorhandenes Material anwenden falls vorhanden
+  // Vorhandenes Material anwenden
   const ms = _matState.get(f.path);
   if (ms && Object.keys(ms.maps).length) _matApplyToPreview(idx, f);
 }
