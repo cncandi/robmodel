@@ -5840,6 +5840,7 @@ async function tryLoadAxisPng(buffers) {
 let _currentRenderMode = 2;
 
 window.setRenderMode = function setRenderMode(mode) {
+  if (_measureActive) return; // Kein Rendermode-Wechsel während Messung
   _currentRenderMode = mode;
   for (let i = 0; i <= 6; i++) {
     const btn = document.getElementById('renderMode' + i);
@@ -6521,32 +6522,38 @@ function _measureReset3c() {
 }
 
 // Vertex-Snap: nächster Vertex innerhalb Pixel-Toleranz
-function _snapToVertex(hitPoint, hitMesh, screenX, screenY) {
+function _snapToVertex(hitPoint, hitMesh) {
   const geo = hitMesh.geometry;
   if (!geo?.attributes?.position) return hitPoint;
 
+  const snapR = parseFloat(document.getElementById('msr-snap-r')?.value || '30');
   const pos = geo.attributes.position;
   const matWorld = hitMesh.matrixWorld;
-  const rect = renderer.domElement.getBoundingClientRect();
 
-  let bestDist = Infinity;
-  let bestPt = hitPoint.clone();
-  const SNAP_PX = 20; // Pixel-Toleranz
+  let bestDist = snapR; // nur innerhalb Radius
+  let bestPt = null;
 
   const v = new THREE.Vector3();
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i).applyMatrix4(matWorld);
-    // In Screenspace projizieren
-    const projected = v.clone().project(camera);
-    const sx = (projected.x * 0.5 + 0.5) * rect.width + rect.left;
-    const sy = (-projected.y * 0.5 + 0.5) * rect.height + rect.top;
-    const d = Math.sqrt((sx - screenX) ** 2 + (sy - screenY) ** 2);
-    if (d < SNAP_PX && d < bestDist) {
+    const d = v.distanceTo(hitPoint);
+    if (d < bestDist) {
       bestDist = d;
       bestPt = v.clone();
     }
   }
-  return bestPt;
+  // Snap-Indikator: Kugel kurz aufleuchten lassen
+  if (bestPt) {
+    const ind = new THREE.Mesh(
+      new THREE.SphereGeometry(8, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xffff00, depthTest: false })
+    );
+    ind.position.copy(bestPt);
+    ind.renderOrder = 1000;
+    scene.add(ind);
+    setTimeout(() => scene.remove(ind), 500);
+  }
+  return bestPt || hitPoint;
 }
 
 // 3-Punkt-Kreis: Mittelpunkt berechnen
@@ -6592,7 +6599,7 @@ function _measurePickExtended(event) {
   if (!hits.length) return;
 
   // Vertex-Snap
-  const pt = _measureSnapEnabled ? _snapToVertex(hits[0].point, hits[0].object, event.clientX, event.clientY) : hits[0].point.clone();
+  const pt = _measureSnapEnabled ? _snapToVertex(hits[0].point, hits[0].object) : hits[0].point.clone();
 
   if (_measureMode === 'pp') {
     // Original Punkt-zu-Punkt Logik
