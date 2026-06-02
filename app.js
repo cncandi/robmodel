@@ -3017,7 +3017,7 @@ $('measureBtn')?.addEventListener('click',()=>{
     btn?.classList.add('on'); $('rib-measure')?.classList.add('on');
     if(panel) panel.style.display='';
     _measureReset(); _measureReset3c();
-    renderer.domElement.addEventListener('pointerdown', _measurePickExtended);
+    renderer.domElement.addEventListener('pointerdown', window._measurePickExtended || _measurePick);
     // Stirnkanten für bessere Sichtbarkeit beim Messen
     _measurePrevRenderMode = _currentRenderMode;
     window.setRenderMode(2);
@@ -3027,7 +3027,7 @@ $('measureBtn')?.addEventListener('click',()=>{
   } else {
     btn?.classList.remove('on'); $('rib-measure')?.classList.remove('on');
     if(panel) panel.style.display='none';
-    renderer.domElement.removeEventListener('pointerdown', _measurePickExtended);
+    renderer.domElement.removeEventListener('pointerdown', window._measurePickExtended || _measurePick);
     _measureReset(); _measureReset3c();
     // Rendermode wiederherstellen
     if (typeof _measurePrevRenderMode !== 'undefined') window.setRenderMode(_measurePrevRenderMode);
@@ -6589,7 +6589,7 @@ function _circumcenter(p1, p2, p3) {
 const _measurePickOrig = _measurePick;
 renderer.domElement.removeEventListener('pointerdown', _measurePick);
 
-function _measurePickExtended(event) {
+window._measurePickExtended = function _measurePickExtended(event) {
   if (!_measureActive) return;
   if (event.button !== undefined && event.button !== 0) return;
 
