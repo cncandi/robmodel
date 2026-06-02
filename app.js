@@ -6281,11 +6281,14 @@ document.getElementById('stlImportInput')?.addEventListener('change', async e =>
       // Kanten-Overlay
       const edges = new THREE.EdgesGeometry(geom, 20);
       mesh.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 })));
+      // Geometrie zentrieren statt Mesh-Position verschieben
+      geom.computeBoundingBox();
+      const center = new THREE.Vector3();
+      geom.boundingBox.getCenter(center);
+      geom.translate(-center.x, -center.y, -center.z);
+      geom.computeBoundingBox();
+      geom.computeBoundingSphere();
       scene.add(mesh);
-      // Kamera auf Objekt ausrichten
-      const box = new THREE.Box3().setFromObject(mesh);
-      const center = new THREE.Vector3(); box.getCenter(center);
-      mesh.position.sub(center); // zentrieren
       _unassignedMeshes.set(fname, { mesh, buf: new Uint8Array(rawBuf) });
     } catch(err) {
       alert('Fehler beim Laden: ' + file.name + '\n' + err.message);
