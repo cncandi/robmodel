@@ -6188,8 +6188,11 @@ window.toggleCS = function() {
   _csVisible = !_csVisible;
   if (csHelperGroup) csHelperGroup.visible = _csVisible;
   if (window._worldAxes) window._worldAxes.visible = _csVisible;
-  if (axisPointGroup) axisPointGroup.visible = _csVisible;
   if (effTcpHelper) effTcpHelper.visible = _csVisible;
+  // Labels + Raycaster-Kugeln ausblenden, Skelett nicht anfassen
+  if (axisPointGroup) axisPointGroup.traverse(o => {
+    if (o.userData.isAxisLabel || o.userData.axisIndex !== undefined) o.visible = _csVisible;
+  });
   updateEffTcpMarker();
   const btn = document.getElementById('rib-cs');
   if (btn) btn.classList.toggle('on', _csVisible);
