@@ -6603,7 +6603,11 @@ function _measurePickExtended(event) {
   const hits = rc.intersectObjects(pickable, false);
   if (!hits.length) return;
 
-  const pt = _snapToVertex(hits[0].point.clone());
+  const rawHit = hits[0].point.clone();
+  const pt = _snapToVertex(rawHit);
+  console.log('[SNAP] raw:', rawHit.x.toFixed(1), rawHit.y.toFixed(1), rawHit.z.toFixed(1),
+              '→ snapped:', pt.x.toFixed(1), pt.y.toFixed(1), pt.z.toFixed(1),
+              'diff:', rawHit.distanceTo(pt).toFixed(1), 'mm');
 
   if (_measureMode === 'pp') {
     if (!_measureP1) {
