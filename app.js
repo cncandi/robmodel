@@ -2333,6 +2333,28 @@ function _getGimbalMeshes() {
   (festeGrps||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'fix', idx:i, grp:g}); }); });
   (effektorGroups||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'eff', idx:i, grp:g}); }); });
   (umfGroups||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'umf', idx:i, grp:g}); }); });
+  // Achsen A1-A6
+  const axKeys = ['A1','A2','A3','A4','A5','A6'];
+  axKeys.forEach((ax, i) => {
+    const parts = state.axisStlParts?.[ax] || [];
+    if (parts.length) {
+      const grp = axisPivotGroups[i] || robotGroup;
+      if (grp) grp.traverse(c => {
+        if (c.isMesh && parts.some(p => c.name === p.name || norm(c.name) === norm(p.name)))
+          result.push({ mesh: c, type: 'axis', idx: i, grp, axKey: ax });
+      });
+    }
+  });
+  // Podest
+  if (meshes.size) {
+    for (const [path, mesh] of meshes) {
+      const f = state.stls.find(s => s.path === path);
+      if (!f) continue;
+      const key = partKey(f.name);
+      if (key === 'Podest') result.push({ mesh, type: 'podest', idx: 0, grp: robotGroup });
+      else if (key === 'Tool') result.push({ mesh, type: 'tool', idx: 0, grp: toolGroup });
+    }
+  }
   // Unassigned importierte STLs
   for (const [, entry] of _unassignedMeshes) {
     if (entry.mesh) result.push({ mesh: entry.mesh, type: 'unassigned', idx: 0, grp: entry.mesh });
@@ -2630,6 +2652,9 @@ function _bodyTreeData() {
     if (type==='pos'){ const p=state.positioners[idx]; return 'Positionierer '+(idx+1)+(p&&p.name?(' — '+p.name):''); }
     if (type==='fix'){ const f=state.festeObjekte[idx]; return 'Festes Objekt '+(idx+1)+(f&&f.name?(' — '+f.name):''); }
     if (type==='rail'){ return 'Schiene'; }
+    if (type==='axis'){ return 'Achse A'+(idx+1); }
+    if (type==='podest'){ return 'Podest'; }
+    if (type==='tool'){ return 'Werkzeug'; }
     return type+' '+idx;
   };
   all.forEach(d => {
@@ -2668,7 +2693,7 @@ function _renderBodyTree() {
       row.style.cssText = 'display:flex;align-items:center;gap:5px;padding:2px 2px;border-radius:3px;transition:background .1s';row.onmouseover=()=>row.style.background='rgba(255,255,255,.07)';row.onmouseout=()=>row.style.background='';
       const nm = document.createElement('span');
       nm.textContent = name;
-      nm.style.cssText = 'flex:1;color:#6699dd;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      nm.style.cssText = 'flex:1;color:#6699dd;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
       const sel = document.createElement('select');
       sel.style.cssText = 'background:#0a1520;border:1px solid #2a4060;color:#d0dce8;border-radius:3px;padding:1px 3px;font-size:10px;max-width:110px';
       sel.innerHTML = '<option value="">zuweisen…</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
@@ -2693,7 +2718,7 @@ function _renderBodyTree() {
     row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:3px 2px';
     const name = document.createElement('span');
     name.textContent = node.label;
-    name.style.cssText = 'flex:1;cursor:pointer;color:var(--txt);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    name.style.cssText = 'flex:1;cursor:pointer;color:var(--txt);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
     name.onclick = () => _selectDescriptor({mesh:node.meshes[0].mesh, type:node.type, idx:node.idx, grp:node.grp}, node.grp);
     const unassign = document.createElement('button');
     unassign.textContent = '↩'; unassign.title = 'Zuweisung aufheben';
@@ -2728,9 +2753,15 @@ window._unassignNode = async function(node) {
   // STL-Buffer aus dem State holen
   let buf = null, fname = null;
 
-  if (/^A[1-6]$/.test(node.type.toUpperCase()) || node.type === 'rail-fix' || node.type === 'rail-mov') {
-    // Achse oder Schiene: aus axisStlParts
-    const parts = state.axisStlParts[node.type] || [];
+  if (node.type === 'axis') {
+    const ax = 'A' + (node.idx + 1);
+    const parts = state.axisStlParts?.[ax] || [];
+    if (parts[0]) { buf = parts[0].buf; fname = parts[0].name; }
+  } else if (node.type === 'podest' || node.type === 'tool') {
+    const mesh = node.meshes[0]?.mesh;
+    if (mesh) { buf = exportBinaryStl(mesh); fname = mesh.name; }
+  } else if (node.type === 'rail-fix' || node.type === 'rail-mov') {
+    const parts = state.axisStlParts['E1'] || [];
     if (parts[0]) { buf = parts[0].buf; fname = parts[0].name; }
   } else if (node.type === 'fix') {
     const f = state.festeObjekte[node.idx];
