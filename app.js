@@ -624,7 +624,7 @@ function rebuildSkeletonMeshes(pts) {
   // Zylinder zwischen aufeinanderfolgenden Punkten
   for (let i = 0; i < pts.length - 1; i++) {
     const cyl = buildSkeletonCylinder(pts[i], pts[i+1], LINK_R[i] || 5);
-    if (cyl) { axisPointGroup.add(cyl); skeletonCyls.push(cyl); }
+    if (cyl) { cyl.visible = _skeletonVisible; axisPointGroup.add(cyl); skeletonCyls.push(cyl); }
   }
   // Kugeln an Gelenkpunkten (ab Index 1 = A1)
   for (let i = 1; i < pts.length; i++) {
@@ -633,6 +633,7 @@ function rebuildSkeletonMeshes(pts) {
     const sph = new THREE.Mesh(new THREE.SphereGeometry(JOINT_R_at(i-1) || 10, 12, 8), mat);
     sph.position.copy(pts[i]);
     sph.userData.isSkelSph = true;
+    sph.visible = _skeletonVisible;
     axisPointGroup.add(sph); skeletonSphs.push(sph);
   }
 }
@@ -6155,6 +6156,8 @@ window.toggleCS = function() {
   _csVisible = !_csVisible;
   if (csHelperGroup) csHelperGroup.visible = _csVisible;
   if (window._worldAxes) window._worldAxes.visible = _csVisible;
+  if (axisPointGroup) axisPointGroup.visible = _csVisible;
+  if (tcpMarker) tcpMarker.visible = false; // immer aus
   const btn = document.getElementById('rib-cs');
   if (btn) btn.classList.toggle('on', _csVisible);
   if (typeof requestRender === 'function') requestRender();
