@@ -6402,18 +6402,16 @@ window._ctxAssign = function(cat) {
   if (!_ctxMesh) return;
   const name = _ctxMesh.name;
 
-  // Aus Szene entfernen falls unassigned
-  if (_ctxMesh.userData.isUnassigned) {
-    scene.remove(_ctxMesh);
-    _unassignedMeshes.delete(name);
-  }
-
-  // Buf holen
+  // Buf ZUERST holen, dann erst entfernen
   const entry = _unassignedMeshes.get(name);
-  const buf = entry?.buf || (meshes.get(name) ? exportBinaryStl(meshes.get(name)) : null);
-  if (!buf) return;
+  const buf = entry?.buf;
+  if (!buf) { console.warn('_ctxAssign: kein buf für', name); return; }
 
-  // Als File-ähnliches Objekt verpacken und _dropAssignStl aufrufen
+  // Aus Szene entfernen
+  scene.remove(_ctxMesh);
+  _unassignedMeshes.delete(name);
+
+  // Als File verpacken und zuweisen
   const blob = new Blob([buf], { type: 'application/octet-stream' });
   const file = new File([blob], name);
   _dropAssignStl(file, cat);
