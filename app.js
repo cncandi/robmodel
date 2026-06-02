@@ -5891,9 +5891,29 @@ function _initMatPreview(idx, f) {
   const canvas = document.getElementById('mat-preview-' + idx);
   if (!canvas) return;
 
+  // Bestehende Preview wiederverwenden falls möglich (verhindert "too many WebGL contexts")
+  const existing = _matPreviews.get(idx);
+  if (existing && existing.canvas === canvas) {
+    // Mesh aktualisieren
+    const srcMesh = meshes.get(f.path);
+    if (srcMesh) {
+      existing.scene.remove(existing.mesh);
+      existing.mesh.geometry.dispose();
+      const geo = srcMesh.geometry.clone();
+      geo.computeVertexNormals();
+      existing.mesh = new THREE.Mesh(geo, existing.mesh.material);
+      existing.mesh.castShadow = true; existing.mesh.receiveShadow = true;
+      existing.scene.add(existing.mesh);
+    }
+    if (typeof _matApplyToPreview === 'function') {
+      const ms = _matState.get(f.path);
+      if (ms && Object.keys(ms.maps).length) _matApplyToPreview(idx, f);
+    }
+    return;
+  }
+
   // Alte Preview aufräumen
-  const old = _matPreviews.get(idx);
-  if (old) { cancelAnimationFrame(old.animId); old.renderer.dispose(); }
+  if (existing) { cancelAnimationFrame(existing.animId); existing.renderer.dispose(); }
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0a1520);
@@ -5909,8 +5929,17 @@ function _initMatPreview(idx, f) {
   scene.add(dl);
   scene.add(new THREE.GridHelper(300, 20, 0x1b3454, 0x0f2038));
 
-  // Mesh aus vorhandenem meshes-Map kopieren
-  const srcMesh = meshes.get(f.path);
+  // Mesh aus meshes-Map oder effektorGroups/objekteGroups kopieren
+  let srcMesh = meshes.get(f.path);
+  if (!srcMesh) {
+    // In allen Gruppen suchen
+    const allGroups = [...(effektorGroups||[]), ...(objekteGroups||[]), ...(umfGroups||[])];
+    for (const grp of allGroups) {
+      if (!grp) continue;
+      grp.traverse(o => { if (o.isMesh && !srcMesh) srcMesh = o; });
+      if (srcMesh) break;
+    }
+  }
   let mesh;
   if (srcMesh) {
     const geo = srcMesh.geometry.clone();
@@ -5942,7 +5971,7 @@ function _initMatPreview(idx, f) {
   }
   animate();
 
-  _matPreviews.set(idx, { renderer, scene, mesh, camera, controls, animId });
+  _matPreviews.set(idx, { renderer, scene, mesh, camera, controls, animId, canvas });
 
   // Vorhandenes Material anwenden falls vorhanden
   const ms = _matState.get(f.path);
