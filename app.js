@@ -2988,24 +2988,80 @@ function _measurePick(event) {
   const my = -((event.clientY-rect.top)/rect.height)*2+1;
   const rc = new THREE.Raycaster();
   rc.setFromCamera(new THREE.Vector2(mx,my), camera);
-  // Collect all pickable meshes
   const pickable = [];
-  scene.traverse(obj=>{ if(obj.isMesh && obj.visible) pickable.push(obj); });
+  scene.traverse(obj=>{ if(obj.isMesh && obj.visible && !obj.userData.noRenderMode) pickable.push(obj); });
   const hits = rc.intersectObjects(pickable, false);
   if(!hits.length) return;
-  const pt = hits[0].point.clone();
-  if(!_measureP1) {
-    _measureP1 = pt;
-    _measureSphere(pt, 0xff4444);
-    $('msr-hint').textContent = 'P1 gesetzt — Klick: P2 setzen';
+
+  // Snap: nächster Vertex im Radius
+  const rawPt = hits[0].point.clone();
+  let pt = rawPt.clone();
+  if (typeof _measureSnapEnabled !== 'undefined' && _measureSnapEnabled) {
+    const snapR = parseFloat(document.getElementById('msr-snap-r')?.value || '50');
+    let bestDist = snapR, bestPt = null;
+    const v = new THREE.Vector3();
+    scene.traverse(obj => {
+      if (!obj.isMesh || !obj.visible || !obj.geometry?.attributes?.position) return;
+      if (obj.userData.noRenderMode) return;
+      const pos = obj.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
+        const d = v.distanceTo(rawPt);
+        if (d < bestDist) { bestDist = d; bestPt = v.clone(); }
+      }
+    });
+    if (bestPt) {
+      pt = bestPt;
+      const ind = new THREE.Mesh(new THREE.SphereGeometry(10,8,6),
+        new THREE.MeshBasicMaterial({color:0xffff00,depthTest:false}));
+      ind.position.copy(pt); ind.renderOrder=1000;
+      scene.add(ind); setTimeout(()=>scene.remove(ind),500);
+    }
+    console.log('[SNAP] raw→snap diff:', rawPt.distanceTo(pt).toFixed(1)+'mm', 'snapR:'+snapR);
+  }
+
+  const mode = typeof _measureMode !== 'undefined' ? _measureMode : 'pp';
+
+  if (mode === 'pp') {
+    if(!_measureP1) {
+      _measureP1 = pt; _measureSphere(pt, 0xff4444);
+      $('msr-hint').textContent = 'P1 gesetzt — Klick: P2 setzen';
+    } else {
+      _measureP2 = pt; _measureSphere(pt, 0x44ff88);
+      _measureDrawLine(_measureP1, _measureP2);
+      _measureUpdate(_measureP1, _measureP2);
+      $('msr-hint').textContent = 'Neuer Klick: neue Messung starten';
+      _measureP1 = null; _measureP2 = null;
+    }
+    return;
+  }
+
+  // 3-Punkt-Kreis
+  if (typeof _circle3pts === 'undefined') return;
+  const colors = [0xff4444,0xff8844,0xffcc44,0x44ff88,0x44ccff,0x8844ff];
+  _measureSphere(pt, colors[_circle3pts.length]||0xffffff);
+  _circle3pts.push(pt);
+  const n = _circle3pts.length;
+
+  if (n === 3 || n === 6) {
+    const b = n-3;
+    const ctr = _circumcenter(_circle3pts[b],_circle3pts[b+1],_circle3pts[b+2]);
+    _circle3centers.push(ctr);
+    const cCol = n===3 ? 0xff4444 : 0x44ff88;
+    _measureSphere(ctr, cCol);
+    const r = ctr.distanceTo(_circle3pts[b]);
+    const nv = _circle3pts[b+1].clone().sub(_circle3pts[b]).cross(_circle3pts[b+2].clone().sub(_circle3pts[b])).normalize();
+    const u = _circle3pts[b].clone().sub(ctr).normalize();
+    const vv = nv.clone().cross(u);
+    const pts3d=[];
+    for(let i=0;i<=64;i++){const a=(i/64)*Math.PI*2;pts3d.push(ctr.clone().addScaledVector(u,Math.cos(a)*r).addScaledVector(vv,Math.sin(a)*r));}
+    const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts3d),new THREE.LineBasicMaterial({color:cCol,depthTest:false}));
+    ln.renderOrder=998; scene.add(ln); _measureSpheres.push(ln);
+    if(n===3){$('msr-hint').textContent=`Kreis 1: r=${Math.round(r)}mm — 3 Punkte für Kreis 2`;}
+    else{_measureDrawLine(_circle3centers[0],_circle3centers[1]);_measureUpdate(_circle3centers[0],_circle3centers[1]);$('msr-hint').textContent='Abstand Mittelpunkte';_measureReset3c();}
   } else {
-    _measureP2 = pt;
-    _measureSphere(pt, 0x44ff88);
-    _measureDrawLine(_measureP1, _measureP2);
-    _measureUpdate(_measureP1, _measureP2);
-    $('msr-hint').textContent = 'Neuer Klick: neue Messung starten';
-    // Next click resets
-    _measureP1 = null; _measureP2 = null;
+    const cn=n<=3?1:2, rem=n<=3?3-n:6-n;
+    $('msr-hint').textContent=`Kreis ${cn}: noch ${rem} Punkt${rem>1?'e':''}`;
   }
 }
 
