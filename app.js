@@ -5264,13 +5264,11 @@ async function _dropAssignStl(file, cat) {
       const eAx='E1';
       if(!state.axisStlParts[eAx]) state.axisStlParts[eAx]=[];
       state.axisStlParts[eAx]=[{name:dn,color:'#2563eb',buf:stlBuf}];
-      if(!state.schienen[0].fixedPart) state.schienen[0].fixedPart={x:0,y:0,z:0,rx:0,ry:0,rz:0};
-      state.schienen[0].fixedPart.stl=dn; state.schienen[0].fixedPart.buf=stlBuf;
+      state.schienen[0].fixedPart={type:'stl',x:0,y:0,z:0,rx:0,ry:0,rz:0,stlName:dn,buf:stlBuf};
       rebuildRailMeshes(); renderRailRows?.();
     } else if(cat==='Schiene (bewegl.)'){
       if(!state.schienen.length) state.schienen=[{name:'Schiene',length_mm:2000,height_mm:200,width_mm:400,axis:'X+',eNumber:1,eMin:0,eMax:2000,ePos:0,showBox:false,boxOffset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}}];
-      if(!state.schienen[0].movingPart) state.schienen[0].movingPart={x:0,y:0,z:0,rx:0,ry:0,rz:0};
-      state.schienen[0].movingPart.stl=dn; state.schienen[0].movingPart.buf=stlBuf;
+      state.schienen[0].movingPart={type:'stl',x:0,y:0,z:0,rx:0,ry:0,rz:0,stlName:dn,buf:stlBuf};
       rebuildRailMeshes(); renderRailRows?.();
     } else if(cat==='Festes Obj.'){
       const fidx=state.festeObjekte.length;
