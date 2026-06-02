@@ -6306,7 +6306,7 @@ document.getElementById('stlImportInput')?.addEventListener('change', async e =>
 // ── Kontextmenü via Rechtsklick ────────────────────────────────────
 let _ctxMesh = null;
 
-renderer.domElement.addEventListener('contextmenu', e => {
+document.addEventListener('contextmenu', e => {
   e.preventDefault();
   e.stopPropagation();
 
