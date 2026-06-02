@@ -2268,6 +2268,7 @@ $('fm-submit')?.addEventListener('click',()=>{
 });
 var _gimbalActive = true;  // Auswahl/Verschieben standardmäßig aktiv
 var _gimbalWasOn = false;  // Merker für Messtool
+var _measurePrevRenderMode = 2;
 var _gimbalMode = 'translate'; // 'translate' | 'rotate'
 var _gimbalTarget = null; // {type, idx, grp}
 var _gimbalPickedMesh = null; // zuletzt angeklicktes Mesh (für Entf-Löschen)
@@ -3017,6 +3018,9 @@ $('measureBtn')?.addEventListener('click',()=>{
     if(panel) panel.style.display='';
     _measureReset(); _measureReset3c();
     renderer.domElement.addEventListener('pointerdown', _measurePickExtended);
+    // Stirnkanten für bessere Sichtbarkeit beim Messen
+    _measurePrevRenderMode = _currentRenderMode;
+    window.setRenderMode(2);
     // Gimbal/Auswahl während des Messens pausieren
     _gimbalWasOn = _gimbalActive;
     if(_gimbalActive) $('gimbalToggle').click();
@@ -3025,6 +3029,8 @@ $('measureBtn')?.addEventListener('click',()=>{
     if(panel) panel.style.display='none';
     renderer.domElement.removeEventListener('pointerdown', _measurePickExtended);
     _measureReset(); _measureReset3c();
+    // Rendermode wiederherstellen
+    if (typeof _measurePrevRenderMode !== 'undefined') window.setRenderMode(_measurePrevRenderMode);
     // Auswahl wiederherstellen, falls vorher aktiv
     if(_gimbalWasOn && !_gimbalActive) $('gimbalToggle').click();
   }
@@ -5840,7 +5846,6 @@ async function tryLoadAxisPng(buffers) {
 let _currentRenderMode = 2;
 
 window.setRenderMode = function setRenderMode(mode) {
-  if (_measureActive) return; // Kein Rendermode-Wechsel während Messung
   _currentRenderMode = mode;
   for (let i = 0; i <= 6; i++) {
     const btn = document.getElementById('renderMode' + i);
