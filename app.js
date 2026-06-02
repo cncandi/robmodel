@@ -125,7 +125,7 @@ function init3d() {
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x050b14);
+  scene.background = new THREE.Color(0x0d1825);
   perspCamera = new THREE.PerspectiveCamera(45, 1, 1, 100000);
   perspCamera.position.set(1600, -2200, 1300);
   perspCamera.up.set(0, 0, 1);
@@ -146,8 +146,8 @@ function init3d() {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x94a3b8, 1.2));
-  const d = new THREE.DirectionalLight(0xffffff, 2.0);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x94a3b8, 1.8));
+  const d = new THREE.DirectionalLight(0xffffff, 2.6);
   d.position.set(1500, -2000, 2500);
   d.castShadow = true;
   d.shadow.mapSize.width = 2048;
@@ -701,6 +701,7 @@ function updateAxisPointVisuals() {
 
     const lbl = makeAxisLabel(label, p.clone().add(new THREE.Vector3(0, 0, (JOINT_R_at(i) || 10) * 2 + 20)));
     lbl.userData.skeletonIdx = i;
+    lbl.visible = _axisLabelsVisible;
     axisPointGroup.add(lbl);
   });
 
@@ -4720,7 +4721,7 @@ $('roblibClose').onclick = () => { $('roblibModal').style.display = 'none'; };
 $('rl-submit').onclick  = () => { $('rl-submit').textContent.includes('Aktualis') ? updateRoblib() : uploadToRoblib(); };
 const THEMES      = ['dark','bg-pro','bg-white','bg-minimal','bg-win11','bg-deep','bg-vivid','bg-matrix'];
 const THEME_NAMES = ['Dark','Pro','White','Minimal','Win11','Deep','Vivid','Matrix'];
-const THEME_BG    = [0x070d1a,0x1e1e1e,0xf0f0eb,0xf4f4f4,0xf3f6fc,0x000408,0x1a0a2e,0x000800];
+const THEME_BG    = [0x0d1825,0x1e1e1e,0xf0f0eb,0xf4f4f4,0xf3f6fc,0x000408,0x1a0a2e,0x000800];
 const THEME_GRID  = [0x0e1e30,0x2d2d30,0xbbbbaa,0xcccccc,0xc8d8e8,0x0a1020,0x2a1040,0x001400];
 let _themeIdx = 0;
 
