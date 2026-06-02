@@ -4299,6 +4299,19 @@ async function buildComponentZip(type, idx) {
     cfg = buildJson();
     for(const [,mesh] of meshes) zip.file(`stl/${mesh.name}`,exportBinaryStl(mesh));
     state.effektoren.forEach((e,i)=>{ if(e.stlFile?.buf) zip.file(`stl/eff_${i}.stl`,e.stlFile.buf); });
+    // Feste Objekte
+    (state.festeObjekte||[]).forEach((f,i)=>{ if(f.stlFile?.buf) zip.file(`stl/fix_${i}.stl`,f.stlFile.buf); });
+    // Positionierer
+    (state.positioners||[]).forEach((p,i)=>{ _addStlsToZip(zip,['E'+(p.eNum||i+2)]); });
+    // Bewegliche Objekte
+    (state.objekte||[]).forEach((o,i)=>{ if(o.stlFile?.buf) zip.file(`stl/obj_${i}.stl`,o.stlFile.buf); });
+    // Umfeld
+    (state.umfElemente||[]).forEach((u,i)=>{ if(u.stlFile?.buf) zip.file(`stl/umf_${i}.stl`,u.stlFile.buf); });
+    // Schienen
+    (state.schienen||[]).forEach((s,i)=>{
+      if(s.fixedPart?.buf) zip.file(`stl/rail_fix_${i}.stl`, s.fixedPart.buf);
+      if(s.movingPart?.buf) zip.file(`stl/rail_mov_${i}.stl`, s.movingPart.buf);
+    });
     if(prevMode!=='world') attachToolToA6();
   } else if(type==='rail'){
     cfg=buildRailJson(0);
