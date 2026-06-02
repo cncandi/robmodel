@@ -2668,7 +2668,7 @@ function _renderBodyTree() {
       row.style.cssText = 'display:flex;align-items:center;gap:5px;padding:2px 2px;border-radius:3px;transition:background .1s';row.onmouseover=()=>row.style.background='rgba(255,255,255,.07)';row.onmouseout=()=>row.style.background='';
       const nm = document.createElement('span');
       nm.textContent = name;
-      nm.style.cssText = 'flex:1;color:#5588cc;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      nm.style.cssText = 'flex:1;color:#6699dd;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
       const sel = document.createElement('select');
       sel.style.cssText = 'background:#0a1520;border:1px solid #2a4060;color:#d0dce8;border-radius:3px;padding:1px 3px;font-size:10px;max-width:110px';
       sel.innerHTML = '<option value="">zuweisen…</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
