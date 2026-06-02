@@ -3015,16 +3015,16 @@ $('measureBtn')?.addEventListener('click',()=>{
   if(_measureActive){
     btn?.classList.add('on'); $('rib-measure')?.classList.add('on');
     if(panel) panel.style.display='';
-    _measureReset();
-    renderer.domElement.addEventListener('pointerdown', _measurePick);
+    _measureReset(); _measureReset3c();
+    renderer.domElement.addEventListener('pointerdown', _measurePickExtended);
     // Gimbal/Auswahl während des Messens pausieren
     _gimbalWasOn = _gimbalActive;
     if(_gimbalActive) $('gimbalToggle').click();
   } else {
     btn?.classList.remove('on'); $('rib-measure')?.classList.remove('on');
     if(panel) panel.style.display='none';
-    renderer.domElement.removeEventListener('pointerdown', _measurePick);
-    _measureReset();
+    renderer.domElement.removeEventListener('pointerdown', _measurePickExtended);
+    _measureReset(); _measureReset3c();
     // Auswahl wiederherstellen, falls vorher aktiv
     if(_gimbalWasOn && !_gimbalActive) $('gimbalToggle').click();
   }
@@ -6498,7 +6498,8 @@ window.openAssignMenu = function() {
 })();
 
 // ── Erweitertes Messen: Vertex-Snap + 3-Punkt-Kreis ───────────────
-let _measureMode = 'pp'; // 'pp' = Punkt zu Punkt, '3c' = 3-Punkt-Kreis
+let _measureMode = 'pp';
+let _measureSnapEnabled = true; // 'pp' = Punkt zu Punkt, '3c' = 3-Punkt-Kreis
 let _circle3pts = []; // gesammelte Punkte für 3-Punkt-Modus
 let _circle3centers = []; // berechnete Mittelpunkte
 
@@ -6591,7 +6592,7 @@ function _measurePickExtended(event) {
   if (!hits.length) return;
 
   // Vertex-Snap
-  const pt = _snapToVertex(hits[0].point, hits[0].object, event.clientX, event.clientY);
+  const pt = _measureSnapEnabled ? _snapToVertex(hits[0].point, hits[0].object, event.clientX, event.clientY) : hits[0].point.clone();
 
   if (_measureMode === 'pp') {
     // Original Punkt-zu-Punkt Logik
@@ -6669,20 +6670,14 @@ function _measurePickExtended(event) {
   }
 }
 
-// Alten Listener durch neuen ersetzen wenn Messen aktiv
-const _measureBtnOrig = $('measureBtn');
-if (_measureBtnOrig) {
-  const origClick = _measureBtnOrig.onclick;
-  _measureBtnOrig.addEventListener('click', () => {
-    // Kurz warten bis _measureActive gesetzt ist
-    setTimeout(() => {
-      if (_measureActive) {
-        renderer.domElement.removeEventListener('pointerdown', _measurePick);
-        renderer.domElement.addEventListener('pointerdown', _measurePickExtended);
-      } else {
-        renderer.domElement.removeEventListener('pointerdown', _measurePickExtended);
-        _measureReset3c();
-      }
-    }, 10);
-  });
-}
+// measurePickExtended is now wired directly in measureBtn handler
+
+window._toggleMeasureSnap = function() {
+  _measureSnapEnabled = !_measureSnapEnabled;
+  const btn = document.getElementById('msr-snap-btn');
+  if (btn) {
+    btn.style.background = _measureSnapEnabled ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.05)';
+    btn.style.color = _measureSnapEnabled ? '#90c0ff' : '#6a8fa8';
+    btn.style.borderColor = _measureSnapEnabled ? 'rgba(37,99,235,.6)' : 'rgba(255,255,255,.15)';
+  }
+};
