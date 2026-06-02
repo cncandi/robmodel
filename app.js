@@ -6534,38 +6534,37 @@ function _measureReset3c() {
 // Vertex-Snap: nächster Vertex innerhalb Pixel-Toleranz
 function _snapToVertex(hitPoint, hitMesh, planeNormal, planePt) {
   if (!_measureSnapEnabled) return hitPoint;
-  const geo = hitMesh.geometry;
-  if (!geo?.attributes?.position) return hitPoint;
-
   const snapR = parseFloat(document.getElementById('msr-snap-r')?.value || '30');
-  const pos = geo.attributes.position;
-  const matWorld = hitMesh.matrixWorld;
+  const planeTol = snapR * 0.5; // Ebenen-Toleranz = halber Snap-Radius
 
   let bestDist = snapR;
   let bestPt = null;
 
-  const v = new THREE.Vector3();
-  const plane = planeNormal ? new THREE.Plane().setFromNormalAndCoplanarPoint(planeNormal, planePt) : null;
+  const plane = (planeNormal && planePt)
+    ? new THREE.Plane().setFromNormalAndCoplanarPoint(planeNormal, planePt)
+    : null;
 
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i).applyMatrix4(matWorld);
-    // Nur Vertices auf der gewählten Ebene (Toleranz 5mm)
-    if (plane && Math.abs(plane.distanceToPoint(v)) > 5) continue;
-    const d = v.distanceTo(hitPoint);
-    if (d < bestDist) {
-      bestDist = d;
-      bestPt = v.clone();
+  // Alle sichtbaren Meshes durchsuchen
+  const v = new THREE.Vector3();
+  scene.traverse(obj => {
+    if (!obj.isMesh || !obj.visible || !obj.geometry?.attributes?.position) return;
+    const pos = obj.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
+      if (plane && Math.abs(plane.distanceToPoint(v)) > planeTol) continue;
+      const d = v.distanceTo(hitPoint);
+      if (d < bestDist) { bestDist = d; bestPt = v.clone(); }
     }
-  }
+  });
+
   if (bestPt) {
-    // Gelbe Snap-Kugel
     const ind = new THREE.Mesh(
-      new THREE.SphereGeometry(8, 8, 6),
+      new THREE.SphereGeometry(10, 8, 6),
       new THREE.MeshBasicMaterial({ color: 0xffff00, depthTest: false })
     );
     ind.position.copy(bestPt); ind.renderOrder = 1000;
     scene.add(ind);
-    setTimeout(() => scene.remove(ind), 400);
+    setTimeout(() => scene.remove(ind), 600);
   }
   return bestPt || hitPoint;
 }
