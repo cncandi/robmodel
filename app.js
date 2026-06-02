@@ -141,6 +141,12 @@ function init3d() {
   controls.enablePan = true;
   controls.screenSpacePanning = true;
   controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
+  // Rollrad-Richtung umkehren
+  canvas.addEventListener('wheel', e => {
+    e.stopPropagation();
+    const fake = new WheelEvent('wheel', { deltaY: -e.deltaY, deltaMode: e.deltaMode, bubbles: false });
+    canvas.dispatchEvent(fake);
+  }, { capture: true, passive: false });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('auxclick', e => { if (e.button === 1) { e.preventDefault(); e.stopPropagation(); } }, true);
   canvas.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); }, true);
