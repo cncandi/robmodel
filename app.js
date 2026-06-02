@@ -5659,3 +5659,88 @@ async function tryLoadAxisPng(buffers) {
     return false;
   }
 }
+
+// ── Darstellungs-Modi ──────────────────────────────────────────────
+let _currentRenderMode = 2;
+
+function setRenderMode(mode) {
+  _currentRenderMode = mode;
+  // Button-Highlight
+  for (let i = 0; i <= 6; i++) {
+    const btn = document.getElementById('renderMode' + i);
+    if (btn) btn.classList.toggle('active', i === mode);
+  }
+  _applyRenderModeToGroup(robotGroup);
+  _applyRenderModeToGroup(toolGroup);
+  _applyRenderModeToGroup(kinematicsRoot);
+  _applyRenderModeToGroup(railGroup);
+  if (typeof requestRender === 'function') requestRender();
+}
+
+function _applyRenderModeToGroup(grp) {
+  if (!grp) return;
+  grp.traverse(obj => {
+    if (!obj.isMesh) return;
+    const mat = obj.material;
+    if (!mat) return;
+    const baseColor = mat._baseColor || (mat._baseColor = mat.color ? mat.color.clone() : new THREE.Color(0xe8a020));
+
+    // Kanten-Overlay: Kind-LineSegments entfernen/zeigen
+    obj.children.forEach(c => {
+      if (c.isLineSegments) c.visible = (mode === 2 || mode === 3 || mode === 6);
+    });
+
+    switch (_currentRenderMode) {
+      case 0: // Drahtmodell
+        mat.wireframe = true;
+        mat.transparent = false; mat.opacity = 1;
+        mat.metalness = 0; mat.roughness = 1;
+        break;
+      case 1: // Schattiert
+        mat.wireframe = false;
+        mat.transparent = false; mat.opacity = 1;
+        mat.metalness = 0.3; mat.roughness = 0.7;
+        break;
+      case 2: // Stirnkanten schattiert (default)
+        mat.wireframe = false;
+        mat.transparent = false; mat.opacity = 1;
+        mat.metalness = 0.55; mat.roughness = 0.42;
+        break;
+      case 3: // Alle Kanten schattiert
+        mat.wireframe = false;
+        mat.transparent = false; mat.opacity = 1;
+        mat.metalness = 0.55; mat.roughness = 0.42;
+        // Kanten mit kleinerem Threshold → mehr Kanten
+        obj.children.forEach(c => {
+          if (c.isLineSegments && obj.geometry) {
+            c.geometry.dispose();
+            c.geometry = new THREE.EdgesGeometry(obj.geometry, 5);
+          }
+        });
+        break;
+      case 4: // Durchsichtig
+        mat.wireframe = false;
+        mat.transparent = true; mat.opacity = 0.3;
+        mat.metalness = 0.3; mat.roughness = 0.5;
+        break;
+      case 5: // Realistisch
+        mat.wireframe = false;
+        mat.transparent = false; mat.opacity = 1;
+        mat.metalness = 0.85; mat.roughness = 0.2;
+        break;
+      case 6: // Realistisch mit Kanten
+        mat.wireframe = false;
+        mat.transparent = false; mat.opacity = 1;
+        mat.metalness = 0.85; mat.roughness = 0.2;
+        // Stirnkanten auf Standard-Threshold zurücksetzen
+        obj.children.forEach(c => {
+          if (c.isLineSegments && obj.geometry) {
+            c.geometry.dispose();
+            c.geometry = new THREE.EdgesGeometry(obj.geometry, 20);
+          }
+        });
+        break;
+    }
+    mat.needsUpdate = true;
+  });
+}
