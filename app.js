@@ -6278,6 +6278,52 @@ window.toggleSkeleton = function() {
 // ── STL Import (neutral, ohne sofortige Zuweisung) ─────────────────
 const _unassignedMeshes = new Map(); // name → {mesh, buf}
 
+function _renderUnassignedList() {
+  let panel = document.getElementById('_unassigned_panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = '_unassigned_panel';
+    panel.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:2000;background:#0d1825;border:1px solid #2a4060;border-radius:6px;padding:8px 12px;min-width:400px;max-width:90vw;font-size:12px;color:#b0c4d8;font-family:monospace';
+    document.body.appendChild(panel);
+  }
+  if (_unassignedMeshes.size === 0) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  const cats = ['A1','A2','A3','A4','A5','A6','Podest','Tool','Endeffektor','Positionierer','Schiene','Festes Obj.','Bew. Obj.'];
+  panel.innerHTML = '<div style="color:#ff8a00;font-weight:700;margin-bottom:6px">Importierte STL — Zuweisung wählen:</div>' +
+    [..._unassignedMeshes.entries()].map(([name]) =>
+      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
+        <select onchange="window._assignFromPanel('${name}', this.value); this.selectedIndex=0;"
+          style="background:#0a1520;border:1px solid #2a4060;color:#d0dce8;border-radius:3px;padding:2px 4px;font-size:11px">
+          <option value="">— zuweisen als —</option>
+          ${cats.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </select>
+        <button onclick="window._removeUnassigned('${name}')"
+          style="background:none;border:none;color:#f87171;cursor:pointer;font-size:14px;padding:0 4px">✕</button>
+      </div>`
+    ).join('');
+}
+
+window._assignFromPanel = function(name, cat) {
+  if (!cat) return;
+  const entry = _unassignedMeshes.get(name);
+  if (!entry) return;
+  const buf = entry.buf;
+  scene.remove(entry.mesh);
+  _unassignedMeshes.delete(name);
+  _renderUnassignedList();
+  const blob = new Blob([buf], { type: 'application/octet-stream' });
+  const file = new File([blob], name);
+  _dropAssignStl(file, cat);
+};
+
+window._removeUnassigned = function(name) {
+  const entry = _unassignedMeshes.get(name);
+  if (entry) scene.remove(entry.mesh);
+  _unassignedMeshes.delete(name);
+  _renderUnassignedList();
+};
+
 document.getElementById('stlImportInput')?.addEventListener('change', async e => {
   const files = [...e.target.files];
   e.target.value = '';
@@ -6287,169 +6333,30 @@ document.getElementById('stlImportInput')?.addEventListener('change', async e =>
       const fname = file.name;
       const geom = await parseGeometry(rawBuf, fname);
       geom.computeVertexNormals();
-      const mat = new THREE.MeshStandardMaterial({ color: 0x5588cc, roughness: .42, metalness: .55 });
-      const mesh = new THREE.Mesh(geom, mat);
-      mesh.name = fname;
-      mesh.userData.isUnassigned = true;
-      mesh.castShadow = true; mesh.receiveShadow = true;
-      // Kanten-Overlay
-      const edges = new THREE.EdgesGeometry(geom, 20);
-      mesh.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 })));
-      // Geometrie zentrieren statt Mesh-Position verschieben
       geom.computeBoundingBox();
       const center = new THREE.Vector3();
       geom.boundingBox.getCenter(center);
       geom.translate(-center.x, -center.y, -center.z);
       geom.computeBoundingBox();
       geom.computeBoundingSphere();
+      const mat = new THREE.MeshStandardMaterial({ color: 0x5588cc, roughness: .42, metalness: .55 });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.name = fname;
+      mesh.userData.isUnassigned = true;
+      mesh.castShadow = true;
+      const edges = new THREE.EdgesGeometry(geom, 20);
+      mesh.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 })));
       scene.add(mesh);
       _unassignedMeshes.set(fname, { mesh, buf: new Uint8Array(rawBuf) });
     } catch(err) {
       alert('Fehler beim Laden: ' + file.name + '\n' + err.message);
     }
   }
+  _renderUnassignedList();
 });
-
-// ── Kontextmenü via Rechtsklick ────────────────────────────────────
-let _ctxMesh = null;
-
-renderer.domElement.addEventListener('contextmenu', e => {
-  e.preventDefault();
-  e.stopPropagation();
-
-  const rect = renderer.domElement.getBoundingClientRect();
-  const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-  const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-  scene.updateMatrixWorld(true);
-  const rc = new THREE.Raycaster();
-  rc.setFromCamera(new THREE.Vector2(mx, my), camera);
-
-  // Alle unassigned Meshes direkt prüfen
-  const unassignedList = [..._unassignedMeshes.values()].map(v => v.mesh).filter(Boolean);
-  console.log('[CTX] unassigned count:', unassignedList.length, 'mouse:', mx.toFixed(2), my.toFixed(2));
-
-  if (unassignedList.length) {
-    // BoundingSphere manuell prüfen als Fallback
-    for (const mesh of unassignedList) {
-      mesh.geometry.computeBoundingSphere();
-      const sphere = mesh.geometry.boundingSphere.clone();
-      sphere.applyMatrix4(mesh.matrixWorld);
-      const ray = rc.ray;
-      if (ray.intersectsSphere(sphere)) {
-        console.log('[CTX] sphere hit:', mesh.name);
-        _ctxMesh = mesh;
-        _ctxHighlight(_ctxMesh);
-        _showCtxMenu(e.clientX, e.clientY);
-        return;
-      }
-    }
-    // Auch normale intersectObjects versuchen
-    const hits = rc.intersectObjects(unassignedList, true);
-    console.log('[CTX] intersect hits:', hits.length);
-    if (hits.length) {
-      let obj = hits[0].object;
-      while (obj.parent && !obj.userData.isUnassigned) obj = obj.parent;
-      _ctxMesh = obj;
-      _ctxHighlight(_ctxMesh);
-      _showCtxMenu(e.clientX, e.clientY);
-      return;
-    }
-  }
-
-  _hideCtxMenu();
-});
-
-document.addEventListener('pointerdown', e => {
-  if (!document.getElementById('ctx-menu')?.contains(e.target)) _hideCtxMenu();
-});
-
-let _ctxOrigColor = null;
-function _ctxHighlight(mesh) {
-  _ctxClearHighlight();
-  if (!mesh?.material?.color) return;
-  _ctxOrigColor = { mesh, color: mesh.material.color.clone() };
-  mesh.material.color.set(0xff8800);
-}
-function _ctxClearHighlight() {
-  if (_ctxOrigColor) {
-    _ctxOrigColor.mesh.material.color.copy(_ctxOrigColor.color);
-    _ctxOrigColor = null;
-  }
-}
-
-function _showCtxMenu(x, y) {
-  const menu = document.getElementById('ctx-menu');
-  if (!menu) return;
-
-  const isUnassigned = _ctxMesh?.userData?.isUnassigned;
-  const name = _ctxMesh?.name || '';
-
-  const cats = ['A1','A2','A3','A4','A5','A6','Podest','Tool','Endeffektor','Positionierer','Schiene','Festes Obj.','Bew. Obj.'];
-
-  menu.innerHTML = `
-    <div style="padding:6px 12px;font-size:11px;color:#4a6a8a;border-bottom:1px solid #1e3450;margin-bottom:4px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
-    ${cats.map(c => `<div class="ctx-item" onclick="window._ctxAssign('${c}')"
-      style="padding:6px 14px;font-size:12px;color:#b0c4d8;cursor:pointer"
-      onmouseover="this.style.background='rgba(255,122,0,.15)';this.style.color='#fff'"
-      onmouseout="this.style.background='';this.style.color='#b0c4d8'">
-      Zuweisen als: ${c}
-    </div>`).join('')}
-    <div style="border-top:1px solid #1e3450;margin-top:4px">
-      <div class="ctx-item" onclick="window._ctxDelete()"
-        style="padding:6px 14px;font-size:12px;color:#f87171;cursor:pointer"
-        onmouseover="this.style.background='rgba(200,50,50,.15)'"
-        onmouseout="this.style.background=''">
-        Entfernen
-      </div>
-    </div>
-  `;
-
-  // Position korrigieren damit Menu nicht aus dem Fenster ragt
-  menu.style.display = 'block';
-  const mw = menu.offsetWidth, mh = menu.offsetHeight;
-  menu.style.left = (x + mw > window.innerWidth ? x - mw : x) + 'px';
-  menu.style.top  = (y + mh > window.innerHeight ? y - mh : y) + 'px';
-}
-
-function _hideCtxMenu() {
-  const menu = document.getElementById('ctx-menu');
-  if (menu) menu.style.display = 'none';
-  _ctxClearHighlight();
-  _ctxMesh = null;
-}
-
-window._ctxAssign = function(cat) {
-  _hideCtxMenu();
-  if (!_ctxMesh) return;
-  const name = _ctxMesh.name;
-
-  // Buf ZUERST holen, dann erst entfernen
-  const entry = _unassignedMeshes.get(name);
-  const buf = entry?.buf;
-  if (!buf) { console.warn('_ctxAssign: kein buf für', name); return; }
-
-  // Aus Szene entfernen
-  scene.remove(_ctxMesh);
-  _unassignedMeshes.delete(name);
-
-  // Als File verpacken und zuweisen
-  const blob = new Blob([buf], { type: 'application/octet-stream' });
-  const file = new File([blob], name);
-  _dropAssignStl(file, cat);
-};
-
-window._ctxDelete = function() {
-  _hideCtxMenu();
-  if (!_ctxMesh) return;
-  if (_ctxMesh.userData.isUnassigned) {
-    scene.remove(_ctxMesh);
-    _unassignedMeshes.delete(_ctxMesh.name);
-  }
-  _ctxMesh = null;
-};
 
 // ── Zuweisen-Button ────────────────────────────────────────────────
+
 window.openAssignMenu = function() {
   const mesh = window._lastUnassignedSel;
   if (!mesh) return;
