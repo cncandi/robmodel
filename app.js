@@ -6306,17 +6306,30 @@ renderer.domElement.addEventListener('contextmenu', e => {
   rc.setFromCamera(new THREE.Vector2(mx, my), camera);
 
   // Alle Meshes in der Szene prüfen (unassigned + vorhandene)
-  const candidates = [];
-  scene.traverse(obj => { if ((obj.isMesh || obj.isLineSegments) && !obj.userData.noRenderMode) candidates.push(obj); });
-  const hit = rc.intersectObjects(candidates, true)[0];
+  scene.updateMatrixWorld(true);
+
+  // Zuerst unassigned Meshes prüfen (höchste Priorität)
+  const unassignedList = [..._unassignedMeshes.values()].map(e => e.mesh);
+  let hit = rc.intersectObjects(unassignedList, false)[0];
+
+  // Dann alle anderen Meshes
+  if (!hit) {
+    const candidates = [];
+    scene.traverse(obj => {
+      if (!obj.isMesh) return;
+      if (obj.userData.noRenderMode) return;
+      if (!obj.geometry) return;
+      if (unassignedList.includes(obj)) return;
+      candidates.push(obj);
+    });
+    hit = rc.intersectObjects(candidates, false)[0];
+  }
 
   if (!hit) { _hideCtxMenu(); return; }
-  // Parent holen falls LineSegments-Child getroffen
   let hitObj = hit.object;
-  if (hitObj.isLineSegments && hitObj.parent?.isMesh) hitObj = hitObj.parent;
+  if (!hitObj.isMesh && hitObj.parent?.isMesh) hitObj = hitObj.parent;
   if (!hitObj.isMesh) { _hideCtxMenu(); return; }
   _ctxMesh = hitObj;
-  // Visuelles Highlight
   _ctxHighlight(_ctxMesh);
   _showCtxMenu(e.clientX, e.clientY);
 });
