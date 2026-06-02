@@ -2333,6 +2333,10 @@ function _getGimbalMeshes() {
   (festeGrps||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'fix', idx:i, grp:g}); }); });
   (effektorGroups||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'eff', idx:i, grp:g}); }); });
   (umfGroups||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'umf', idx:i, grp:g}); }); });
+  // Unassigned importierte STLs
+  for (const [, entry] of _unassignedMeshes) {
+    if (entry.mesh) result.push({ mesh: entry.mesh, type: 'unassigned', idx: 0, grp: entry.mesh });
+  }
   return result;
 }
 
@@ -6303,6 +6307,15 @@ renderer.domElement.addEventListener('contextmenu', e => {
   e.preventDefault();
   e.stopPropagation();
 
+  // Wenn ein unassigned Mesh per Gimbal selektiert ist, dieses verwenden
+  if (_gimbalPickedMesh && _gimbalPickedMesh.userData?.isUnassigned) {
+    _ctxMesh = _gimbalPickedMesh;
+    _ctxHighlight(_ctxMesh);
+    _showCtxMenu(e.clientX, e.clientY);
+    return;
+  }
+
+  // Sonst per Raycaster suchen
   const rect = renderer.domElement.getBoundingClientRect();
   const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -6311,21 +6324,18 @@ renderer.domElement.addEventListener('contextmenu', e => {
   const rc = new THREE.Raycaster();
   rc.setFromCamera(new THREE.Vector2(mx, my), camera);
 
-  // Alle sichtbaren Meshes sammeln
-  const candidates = [];
-  scene.traverse(obj => {
-    if (!obj.isMesh) return;
-    if (!obj.visible) return;
-    if (!obj.geometry) return;
-    candidates.push(obj);
-  });
+  const unassignedMeshList = [..._unassignedMeshes.values()].map(e => e.mesh).filter(Boolean);
+  if (unassignedMeshList.length) {
+    const hits = rc.intersectObjects(unassignedMeshList, false);
+    if (hits.length) {
+      _ctxMesh = hits[0].object;
+      _ctxHighlight(_ctxMesh);
+      _showCtxMenu(e.clientX, e.clientY);
+      return;
+    }
+  }
 
-  const hits = rc.intersectObjects(candidates, false);
-  if (!hits.length) { _hideCtxMenu(); return; }
-
-  _ctxMesh = hits[0].object;
-  _ctxHighlight(_ctxMesh);
-  _showCtxMenu(e.clientX, e.clientY);
+  _hideCtxMenu();
 });
 
 document.addEventListener('pointerdown', e => {
