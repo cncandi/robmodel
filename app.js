@@ -2333,26 +2333,21 @@ function _getGimbalMeshes() {
   (festeGrps||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'fix', idx:i, grp:g}); }); });
   (effektorGroups||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'eff', idx:i, grp:g}); }); });
   (umfGroups||[]).forEach((g,i)=>{ if(g) g.traverse(c=>{ if(c.isMesh) result.push({mesh:c, type:'umf', idx:i, grp:g}); }); });
-  // Achsen A1-A6
-  const axKeys = ['A1','A2','A3','A4','A5','A6'];
-  axKeys.forEach((ax, i) => {
-    const parts = state.axisStlParts?.[ax] || [];
-    if (parts.length) {
-      const grp = axisPivotGroups[i] || robotGroup;
-      if (grp) grp.traverse(c => {
-        if (c.isMesh && parts.some(p => c.name === p.name || norm(c.name) === norm(p.name)))
-          result.push({ mesh: c, type: 'axis', idx: i, grp, axKey: ax });
-      });
-    }
-  });
-  // Podest
+  // Alle Meshes aus der meshes-Map (Achsen, Podest, Tool)
   if (meshes.size) {
     for (const [path, mesh] of meshes) {
-      const f = state.stls.find(s => s.path === path);
-      if (!f) continue;
+      const f = state.stls.find(s => s.path === path) || { name: mesh.name };
       const key = partKey(f.name);
-      if (key === 'Podest') result.push({ mesh, type: 'podest', idx: 0, grp: robotGroup });
-      else if (key === 'Tool') result.push({ mesh, type: 'tool', idx: 0, grp: toolGroup });
+      const axMatch = key.match(/^A([1-6])$/);
+      if (axMatch) {
+        const i = parseInt(axMatch[1]) - 1;
+        const grp = axisPivotGroups[i] || robotGroup;
+        result.push({ mesh, type: 'axis', idx: i, grp });
+      } else if (key === 'Podest') {
+        result.push({ mesh, type: 'podest', idx: 0, grp: robotGroup });
+      } else if (key === 'Tool') {
+        result.push({ mesh, type: 'tool', idx: 0, grp: toolGroup });
+      }
     }
   }
   // Unassigned importierte STLs
