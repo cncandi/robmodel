@@ -125,7 +125,8 @@ animate();
 // ── 3D-Szene ───────────────────────────────────────────────────────
 function init3d() {
   const canvas = $('viewer');
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, alpha: true });
+  renderer.setClearColor(0x0d1825, 1);
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0d1825);
@@ -6217,6 +6218,9 @@ document.getElementById('bgImageInput')?.addEventListener('change', e => {
   bgDiv.style.backgroundRepeat = 'no-repeat';
   bgDiv.style.backgroundColor = '#000';
   _bgTexture = url;
+  if (_bgOrigColor === null && scene.background) _bgOrigColor = scene.background.clone();
+  scene.background = null;
+  renderer.setClearColor(0x000000, 0);
   _bgTexture = url; // URL merken für Cleanup
   const btn = document.getElementById('rib-bg');
   if (btn) {
@@ -6231,7 +6235,8 @@ window.removeBg = function() {
   if (_bgTexture) { URL.revokeObjectURL(_bgTexture); _bgTexture = null; }
   const bgDiv = document.getElementById('_robmodel_bg');
   if (bgDiv) bgDiv.style.backgroundImage = '';
-  if (_bgOrigColor) scene.background = _bgOrigColor;
+  if (_bgOrigColor) { scene.background = _bgOrigColor; _bgOrigColor = null; }
+  renderer.setClearColor(0x0d1825, 1);
   const btn = document.getElementById('rib-bg');
   if (btn) {
     btn.classList.remove('on');
