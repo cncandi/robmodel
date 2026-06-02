@@ -80,6 +80,7 @@ let railFixGrp, railMovGrp;
 let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup;
 let _axisLabelsVisible = true;
 let _skeletonVisible = true;
+let _csVisible = true;
 // On-Demand-Rendering: nur rendern wenn nötig (spart GPU/CPU/Akku im Leerlauf)
 let _renderFrames = 3;
 function requestRender(n) { _renderFrames = Math.max(_renderFrames, n || 2); }
@@ -6182,7 +6183,7 @@ window._injectGlbsIntoZip = function(zip) {
 };
 
 // ── Koordinatensysteme Toggle ──────────────────────────────────────
-let _csVisible = true;
+// _csVisible moved to top
 window.toggleCS = function() {
   _csVisible = !_csVisible;
   if (csHelperGroup) csHelperGroup.visible = _csVisible;
