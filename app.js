@@ -5665,82 +5665,58 @@ let _currentRenderMode = 2;
 
 function setRenderMode(mode) {
   _currentRenderMode = mode;
-  // Button-Highlight
   for (let i = 0; i <= 6; i++) {
     const btn = document.getElementById('renderMode' + i);
     if (btn) btn.classList.toggle('active', i === mode);
   }
-  _applyRenderModeToGroup(robotGroup);
-  _applyRenderModeToGroup(toolGroup);
-  _applyRenderModeToGroup(kinematicsRoot);
-  _applyRenderModeToGroup(railGroup);
+  const showEdges = (mode === 2 || mode === 3 || mode === 6);
+  const edgeThreshold = (mode === 3) ? 5 : 20;
+
+  scene.traverse(obj => {
+    if (!obj.isMesh) return;
+    // Kein UI-Element (tcpMarker, Achspfeile etc.) anfassen
+    if (obj.userData.noRenderMode) return;
+
+    const mat = obj.material;
+    if (!mat) return;
+
+    // Kanten-Overlay: erzeugen falls noch nicht vorhanden, sonst anpassen
+    let edgeLine = obj.children.find(c => c.isLineSegments && c.userData.isEdgeOverlay);
+    if (!edgeLine && obj.geometry && showEdges) {
+      const edgeMat = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 });
+      edgeLine = new THREE.LineSegments(new THREE.EdgesGeometry(obj.geometry, edgeThreshold), edgeMat);
+      edgeLine.userData.isEdgeOverlay = true;
+      obj.add(edgeLine);
+    }
+    if (edgeLine) {
+      edgeLine.visible = showEdges;
+      if (showEdges) {
+        edgeLine.geometry.dispose();
+        edgeLine.geometry = new THREE.EdgesGeometry(obj.geometry, edgeThreshold);
+      }
+    }
+
+    // Material upgraden falls noch Phong
+    if (mat.isMeshPhongMaterial) {
+      const col = mat.color ? mat.color.clone() : new THREE.Color(0xe8a020);
+      const newMat = new THREE.MeshStandardMaterial({ color: col, transparent: mat.transparent, opacity: mat.opacity, side: mat.side });
+      obj.material = newMat;
+      newMat.needsUpdate = true;
+    }
+
+    const m = obj.material;
+    switch (mode) {
+      case 0: m.wireframe = true;  m.transparent = false; m.opacity = 1;   m.metalness = 0;    m.roughness = 1;    break;
+      case 1: m.wireframe = false; m.transparent = false; m.opacity = 1;   m.metalness = 0.3;  m.roughness = 0.7;  break;
+      case 2: m.wireframe = false; m.transparent = false; m.opacity = 1;   m.metalness = 0.55; m.roughness = 0.42; break;
+      case 3: m.wireframe = false; m.transparent = false; m.opacity = 1;   m.metalness = 0.55; m.roughness = 0.42; break;
+      case 4: m.wireframe = false; m.transparent = true;  m.opacity = 0.3; m.metalness = 0.3;  m.roughness = 0.5;  break;
+      case 5: m.wireframe = false; m.transparent = false; m.opacity = 1;   m.metalness = 0.85; m.roughness = 0.2;  break;
+      case 6: m.wireframe = false; m.transparent = false; m.opacity = 1;   m.metalness = 0.85; m.roughness = 0.2;  break;
+    }
+    m.needsUpdate = true;
+  });
   if (typeof requestRender === 'function') requestRender();
 }
 
-function _applyRenderModeToGroup(grp) {
-  if (!grp) return;
-  grp.traverse(obj => {
-    if (!obj.isMesh) return;
-    const mat = obj.material;
-    if (!mat) return;
-    const baseColor = mat._baseColor || (mat._baseColor = mat.color ? mat.color.clone() : new THREE.Color(0xe8a020));
-
-    // Kanten-Overlay: Kind-LineSegments entfernen/zeigen
-    obj.children.forEach(c => {
-      if (c.isLineSegments) c.visible = (mode === 2 || mode === 3 || mode === 6);
-    });
-
-    switch (_currentRenderMode) {
-      case 0: // Drahtmodell
-        mat.wireframe = true;
-        mat.transparent = false; mat.opacity = 1;
-        mat.metalness = 0; mat.roughness = 1;
-        break;
-      case 1: // Schattiert
-        mat.wireframe = false;
-        mat.transparent = false; mat.opacity = 1;
-        mat.metalness = 0.3; mat.roughness = 0.7;
-        break;
-      case 2: // Stirnkanten schattiert (default)
-        mat.wireframe = false;
-        mat.transparent = false; mat.opacity = 1;
-        mat.metalness = 0.55; mat.roughness = 0.42;
-        break;
-      case 3: // Alle Kanten schattiert
-        mat.wireframe = false;
-        mat.transparent = false; mat.opacity = 1;
-        mat.metalness = 0.55; mat.roughness = 0.42;
-        // Kanten mit kleinerem Threshold → mehr Kanten
-        obj.children.forEach(c => {
-          if (c.isLineSegments && obj.geometry) {
-            c.geometry.dispose();
-            c.geometry = new THREE.EdgesGeometry(obj.geometry, 5);
-          }
-        });
-        break;
-      case 4: // Durchsichtig
-        mat.wireframe = false;
-        mat.transparent = true; mat.opacity = 0.3;
-        mat.metalness = 0.3; mat.roughness = 0.5;
-        break;
-      case 5: // Realistisch
-        mat.wireframe = false;
-        mat.transparent = false; mat.opacity = 1;
-        mat.metalness = 0.85; mat.roughness = 0.2;
-        break;
-      case 6: // Realistisch mit Kanten
-        mat.wireframe = false;
-        mat.transparent = false; mat.opacity = 1;
-        mat.metalness = 0.85; mat.roughness = 0.2;
-        // Stirnkanten auf Standard-Threshold zurücksetzen
-        obj.children.forEach(c => {
-          if (c.isLineSegments && obj.geometry) {
-            c.geometry.dispose();
-            c.geometry = new THREE.EdgesGeometry(obj.geometry, 20);
-          }
-        });
-        break;
-    }
-    mat.needsUpdate = true;
-  });
-}
+function _applyRenderModeToGroup(grp) { setRenderMode(_currentRenderMode); }
