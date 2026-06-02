@@ -6496,3 +6496,193 @@ window.openAssignMenu = function() {
     e.preventDefault();
   });
 })();
+
+// ── Erweitertes Messen: Vertex-Snap + 3-Punkt-Kreis ───────────────
+let _measureMode = 'pp'; // 'pp' = Punkt zu Punkt, '3c' = 3-Punkt-Kreis
+let _circle3pts = []; // gesammelte Punkte für 3-Punkt-Modus
+let _circle3centers = []; // berechnete Mittelpunkte
+
+window._setMeasureMode = function(mode) {
+  _measureMode = mode;
+  document.getElementById('msr-mode-pp')?.style && (
+    document.getElementById('msr-mode-pp').style.background = mode==='pp' ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.05)',
+    document.getElementById('msr-mode-pp').style.color = mode==='pp' ? '#90c0ff' : '#6a8fa8',
+    document.getElementById('msr-mode-3c').style.background = mode==='3c' ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.05)',
+    document.getElementById('msr-mode-3c').style.color = mode==='3c' ? '#90c0ff' : '#6a8fa8'
+  );
+  _measureReset3c();
+  _measureReset();
+};
+
+function _measureReset3c() {
+  _circle3pts = [];
+  _circle3centers = [];
+}
+
+// Vertex-Snap: nächster Vertex innerhalb Pixel-Toleranz
+function _snapToVertex(hitPoint, hitMesh, screenX, screenY) {
+  const geo = hitMesh.geometry;
+  if (!geo?.attributes?.position) return hitPoint;
+
+  const pos = geo.attributes.position;
+  const matWorld = hitMesh.matrixWorld;
+  const rect = renderer.domElement.getBoundingClientRect();
+
+  let bestDist = Infinity;
+  let bestPt = hitPoint.clone();
+  const SNAP_PX = 20; // Pixel-Toleranz
+
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i).applyMatrix4(matWorld);
+    // In Screenspace projizieren
+    const projected = v.clone().project(camera);
+    const sx = (projected.x * 0.5 + 0.5) * rect.width + rect.left;
+    const sy = (-projected.y * 0.5 + 0.5) * rect.height + rect.top;
+    const d = Math.sqrt((sx - screenX) ** 2 + (sy - screenY) ** 2);
+    if (d < SNAP_PX && d < bestDist) {
+      bestDist = d;
+      bestPt = v.clone();
+    }
+  }
+  return bestPt;
+}
+
+// 3-Punkt-Kreis: Mittelpunkt berechnen
+function _circumcenter(p1, p2, p3) {
+  // Projektion auf Ebene der 3 Punkte
+  const v1 = p2.clone().sub(p1);
+  const v2 = p3.clone().sub(p1);
+  const n = v1.clone().cross(v2).normalize();
+
+  // 2D in der Ebene
+  const u = v1.clone().normalize();
+  const w = n.clone().cross(u).normalize();
+
+  const ax = 0, ay = 0;
+  const bx = v1.dot(u), by = v1.dot(w);
+  const cx = v2.dot(u), cy = v2.dot(w);
+
+  const D = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+  if (Math.abs(D) < 1e-10) return p1.clone().add(p2).add(p3).divideScalar(3); // fallback: centroid
+
+  const ux = ((ax*ax + ay*ay) * (by - cy) + (bx*bx + by*by) * (cy - ay) + (cx*cx + cy*cy) * (ay - by)) / D;
+  const uy = ((ax*ax + ay*ay) * (cx - bx) + (bx*bx + by*by) * (ax - cx) + (cx*cx + cy*cy) * (bx - ax)) / D;
+
+  return p1.clone().addScaledVector(u, ux).addScaledVector(w, uy);
+}
+
+// Override _measurePick für den neuen Modus
+const _measurePickOrig = _measurePick;
+renderer.domElement.removeEventListener('pointerdown', _measurePick);
+
+function _measurePickExtended(event) {
+  if (!_measureActive) return;
+  if (event.button !== undefined && event.button !== 0) return;
+
+  const rect = renderer.domElement.getBoundingClientRect();
+  const mx = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  const my = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  const rc = new THREE.Raycaster();
+  rc.setFromCamera(new THREE.Vector2(mx, my), camera);
+  const pickable = [];
+  scene.traverse(obj => { if (obj.isMesh && obj.visible && !obj.userData.noRenderMode) pickable.push(obj); });
+  const hits = rc.intersectObjects(pickable, false);
+  if (!hits.length) return;
+
+  // Vertex-Snap
+  const pt = _snapToVertex(hits[0].point, hits[0].object, event.clientX, event.clientY);
+
+  if (_measureMode === 'pp') {
+    // Original Punkt-zu-Punkt Logik
+    if (!_measureP1) {
+      _measureP1 = pt;
+      _measureSphere(pt, 0xff4444);
+      $('msr-hint').textContent = 'P1 gesetzt — Klick: P2 setzen';
+    } else {
+      _measureP2 = pt;
+      _measureSphere(pt, 0x44ff88);
+      _measureDrawLine(_measureP1, _measureP2);
+      _measureUpdate(_measureP1, _measureP2);
+      $('msr-hint').textContent = 'Neuer Klick: neue Messung';
+      _measureP1 = null; _measureP2 = null;
+    }
+  } else {
+    // 3-Punkt-Kreis Modus
+    const phase = _circle3pts.length; // 0-5: erst 3 für Kreis 1, dann 3 für Kreis 2
+    const colors = [0xff4444, 0xff8844, 0xffcc44, 0x44ff88, 0x44ccff, 0x8844ff];
+    _measureSphere(pt, colors[phase] || 0xffffff);
+    _circle3pts.push(pt);
+
+    if (_circle3pts.length === 3) {
+      const c1 = _circumcenter(_circle3pts[0], _circle3pts[1], _circle3pts[2]);
+      _circle3centers.push(c1);
+      _measureSphere(c1, 0xff4444);
+      // Kreislinie zeichnen
+      const r = c1.distanceTo(_circle3pts[0]);
+      const pts3d = [];
+      const n = _circle3pts[1].clone().sub(_circle3pts[0]).cross(_circle3pts[2].clone().sub(_circle3pts[0])).normalize();
+      const u = _circle3pts[0].clone().sub(c1).normalize();
+      const v = n.clone().cross(u);
+      for (let i = 0; i <= 64; i++) {
+        const a = (i / 64) * Math.PI * 2;
+        pts3d.push(c1.clone().addScaledVector(u, Math.cos(a) * r).addScaledVector(v, Math.sin(a) * r));
+      }
+      const geo = new THREE.BufferGeometry().setFromPoints(pts3d);
+      const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xff4444, depthTest: false }));
+      line.renderOrder = 998;
+      scene.add(line); _measureSpheres.push(line);
+      $('msr-hint').textContent = 'Kreis 1 erkannt (r=' + Math.round(r) + 'mm) — 3 Punkte für Kreis 2';
+    }
+
+    if (_circle3pts.length === 6) {
+      const c2 = _circumcenter(_circle3pts[3], _circle3pts[4], _circle3pts[5]);
+      _circle3centers.push(c2);
+      _measureSphere(c2, 0x44ff88);
+      // Zweiter Kreis
+      const r2 = c2.distanceTo(_circle3pts[3]);
+      const n2 = _circle3pts[4].clone().sub(_circle3pts[3]).cross(_circle3pts[5].clone().sub(_circle3pts[3])).normalize();
+      const u2 = _circle3pts[3].clone().sub(c2).normalize();
+      const v2 = n2.clone().cross(u2);
+      const pts3d2 = [];
+      for (let i = 0; i <= 64; i++) {
+        const a = (i / 64) * Math.PI * 2;
+        pts3d2.push(c2.clone().addScaledVector(u2, Math.cos(a) * r2).addScaledVector(v2, Math.sin(a) * r2));
+      }
+      const geo2 = new THREE.BufferGeometry().setFromPoints(pts3d2);
+      const line2 = new THREE.Line(geo2, new THREE.LineBasicMaterial({ color: 0x44ff88, depthTest: false }));
+      line2.renderOrder = 998;
+      scene.add(line2); _measureSpheres.push(line2);
+
+      // Abstand zwischen Mittelpunkten
+      _measureDrawLine(_circle3centers[0], _circle3centers[1]);
+      _measureUpdate(_circle3centers[0], _circle3centers[1]);
+      $('msr-hint').textContent = 'Abstand Mittelpunkte — Klick: neue Messung';
+      _measureReset3c();
+    } else if (_circle3pts.length < 3) {
+      $('msr-hint').textContent = `Punkt ${_circle3pts.length}/3 für Kreis 1 gesetzt`;
+    } else if (_circle3pts.length < 6) {
+      $('msr-hint').textContent = `Punkt ${_circle3pts.length - 3}/3 für Kreis 2 gesetzt`;
+    }
+
+    if (_circle3pts.length >= 6) _circle3pts = [];
+  }
+}
+
+// Alten Listener durch neuen ersetzen wenn Messen aktiv
+const _measureBtnOrig = $('measureBtn');
+if (_measureBtnOrig) {
+  const origClick = _measureBtnOrig.onclick;
+  _measureBtnOrig.addEventListener('click', () => {
+    // Kurz warten bis _measureActive gesetzt ist
+    setTimeout(() => {
+      if (_measureActive) {
+        renderer.domElement.removeEventListener('pointerdown', _measurePick);
+        renderer.domElement.addEventListener('pointerdown', _measurePickExtended);
+      } else {
+        renderer.domElement.removeEventListener('pointerdown', _measurePickExtended);
+        _measureReset3c();
+      }
+    }, 10);
+  });
+}
