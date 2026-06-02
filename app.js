@@ -84,7 +84,11 @@ let _csVisible = true;
 // On-Demand-Rendering: nur rendern wenn nötig (spart GPU/CPU/Akku im Leerlauf)
 let _renderFrames = 3;
 function requestRender(n) { _renderFrames = Math.max(_renderFrames, n || 5); }
-var objekteGroups = [];
+
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}var objekteGroups = [];
 var effektorGroups = [];
 var positionerGroups = [];
 var umfGroups = [];
@@ -377,15 +381,6 @@ function toggleCameraMode() {
 }
 window.toggleCameraMode = toggleCameraMode;
 
-
-function animate() {
-  requestAnimationFrame(animate);
-  const simActive = !!(state && state.simulation && state.simulation.active);
-  if (_renderFrames > 0 || simActive) {
-    renderer.render(scene, camera);
-    if (_renderFrames > 0) _renderFrames--;
-  }
-}
 
 // ── Transforms ─────────────────────────────────────────────────────
 function defaultRobotTr() { return { x: 0, y: 0, z: 0, rx: -90, ry: 0, rz: -90 }; }
