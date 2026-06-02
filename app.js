@@ -2405,9 +2405,16 @@ function _gimbalPick(event) {
   }
 
   _gimbalPickedMesh = hits[0].object;
-  // Unassigned Mesh für Rechtsklick-Zuweisung merken
-  if (_gimbalPickedMesh?.userData?.isUnassigned) window._lastUnassignedSel = _gimbalPickedMesh;
-  else window._lastUnassignedSel = null;
+  // Unassigned Mesh für Zuweisung merken + Button zeigen
+  if (_gimbalPickedMesh?.userData?.isUnassigned) {
+    window._lastUnassignedSel = _gimbalPickedMesh;
+    const btn = document.getElementById('rib-assign');
+    if (btn) btn.style.display = '';
+  } else {
+    window._lastUnassignedSel = null;
+    const btn = document.getElementById('rib-assign');
+    if (btn) btn.style.display = 'none';
+  }
   _attachGimbalToTargets();
   requestRender();
 }
@@ -6306,7 +6313,7 @@ document.getElementById('stlImportInput')?.addEventListener('change', async e =>
 // ── Kontextmenü via Rechtsklick ────────────────────────────────────
 let _ctxMesh = null;
 
-document.addEventListener('contextmenu', e => {
+renderer.domElement.addEventListener('contextmenu', e => {
   e.preventDefault();
   e.stopPropagation();
 
@@ -6440,4 +6447,15 @@ window._ctxDelete = function() {
     _unassignedMeshes.delete(_ctxMesh.name);
   }
   _ctxMesh = null;
+};
+
+// ── Zuweisen-Button ────────────────────────────────────────────────
+window.openAssignMenu = function() {
+  const mesh = window._lastUnassignedSel;
+  if (!mesh) return;
+  _ctxMesh = mesh;
+  // Button-Position für Menü
+  const btn = document.getElementById('rib-assign');
+  const rect = btn ? btn.getBoundingClientRect() : { left: 200, bottom: 80 };
+  _showCtxMenu(rect.left, rect.bottom + 4);
 };
