@@ -6307,17 +6307,37 @@ renderer.domElement.addEventListener('contextmenu', e => {
 
   // Alle Meshes in der Szene prüfen (unassigned + vorhandene)
   const candidates = [];
-  scene.traverse(obj => { if (obj.isMesh && !obj.userData.noRenderMode) candidates.push(obj); });
-  const hit = rc.intersectObjects(candidates, false)[0];
+  scene.traverse(obj => { if ((obj.isMesh || obj.isLineSegments) && !obj.userData.noRenderMode) candidates.push(obj); });
+  const hit = rc.intersectObjects(candidates, true)[0];
 
   if (!hit) { _hideCtxMenu(); return; }
-  _ctxMesh = hit.object;
+  // Parent holen falls LineSegments-Child getroffen
+  let hitObj = hit.object;
+  if (hitObj.isLineSegments && hitObj.parent?.isMesh) hitObj = hitObj.parent;
+  if (!hitObj.isMesh) { _hideCtxMenu(); return; }
+  _ctxMesh = hitObj;
+  // Visuelles Highlight
+  _ctxHighlight(_ctxMesh);
   _showCtxMenu(e.clientX, e.clientY);
 });
 
 document.addEventListener('pointerdown', e => {
   if (!document.getElementById('ctx-menu')?.contains(e.target)) _hideCtxMenu();
 });
+
+let _ctxOrigColor = null;
+function _ctxHighlight(mesh) {
+  _ctxClearHighlight();
+  if (!mesh?.material?.color) return;
+  _ctxOrigColor = { mesh, color: mesh.material.color.clone() };
+  mesh.material.color.set(0xff8800);
+}
+function _ctxClearHighlight() {
+  if (_ctxOrigColor) {
+    _ctxOrigColor.mesh.material.color.copy(_ctxOrigColor.color);
+    _ctxOrigColor = null;
+  }
+}
 
 function _showCtxMenu(x, y) {
   const menu = document.getElementById('ctx-menu');
@@ -6356,6 +6376,7 @@ function _showCtxMenu(x, y) {
 function _hideCtxMenu() {
   const menu = document.getElementById('ctx-menu');
   if (menu) menu.style.display = 'none';
+  _ctxClearHighlight();
   _ctxMesh = null;
 }
 
