@@ -4796,7 +4796,7 @@ toggleCameraMode();
 
 let _axisLabelsVisible = true;
 // Robot-Visibility: 0=sichtbar, 1=durchsichtig, 2=unsichtbar
-var _robotVisState = 0;
+var _robotVisState = 0; // legacy, nicht mehr genutzt
 
 function _setRobotOpacity(grp, opacity) {
   grp.traverse(function(obj) {
@@ -4820,8 +4820,46 @@ function _setRobotOpacity(grp, opacity) {
   });
 }
 
+// Modi: 0-6 = Darstellungs-Modi, 7 = Unsichtbar
+const _ROBOT_MODES = [
+  { label: 'Drahtmodell',            tip: 'Nächster: Schattiert',              renderMode: 0 },
+  { label: 'Schattiert',             tip: 'Nächster: Stirnkanten',             renderMode: 1 },
+  { label: 'Stirnkanten schattiert', tip: 'Nächster: Alle Kanten',             renderMode: 2 },
+  { label: 'Alle Kanten schattiert', tip: 'Nächster: Durchsichtig',            renderMode: 3 },
+  { label: 'Durchsichtig',           tip: 'Nächster: Realistisch',             renderMode: 4 },
+  { label: 'Realistisch',            tip: 'Nächster: Realistisch mit Kanten',  renderMode: 5 },
+  { label: 'Realistisch mit Kanten', tip: 'Nächster: Unsichtbar',              renderMode: 6 },
+  { label: 'Unsichtbar',             tip: 'Nächster: Drahtmodell',             renderMode: -1 },
+];
+let _robotModeIdx = 2; // Start: Stirnkanten schattiert
+
+function _updateRobotModeBtn() {
+  const m = _ROBOT_MODES[_robotModeIdx];
+  const btn = $('robotVisBtn');
+  if (btn) {
+    btn.innerHTML = '<svg class="ico"><use href="#i-eye"/></svg>' + m.label;
+    btn.title = m.tip;
+    btn.style.background  = _robotModeIdx === 7 ? 'rgba(255,255,255,.05)' : 'rgba(255,122,0,.12)';
+    btn.style.borderColor = _robotModeIdx === 7 ? 'rgba(255,255,255,.15)' : 'rgba(255,122,0,.45)';
+    btn.style.color       = _robotModeIdx === 7 ? '#6a8fa8' : 'var(--acc)';
+  }
+  const rib = document.getElementById('rib-roboter');
+  if (rib) {
+    const lbl = document.getElementById('rib-roboter-label');
+    if (lbl) lbl.textContent = m.label;
+    rib.title = m.label + ' — ' + m.tip;
+    rib.classList.toggle('on', _robotModeIdx !== 7);
+  }
+  // Render-Modi-Buttons in Ansicht-Menü sync
+  for (let i = 0; i <= 6; i++) {
+    const b = document.getElementById('renderMode' + i);
+    if (b) b.classList.toggle('active', i === m.renderMode);
+  }
+}
+
 $('robotVisBtn')?.addEventListener('click', () => {
-  _robotVisState = (_robotVisState + 1) % 3;
+  _robotModeIdx = (_robotModeIdx + 1) % 8;
+  const m = _ROBOT_MODES[_robotModeIdx];
 
   var groups = [];
   if (robotGroup)     groups.push(robotGroup);
@@ -4831,29 +4869,15 @@ $('robotVisBtn')?.addEventListener('click', () => {
   if (railGroup)      groups.push(railGroup);
   (positionerGroups||[]).forEach(function(g){ if(g?.containerGrp) groups.push(g.containerGrp); });
 
-  groups.forEach(function(grp) {
-    if (_robotVisState === 2) {
-      grp.visible = false;
-    } else {
-      grp.visible = true;
-      _setRobotOpacity(grp, _robotVisState === 1 ? 0.25 : 1.0);
-    }
-  });
-
-  // Button-Style
-  var btn = $('robotVisBtn');
-  if (btn) {
-    var labels = ['🤖 Roboter','👻 Roboter','⬜ Roboter'];
-    var bgs    = ['rgba(37,99,235,.2)','rgba(255,165,0,.2)','rgba(255,255,255,.05)'];
-    var bcs    = ['rgba(37,99,235,.4)','rgba(255,165,0,.4)','rgba(255,255,255,.15)'];
-    var cols   = ['#60a5fa','#fbbf24','#6a8fa8'];
-    var tips   = ['Klick: durchsichtig','Klick: ausblenden','Klick: einblenden'];
-    btn.textContent   = labels[_robotVisState];
-    btn.style.background  = bgs[_robotVisState];
-    btn.style.borderColor = bcs[_robotVisState];
-    btn.style.color       = cols[_robotVisState];
-    btn.title             = tips[_robotVisState];
+  if (_robotModeIdx === 7) {
+    // Unsichtbar
+    groups.forEach(g => { g.visible = false; });
+  } else {
+    groups.forEach(g => { g.visible = true; });
+    window.setRenderMode(m.renderMode);
   }
+
+  _updateRobotModeBtn();
   requestRender();
 });
 
