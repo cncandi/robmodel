@@ -2889,7 +2889,7 @@ $('measureBtn')?.addEventListener('click',()=>{
   }
 });
 
-function renderTcp(){qsa('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===state.activeTcp));const tcp=state.tcp[state.activeTcp];qsa('[data-tcp]').forEach(i=>i.value=tcp?.[i.dataset.tcp]??'');const x=num(tcp?.x),y=num(tcp?.y),z=num(tcp?.z);tcpMarker.visible=x!==null||y!==null||z!==null;tcpMarker.position.set(x||0,y||0,z||0);}
+function renderTcp(){qsa('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===state.activeTcp));const tcp=state.tcp[state.activeTcp];qsa('[data-tcp]').forEach(i=>i.value=tcp?.[i.dataset.tcp]??'');const x=num(tcp?.x),y=num(tcp?.y),z=num(tcp?.z);tcpMarker.visible=(x!==null||y!==null||z!==null)&&(x||y||z);tcpMarker.position.set(x||0,y||0,z||0);}
 
 
 
@@ -6197,5 +6197,16 @@ window.removeBg = function() {
     btn.title = 'Hintergrundbild';
     btn.onclick = window.openBgPicker;
   }
+  if (typeof requestRender === 'function') requestRender();
+};
+
+// ── Skelett Toggle ─────────────────────────────────────────────────
+let _skeletonVisible = true;
+window.toggleSkeleton = function() {
+  _skeletonVisible = !_skeletonVisible;
+  skeletonCyls.forEach(m => m.visible = _skeletonVisible);
+  skeletonSphs.forEach(m => m.visible = _skeletonVisible);
+  const btn = document.getElementById('skeletonVisBtn');
+  if (btn) btn.classList.toggle('on', _skeletonVisible);
   if (typeof requestRender === 'function') requestRender();
 };
