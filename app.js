@@ -143,10 +143,25 @@ function init3d() {
   controls.target.set(450, 0, 550);
   controls.update();
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x94a3b8, 2.4));
-  const d = new THREE.DirectionalLight(0xffffff, 2.1);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x94a3b8, 1.2));
+  const d = new THREE.DirectionalLight(0xffffff, 2.0);
   d.position.set(1500, -2000, 2500);
+  d.castShadow = true;
+  d.shadow.mapSize.width = 2048;
+  d.shadow.mapSize.height = 2048;
+  d.shadow.camera.near = 10;
+  d.shadow.camera.far = 10000;
+  d.shadow.camera.left = -3000;
+  d.shadow.camera.right = 3000;
+  d.shadow.camera.top = 3000;
+  d.shadow.camera.bottom = -3000;
   scene.add(d);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.6);
+  fill.position.set(-1500, 1500, 800);
+  scene.add(fill);
 
   grid = new THREE.GridHelper(4000, 40, 0x1b3454, 0x0f2038);
   grid.rotation.x = Math.PI / 2;
@@ -585,7 +600,7 @@ function buildSkeletonCylinder(from, to, radius) {
   const dir = new THREE.Vector3().subVectors(v2, v1);
   const len = dir.length(); if (len < 1) return null;
   const geo = new THREE.CylinderGeometry(radius, radius, len, 10);
-  const mat = new THREE.MeshPhongMaterial({ color: LINK_COLOR, shininess: 80, specular: 0x444444 });
+  const mat = new THREE.MeshStandardMaterial({ color: LINK_COLOR,metalness:.55,roughness:.4});
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.copy(v1).addScaledVector(dir.normalize(), len * .5);
   const up = new THREE.Vector3(0,1,0);
@@ -609,9 +624,8 @@ function rebuildSkeletonMeshes(pts) {
   }
   // Kugeln an Gelenkpunkten (ab Index 1 = A1)
   for (let i = 1; i < pts.length; i++) {
-    const mat = new THREE.MeshPhongMaterial({
-      color: JOINT_COLOR, shininess: 120, specular: 0x666666
-    });
+    const mat = new THREE.MeshStandardMaterial({
+      color: JOINT_COLOR,metalness:.55,roughness:.4});
     const sph = new THREE.Mesh(new THREE.SphereGeometry(JOINT_R_at(i-1) || 10, 12, 8), mat);
     sph.position.copy(pts[i]);
     sph.userData.isSkelSph = true;
@@ -981,8 +995,12 @@ async function loadStls() {
       const g = await parseGeometry(u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength), f.name);
       // Rotation NICHT einbrennen — wird über kinematicsRoot/robotGroup angewendet
       g.computeVertexNormals();
-      const mat = new THREE.MeshStandardMaterial({ color: colors[partKey(f.name)], roughness: .62, metalness: .08 });
+      const mat = new THREE.MeshStandardMaterial({ color: colors[partKey(f.name)], roughness: .42, metalness: .55 });
       const mesh = new THREE.Mesh(g, mat); mesh.name = f.name;
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      const edges = new THREE.EdgesGeometry(g, 20);
+      const edgeMat = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 });
+      mesh.add(new THREE.LineSegments(edges, edgeMat));
       meshes.set(f.path, mesh);
     } catch (e) { console.warn(e); }
   }
@@ -1761,11 +1779,11 @@ function rebuildUmfMesh(i) {
   grp.rotation.set((o.rx||0)*deg2,(o.ry||0)*deg2,(o.rz||0)*deg2,'XYZ');
   if(u.stlFile?.buf){
     const geo=loader.parse(u.stlFile.buf.buffer||u.stlFile.buf); geo.computeVertexNormals();
-    grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:u.color||0x3a5a7a,shininess:60})));
+    grp.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:u.color||0x3a5a7a,metalness:.55,roughness:.4})));
   } else if(u.objectType&&u.objectType!=='stl'){
     const L=u.length||2000,W=u.width||200,H=u.height||2000,R=u.radius||500;
     const geo=u.objectType==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
-    grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:u.color||0x3a5a7a,shininess:60,transparent:true,opacity:0.85,side:THREE.DoubleSide})));
+    grp.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:u.color||0x3a5a7a,transparent:true,opacity:0.85,side:THREE.DoubleSide,metalness:.3,roughness:.5})));
   }
   if (typeof requestRender === 'function') requestRender();
   if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
@@ -1782,11 +1800,11 @@ function rebuildObjektMesh(i) {
   const lbl='Label'+(o.labelNum||i+1);
   const parts=state.axisStlParts[lbl]||[];
   if(parts.length){
-    parts.forEach(p=>{ if(!p.buf)return; const geo=loader.parse(p.buf.buffer||p.buf); geo.computeVertexNormals(); grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:p.color||0x4499cc,shininess:60}))); });
+    parts.forEach(p=>{ if(!p.buf)return; const geo=loader.parse(p.buf.buffer||p.buf); geo.computeVertexNormals(); grp.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:p.color||0x4499cc,metalness:.55,roughness:.4}))); });
   } else if(o.showBox!==false){
     const L=o.length||500,H=o.height||500,W=o.width||500,R=o.radius||200;
     const geo=o.type==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
-    grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:o.color||0x4499cc,shininess:60,transparent:true,opacity:0.85,side:THREE.DoubleSide})));
+    grp.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:o.color||0x4499cc,transparent:true,opacity:0.85,side:THREE.DoubleSide,metalness:.3,roughness:.5})));
   }
   // Position: base offset + movement along axis
   const p=o.ePos||0, ax=o.axis||'Y+', bo=o.boxOffset||{}, deg=Math.PI/180;
@@ -1816,11 +1834,11 @@ function rebuildEffMesh(effIdx) {
       const tGrp=new THREE.Group(); grp.add(tGrp);
       if(t.stlFile?.buf){
         const geo=loader.parse(t.stlFile.buf.buffer||t.stlFile.buf); geo.computeVertexNormals();
-        tGrp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:t.color||0x607080,shininess:60})));
+        tGrp.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:t.color||0x607080,metalness:.55,roughness:.4})));
       } else {
         const L=t.length||100,W=t.width||50,H=t.height||50,R=t.radius||25;
         const geo=t.objectType==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
-        tGrp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:t.color||0x607080,shininess:60,transparent:true,opacity:.85})));
+        tGrp.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:t.color||0x607080,transparent:true,opacity:.85,metalness:.3,roughness:.5})));
       }
       const bo=t.offset||{}, ax=t.axis||'Y+';
       const eMax=t.eMax??t.ePos??0;
@@ -1839,11 +1857,11 @@ function rebuildEffMesh(effIdx) {
     // Backward compat: single geometry on eff itself
     if(eff.stlFile?.buf){
       const geo=loader.parse(eff.stlFile.buf.buffer||eff.stlFile.buf); geo.computeVertexNormals();
-      grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:eff.color||0x607080,shininess:60})));
+      grp.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:eff.color||0x607080,metalness:.55,roughness:.4})));
     } else if(eff.objectType&&eff.objectType!=='stl'){
       const L=eff.length||200,W=eff.width||200,H=eff.height||300,R=eff.radius||80;
       const geo=eff.objectType==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
-      grp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:eff.color||0x607080,shininess:60,transparent:true,opacity:.85})));
+      grp.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:eff.color||0x607080,transparent:true,opacity:.85,metalness:.3,roughness:.5})));
     }
   }
   if (typeof requestRender === 'function') requestRender();
@@ -1997,11 +2015,11 @@ function rebuildPositionerMesh(i) {
   pivotGrp.add(meshGrp);
   // Build mesh
   if(parts.length){
-    parts.forEach(pt=>{ if(!pt.buf)return; const geo=loader.parse(pt.buf.buffer||pt.buf); geo.computeVertexNormals(); meshGrp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:pt.color||0xe8a020,shininess:60}))); });
+    parts.forEach(pt=>{ if(!pt.buf)return; const geo=loader.parse(pt.buf.buffer||pt.buf); geo.computeVertexNormals(); meshGrp.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:pt.color||0xe8a020,metalness:.55,roughness:.4}))); });
   } else if(p.showBox!==false){
     const L=p.length||500,H=p.height||100,W=p.width||500,R=p.radius||300;
     const geo=p.type==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
-    meshGrp.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:p.color||0xe8a020,transparent:true,opacity:0.5,side:THREE.DoubleSide})));
+    meshGrp.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:p.color||0xe8a020,transparent:true,opacity:0.5,side:THREE.DoubleSide,metalness:.3,roughness:.5})));
   }
   // Yellow pivot sphere
   const pivotSphere=new THREE.Mesh(
@@ -2139,11 +2157,11 @@ function rebuildFixMesh(i) {
   g.rotation.set((o.rx||0)*deg,(o.ry||0)*deg,(o.rz||0)*deg,'XYZ');
   if(o.stlFile?.buf){
     const geo=loader.parse(o.stlFile.buf.buffer||o.stlFile.buf); geo.computeVertexNormals();
-    g.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:o.color||0x607080,shininess:60})));
+    g.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:o.color||0x607080,metalness:.55,roughness:.4})));
   } else if(o.showBox!==false){
     const L=o.length||500,H=o.height||500,W=o.width||500,R=o.radius||200;
     const geo=o.type==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
-    g.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:o.color||0x607080,transparent:true,opacity:0.6,side:THREE.DoubleSide})));
+    g.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:o.color||0x607080,transparent:true,opacity:0.6,side:THREE.DoubleSide,metalness:.3,roughness:.5})));
   }
   if (typeof requestRender === 'function') requestRender();
   if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
@@ -3503,16 +3521,16 @@ function rebuildRailMeshes() {
     let mesh;
     if(part.type==='stl' && part.buf) {
       const geo=loader.parse(part.buf.buffer||part.buf); geo.computeVertexNormals();
-      mesh=new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:color||0x2563eb,shininess:60}));
+      mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:color||0x2563eb,metalness:.55,roughness:.4}));
     } else if(part.type==='cylinder') {
       const geo=new THREE.CylinderGeometry(part.radius||200,part.radius||200,part.cheight||400,32);
-      mesh=new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:color||0x2563eb,transparent:true,opacity:0.4}));
+      mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:color||0x2563eb,transparent:true,opacity:0.4,metalness:.3,roughness:.5}));
     } else { // box
       const L=part.length||2000,W=part.width||400,H=part.height||200;
       const geo=(ax==='X+'||ax==='X-')?new THREE.BoxGeometry(L,H,W):
                 (ax==='Y+'||ax==='Y-')?new THREE.BoxGeometry(W,L,H):
                                        new THREE.BoxGeometry(W,H,L);
-      mesh=new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:color||0x2563eb,transparent:true,opacity:0.4}));
+      mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:color||0x2563eb,transparent:true,opacity:0.4,metalness:.3,roughness:.5}));
     }
     if(!mesh) return null;
     return mesh;
