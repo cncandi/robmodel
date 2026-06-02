@@ -2982,7 +2982,6 @@ function _measureUpdate(p1, p2) {
 
 function _measurePick(event) {
   if(!_measureActive) return;
-  if(event.button !== undefined && event.button !== 0) return;
   const rect = renderer.domElement.getBoundingClientRect();
   const mx = ((event.clientX-rect.left)/rect.width)*2-1;
   const my = -((event.clientY-rect.top)/rect.height)*2+1;
@@ -3073,7 +3072,7 @@ $('measureBtn')?.addEventListener('click',()=>{
     btn?.classList.add('on'); $('rib-measure')?.classList.add('on');
     if(panel) panel.style.display='';
     _measureReset(); _measureReset3c();
-    renderer.domElement.addEventListener('pointerdown', _measurePick);
+    renderer.domElement.addEventListener('click', _measurePick);
     // Stirnkanten für bessere Sichtbarkeit beim Messen
     _measurePrevRenderMode = _currentRenderMode;
     window.setRenderMode(2);
@@ -3083,7 +3082,7 @@ $('measureBtn')?.addEventListener('click',()=>{
   } else {
     btn?.classList.remove('on'); $('rib-measure')?.classList.remove('on');
     if(panel) panel.style.display='none';
-    renderer.domElement.removeEventListener('pointerdown', _measurePick);
+    renderer.domElement.removeEventListener('click', _measurePick);
     _measureReset(); _measureReset3c();
     // Rendermode wiederherstellen
     if (typeof _measurePrevRenderMode !== 'undefined') window.setRenderMode(_measurePrevRenderMode);
@@ -6643,7 +6642,7 @@ function _circumcenter(p1, p2, p3) {
 
 // Override _measurePick für den neuen Modus
 const _measurePickOrig = _measurePick;
-renderer.domElement.removeEventListener('pointerdown', _measurePick);
+renderer.domElement.removeEventListener('click', _measurePick);
 
 window._toggleMeasureSnap = function() {
   _measureSnapEnabled = !_measureSnapEnabled;
