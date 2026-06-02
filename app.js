@@ -79,6 +79,7 @@ let scene, camera, perspCamera, orthoCamera, isOrtho=false, renderer, controls, 
 let railFixGrp, railMovGrp;
 let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup;
 let _axisLabelsVisible = true;
+let _skeletonVisible = true;
 // On-Demand-Rendering: nur rendern wenn nötig (spart GPU/CPU/Akku im Leerlauf)
 let _renderFrames = 3;
 function requestRender(n) { _renderFrames = Math.max(_renderFrames, n || 2); }
@@ -6205,7 +6206,7 @@ window.removeBg = function() {
 };
 
 // ── Skelett Toggle ─────────────────────────────────────────────────
-let _skeletonVisible = true;
+// _skeletonVisible moved to top
 window.toggleSkeleton = function() {
   _skeletonVisible = !_skeletonVisible;
   skeletonCyls.forEach(m => m.visible = _skeletonVisible);
