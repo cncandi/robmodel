@@ -154,7 +154,7 @@ function init3d() {
     const fake = new WheelEvent('wheel', { deltaY: -e.deltaY, deltaMode: e.deltaMode, bubbles: true, cancelable: true });
     canvas.dispatchEvent(fake);
   }, { capture: true, passive: false });
-  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('contextmenu', e => { /* handled by ctx menu */ });
   canvas.addEventListener('auxclick', e => { if (e.button === 1) { e.preventDefault(); e.stopPropagation(); } }, true);
   canvas.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); }, true);
   controls.target.set(450, 0, 550);
@@ -6301,38 +6301,29 @@ let _ctxMesh = null;
 
 renderer.domElement.addEventListener('contextmenu', e => {
   e.preventDefault();
+  e.stopPropagation();
+
   const rect = renderer.domElement.getBoundingClientRect();
   const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
+  scene.updateMatrixWorld(true);
   const rc = new THREE.Raycaster();
   rc.setFromCamera(new THREE.Vector2(mx, my), camera);
 
-  // Alle Meshes in der Szene prüfen (unassigned + vorhandene)
-  scene.updateMatrixWorld(true);
+  // Alle sichtbaren Meshes sammeln
+  const candidates = [];
+  scene.traverse(obj => {
+    if (!obj.isMesh) return;
+    if (!obj.visible) return;
+    if (!obj.geometry) return;
+    candidates.push(obj);
+  });
 
-  // Zuerst unassigned Meshes prüfen (höchste Priorität)
-  const unassignedList = [..._unassignedMeshes.values()].map(e => e.mesh);
-  let hit = rc.intersectObjects(unassignedList, false)[0];
+  const hits = rc.intersectObjects(candidates, false);
+  if (!hits.length) { _hideCtxMenu(); return; }
 
-  // Dann alle anderen Meshes
-  if (!hit) {
-    const candidates = [];
-    scene.traverse(obj => {
-      if (!obj.isMesh) return;
-      if (obj.userData.noRenderMode) return;
-      if (!obj.geometry) return;
-      if (unassignedList.includes(obj)) return;
-      candidates.push(obj);
-    });
-    hit = rc.intersectObjects(candidates, false)[0];
-  }
-
-  if (!hit) { _hideCtxMenu(); return; }
-  let hitObj = hit.object;
-  if (!hitObj.isMesh && hitObj.parent?.isMesh) hitObj = hitObj.parent;
-  if (!hitObj.isMesh) { _hideCtxMenu(); return; }
-  _ctxMesh = hitObj;
+  _ctxMesh = hits[0].object;
   _ctxHighlight(_ctxMesh);
   _showCtxMenu(e.clientX, e.clientY);
 });
