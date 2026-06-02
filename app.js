@@ -2654,8 +2654,40 @@ function _selectDescriptor(desc, hlTarget) {
 function _renderBodyTree() {
   const host = $('bodyTreeList'); if (!host) return;
   host.innerHTML = '';
+
+  // ── Importierte STLs (noch nicht zugewiesen) ──
+  if (_unassignedMeshes.size > 0) {
+    const hdr = document.createElement('div');
+    hdr.style.cssText = 'color:#ff8a00;font-size:10px;font-weight:700;padding:4px 2px 2px;letter-spacing:.06em';
+    hdr.textContent = 'IMPORTIERT — NICHT ZUGEWIESEN';
+    host.appendChild(hdr);
+
+    const cats = ['A1','A2','A3','A4','A5','A6','Podest','Tool','Endeffektor','Positionierer','Schiene','Festes Obj.','Bew. Obj.'];
+    for (const [name] of _unassignedMeshes) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:3px 2px';
+      const nm = document.createElement('span');
+      nm.textContent = name;
+      nm.style.cssText = 'flex:1;color:#5588cc;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      const sel = document.createElement('select');
+      sel.style.cssText = 'background:#0a1520;border:1px solid #2a4060;color:#d0dce8;border-radius:3px;padding:1px 3px;font-size:10px;max-width:110px';
+      sel.innerHTML = '<option value="">zuweisen…</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+      sel.onchange = () => { if (sel.value) window._assignFromPanel(name, sel.value); };
+      const del = document.createElement('button');
+      del.textContent = '✕';
+      del.style.cssText = 'background:none;border:none;color:#cc3333;cursor:pointer;font-size:12px;padding:0 2px';
+      del.onclick = () => window._removeUnassigned(name);
+      row.appendChild(nm); row.appendChild(sel); row.appendChild(del);
+      host.appendChild(row);
+    }
+
+    const sep = document.createElement('div');
+    sep.style.cssText = 'border-top:1px solid #1e3450;margin:6px 0 4px';
+    host.appendChild(sep);
+  }
+
   const data = _bodyTreeData();
-  if (!data.length) { host.innerHTML = '<div style="color:var(--txt3);font-size:11px;padding:6px">Keine Körper erkannt</div>'; return; }
+  if (!data.length && _unassignedMeshes.size === 0) { host.innerHTML = '<div style="color:var(--txt3);font-size:11px;padding:6px">Keine Körper erkannt</div>'; return; }
   data.forEach(node => {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:3px 2px';
@@ -6279,29 +6311,13 @@ window.toggleSkeleton = function() {
 const _unassignedMeshes = new Map(); // name → {mesh, buf}
 
 function _renderUnassignedList() {
-  let panel = document.getElementById('_unassigned_panel');
-  if (!panel) {
-    panel = document.createElement('div');
-    panel.id = '_unassigned_panel';
-    panel.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:2000;background:#0d1825;border:1px solid #2a4060;border-radius:6px;padding:8px 12px;min-width:400px;max-width:90vw;font-size:12px;color:#b0c4d8;font-family:monospace';
-    document.body.appendChild(panel);
+  // Strukturbaum öffnen und aktualisieren
+  if (!_treeOpen) {
+    _treeOpen = true;
+    const p = $('bodyTreePanel'); if (p) p.style.display = '';
+    $('treeToggle')?.classList.add('on');
   }
-  if (_unassignedMeshes.size === 0) { panel.style.display = 'none'; return; }
-  panel.style.display = 'block';
-  const cats = ['A1','A2','A3','A4','A5','A6','Podest','Tool','Endeffektor','Positionierer','Schiene','Festes Obj.','Bew. Obj.'];
-  panel.innerHTML = '<div style="color:#ff8a00;font-weight:700;margin-bottom:6px">Importierte STL — Zuweisung wählen:</div>' +
-    [..._unassignedMeshes.entries()].map(([name]) =>
-      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
-        <select onchange="window._assignFromPanel('${name}', this.value); this.selectedIndex=0;"
-          style="background:#0a1520;border:1px solid #2a4060;color:#d0dce8;border-radius:3px;padding:2px 4px;font-size:11px">
-          <option value="">— zuweisen als —</option>
-          ${cats.map(c => `<option value="${c}">${c}</option>`).join('')}
-        </select>
-        <button onclick="window._removeUnassigned('${name}')"
-          style="background:none;border:none;color:#f87171;cursor:pointer;font-size:14px;padding:0 4px">✕</button>
-      </div>`
-    ).join('');
+  if (typeof _renderBodyTree === 'function') _renderBodyTree();
 }
 
 window._assignFromPanel = function(name, cat) {
