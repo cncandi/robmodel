@@ -48,7 +48,7 @@ const state = {
   toolTr:  { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
   activeTcp: 'auftragen',
   axisPoints: ['A1','A2','A3','A4','A5','A6'].map((name, i) => ({ name, ...defOffset(i), rx: 0, ry: 0, rz: 0, source: 'KR8 Zielwert' })),
-  selectedAxis: 0,
+  selectedAxis: 5,
   jointAngles: [0, -90, 90, 0, 0, 0],
   axisStlMap: { A1:null, A2:null, A3:null, A4:null, A5:null, A6:null },
   axisStlParts: { A1:[], A2:[], A3:[], A4:[], A5:[], A6:[] },
@@ -166,7 +166,9 @@ function init3d() {
   grid = new THREE.GridHelper(4000, 40, 0x1b3454, 0x0f2038);
   grid.rotation.x = Math.PI / 2;
   scene.add(grid);
-  scene.add(new THREE.AxesHelper(900));
+  const _worldAxes = new THREE.AxesHelper(900);
+  scene.add(_worldAxes);
+  window._worldAxes = _worldAxes;
 
   robotGroup = new THREE.Group();
   toolGroup = new THREE.Group();
@@ -6143,4 +6145,56 @@ window._injectGlbsIntoZip = function(zip) {
     }
   }
   return zip;
+};
+
+// ── Koordinatensysteme Toggle ──────────────────────────────────────
+let _csVisible = true;
+window.toggleCS = function() {
+  _csVisible = !_csVisible;
+  if (csHelperGroup) csHelperGroup.visible = _csVisible;
+  if (window._worldAxes) window._worldAxes.visible = _csVisible;
+  const btn = document.getElementById('rib-cs');
+  if (btn) btn.classList.toggle('on', _csVisible);
+  if (typeof requestRender === 'function') requestRender();
+};
+
+// ── Hintergrundbild ────────────────────────────────────────────────
+let _bgTexture = null;
+let _bgOrigColor = null;
+
+window.openBgPicker = function() {
+  document.getElementById('bgImageInput')?.click();
+};
+
+document.getElementById('bgImageInput')?.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  new THREE.TextureLoader().loadAsync(url).then(tex => {
+    URL.revokeObjectURL(url);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    if (_bgOrigColor === null) _bgOrigColor = scene.background.clone();
+    if (_bgTexture) _bgTexture.dispose();
+    _bgTexture = tex;
+    scene.background = tex;
+    const btn = document.getElementById('rib-bg');
+    if (btn) {
+      btn.classList.add('on');
+      btn.title = 'Hintergrundbild entfernen';
+      btn.onclick = window.removeBg;
+    }
+    if (typeof requestRender === 'function') requestRender();
+  });
+});
+
+window.removeBg = function() {
+  if (_bgTexture) { _bgTexture.dispose(); _bgTexture = null; }
+  if (_bgOrigColor) scene.background = _bgOrigColor;
+  const btn = document.getElementById('rib-bg');
+  if (btn) {
+    btn.classList.remove('on');
+    btn.title = 'Hintergrundbild';
+    btn.onclick = window.openBgPicker;
+  }
+  if (typeof requestRender === 'function') requestRender();
 };
