@@ -1491,6 +1491,8 @@ async function downloadZip() {
   const zip=new JSZip(), base=zipName(state.robotName||'RobModel_export');
   zip.file(base+'.json',JSON.stringify(buildJson(),null,2));
   for(const[,mesh] of meshes) zip.file(mesh.name,exportBinaryStl(mesh));
+  // GLBs einbetten falls vorhanden
+  if (typeof window._injectGlbsIntoZip === 'function') window._injectGlbsIntoZip(zip);
   dl(await zip.generateAsync({type:'blob'}),base+'.zip');
 }
 function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);}
@@ -5744,3 +5746,396 @@ window.setRenderMode = function setRenderMode(mode) {
 }
 
 function _applyRenderModeToGroup(grp) { setRenderMode(_currentRenderMode); }
+
+// ── Material-Modal ─────────────────────────────────────────────────
+const _matState = new Map(); // path → { maps, glbBlob, objectUrls }
+
+window.openMaterialModal = function() {
+  const modal = document.getElementById('materialModal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  _renderMatPartList();
+};
+
+function _renderMatPartList() {
+  const list = document.getElementById('matPartList');
+  if (!list) return;
+  const parts = state.stls || [];
+  if (!parts.length) {
+    list.innerHTML = '<div style="color:#4a6a8a;font-size:12px;padding:8px">Keine Elemente geladen</div>';
+    return;
+  }
+  list.innerHTML = parts.map((f, i) => {
+    const hasGlb = _matState.has(f.path) && _matState.get(f.path).glbBlob;
+    return `<div id="matpart-${i}" onclick="window._selectMatPart(${i})"
+      style="padding:7px 10px;cursor:pointer;border-radius:4px;margin-bottom:2px;
+             font-size:12px;color:${hasGlb ? '#60a5fa' : '#b0c4d8'};
+             background:rgba(255,255,255,.03);border:1px solid transparent"
+      onmouseover="this.style.background='rgba(255,255,255,.07)'"
+      onmouseout="this.style.background='rgba(255,255,255,.03)'">
+      ${hasGlb ? '🎨 ' : ''}${f.name}
+    </div>`;
+  }).join('');
+}
+
+window._selectMatPart = function(idx) {
+  const parts = state.stls || [];
+  const f = parts[idx];
+  if (!f) return;
+
+  // Highlight
+  parts.forEach((_, i) => {
+    const el = document.getElementById('matpart-' + i);
+    if (el) el.style.border = i === idx ? '1px solid rgba(255,122,0,.5)' : '1px solid transparent';
+  });
+
+  _renderMatEditor(f, idx);
+};
+
+function _renderMatEditor(f, idx) {
+  const ed = document.getElementById('matEditor');
+  if (!ed) return;
+  const ms = _matState.get(f.path) || { maps: {}, objectUrls: [] };
+
+  const hasGlb = !!ms.glbBlob;
+  const mapNames = Object.keys(ms.maps).filter(k => k !== 'normalIsDirectX').join(', ') || '—';
+
+  ed.innerHTML = `
+    <div style="font-size:13px;font-weight:600;color:#d0dce8;margin-bottom:12px">${f.name}</div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+      <label style="font-size:12px;color:#7a9ab8;display:flex;flex-direction:column;gap:4px">
+        Poly-Haven-ZIP
+        <input type="file" accept=".zip" id="mat-zip-${idx}" style="font-size:11px">
+      </label>
+      <label style="font-size:12px;color:#7a9ab8;display:flex;flex-direction:column;gap:4px">
+        Einzeltextur
+        <input type="file" accept="image/png,image/jpeg,image/webp" id="mat-tex-${idx}" style="font-size:11px">
+      </label>
+    </div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+      <label style="font-size:12px;color:#7a9ab8;display:flex;flex-direction:column;gap:4px">
+        Mapping
+        <select id="mat-map-${idx}" style="font-size:12px;background:#0a1520;border:1px solid #1e3450;color:#d0dce8;padding:4px;border-radius:3px">
+          <option value="xy">XY</option>
+          <option value="xz" selected>XZ</option>
+          <option value="yz">YZ</option>
+        </select>
+      </label>
+      <label style="font-size:12px;color:#7a9ab8;display:flex;flex-direction:column;gap:4px">
+        Wiederholung
+        <input type="number" id="mat-rep-${idx}" min="0.1" step="0.1" value="1.0"
+          style="width:70px;font-size:12px;background:#0a1520;border:1px solid #1e3450;color:#d0dce8;padding:4px;border-radius:3px">
+      </label>
+      <label style="font-size:12px;color:#7a9ab8;display:flex;flex-direction:column;gap:4px">
+        Displacement
+        <input type="number" id="mat-disp-${idx}" step="0.01" value="0.00"
+          style="width:70px;font-size:12px;background:#0a1520;border:1px solid #1e3450;color:#d0dce8;padding:4px;border-radius:3px">
+      </label>
+    </div>
+
+    <div style="font-size:11px;color:#4a6a8a;margin-bottom:12px">Geladene Maps: ${mapNames}</div>
+
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button id="mat-apply-${idx}" onclick="window._matApply(${idx})"
+        style="font-size:12px;padding:5px 14px;background:rgba(255,122,0,.15);border:1px solid rgba(255,122,0,.4);color:var(--acc);border-radius:4px;cursor:pointer">
+        Material anwenden
+      </button>
+      <button id="mat-glb-${idx}" onclick="window._matExportGlb(${idx})"
+        style="font-size:12px;padding:5px 14px;background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:4px;cursor:pointer">
+        GLB erzeugen ${hasGlb ? '✓' : ''}
+      </button>
+      ${hasGlb ? `<button onclick="window._matClearGlb(${idx})"
+        style="font-size:12px;padding:5px 14px;background:rgba(200,50,50,.1);border:1px solid rgba(200,50,50,.3);color:#f87171;border-radius:4px;cursor:pointer">
+        GLB entfernen
+      </button>` : ''}
+    </div>
+
+    <canvas id="mat-preview-${idx}" width="400" height="280"
+      style="width:100%;max-width:400px;border:1px solid #1e3450;border-radius:4px;background:#0a1520"></canvas>
+  `;
+
+  // Preview-Scene aufbauen
+  _initMatPreview(idx, f);
+
+  // Events
+  document.getElementById('mat-zip-' + idx)?.addEventListener('change', async e => {
+    const file = e.target.files[0]; if (!file) return;
+    await _matLoadZip(idx, f, file);
+  });
+  document.getElementById('mat-tex-' + idx)?.addEventListener('change', async e => {
+    const file = e.target.files[0]; if (!file) return;
+    await _matLoadSingleTex(idx, f, file);
+  });
+  ['mat-map-', 'mat-rep-', 'mat-disp-'].forEach(pfx => {
+    document.getElementById(pfx + idx)?.addEventListener('change', () => _matApplyToPreview(idx, f));
+  });
+}
+
+// ── Preview Three.js Scene pro Element ────────────────────────────
+const _matPreviews = new Map(); // idx → { renderer, scene, mesh, animId }
+
+function _initMatPreview(idx, f) {
+  const canvas = document.getElementById('mat-preview-' + idx);
+  if (!canvas) return;
+
+  // Alte Preview aufräumen
+  const old = _matPreviews.get(idx);
+  if (old) { cancelAnimationFrame(old.animId); old.renderer.dispose(); }
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a1520);
+
+  const camera = new THREE.PerspectiveCamera(45, 400/280, 0.1, 100000);
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setSize(canvas.clientWidth || 400, canvas.clientHeight || 280, false);
+  renderer.shadowMap.enabled = true;
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+  const dl = new THREE.DirectionalLight(0xffffff, 1.8);
+  dl.position.set(200, 300, 250); dl.castShadow = true;
+  scene.add(dl);
+  scene.add(new THREE.GridHelper(300, 20, 0x1b3454, 0x0f2038));
+
+  // Mesh aus vorhandenem meshes-Map kopieren
+  const srcMesh = meshes.get(f.path);
+  let mesh;
+  if (srcMesh) {
+    const geo = srcMesh.geometry.clone();
+    geo.computeVertexNormals();
+    mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xb8b8b8, roughness: 0.65, metalness: 0.05 }));
+  } else {
+    mesh = new THREE.Mesh(new THREE.BoxGeometry(100,100,100), new THREE.MeshStandardMaterial({ color: 0xb8b8b8 }));
+  }
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  scene.add(mesh);
+
+  // Kamera zentrieren
+  const box = new THREE.Box3().setFromObject(mesh);
+  const center = new THREE.Vector3(); box.getCenter(center);
+  const size = new THREE.Vector3(); box.getSize(size);
+  mesh.position.sub(center);
+  const dist = Math.max(size.x, size.y, size.z) * 2.2 || 300;
+  camera.position.set(dist, dist * 0.7, dist);
+  camera.lookAt(0, 0, 0);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+
+  let animId;
+  function animate() {
+    animId = requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  _matPreviews.set(idx, { renderer, scene, mesh, camera, controls, animId });
+
+  // Vorhandenes Material anwenden falls vorhanden
+  const ms = _matState.get(f.path);
+  if (ms && Object.keys(ms.maps).length) _matApplyToPreview(idx, f);
+}
+
+// ── Textur-Hilfsfunktionen ─────────────────────────────────────────
+function _matFileRole(name) {
+  const n = name.toLowerCase();
+  if (!/\.(jpg|jpeg|png|webp)$/i.test(n)) return null;
+  if (/(^|[_\-.])(diff|diffuse|albedo|basecolor|base_color|col|color)([_\-.]|$)/.test(n)) return 'map';
+  if (/(^|[_\-.])(nor_gl|normal_gl|normal_opengl)([_\-.]|$)/.test(n)) return 'normalMapGL';
+  if (/(^|[_\-.])(nor_dx|normal_dx|normal_directx)([_\-.]|$)/.test(n)) return 'normalMapDX';
+  if (/(^|[_\-.])(nor|normal)([_\-.]|$)/.test(n)) return 'normalMapGL';
+  if (/(^|[_\-.])(rough|roughness)([_\-.]|$)/.test(n)) return 'roughnessMap';
+  if (/(^|[_\-.])(metal|metallic|metalness)([_\-.]|$)/.test(n)) return 'metalnessMap';
+  if (/(^|[_\-.])(ao|ambientocclusion|ambient_occlusion)([_\-.]|$)/.test(n)) return 'aoMap';
+  if (/(^|[_\-.])(disp|displacement|height)([_\-.]|$)/.test(n)) return 'displacementMap';
+  return null;
+}
+
+function _matPrepTex(tex, isColor) {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.flipY = true;
+  if (isColor) tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+async function _matTexFromBlob(blob, isColor) {
+  const url = URL.createObjectURL(blob);
+  const tex = await new THREE.TextureLoader().loadAsync(url);
+  URL.revokeObjectURL(url);
+  return _matPrepTex(tex, isColor);
+}
+
+function _matCreateUVs(geo, mode, repeat) {
+  geo.computeBoundingBox();
+  const box = geo.boundingBox;
+  const size = new THREE.Vector3(); box.getSize(size);
+  const pos = geo.attributes.position;
+  const uvs = [];
+  const safe = v => Math.abs(v) < 1e-9 ? 1 : v;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    let u, v;
+    if (mode === 'xy')      { u = (x - box.min.x) / safe(size.x); v = (y - box.min.y) / safe(size.y); }
+    else if (mode === 'yz') { u = (y - box.min.y) / safe(size.y); v = (z - box.min.z) / safe(size.z); }
+    else                    { u = (x - box.min.x) / safe(size.x); v = (z - box.min.z) / safe(size.z); }
+    uvs.push(u * repeat, v * repeat);
+  }
+  geo.setAttribute('uv',  new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setAttribute('uv2', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.attributes.uv.needsUpdate = true;
+}
+
+// ── ZIP laden ──────────────────────────────────────────────────────
+async function _matLoadZip(idx, f, file) {
+  const { default: JSZip } = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm');
+  const zip = await JSZip.loadAsync(file);
+  const candidates = {};
+  zip.forEach((path, entry) => {
+    if (entry.dir) return;
+    const role = _matFileRole(path);
+    if (!role) return;
+    if (role === 'normalMapGL') candidates.normalMapGL = { entry, path };
+    else if (role === 'normalMapDX' && !candidates.normalMapGL) candidates.normalMapDX = { entry, path };
+    else if (!candidates[role]) candidates[role] = { entry, path };
+  });
+
+  const ms = _matState.get(f.path) || { maps: {}, objectUrls: [] };
+  ms.maps = {};
+
+  async function load(key, target, isColor) {
+    if (!candidates[key]) return;
+    const blob = await candidates[key].entry.async('blob');
+    ms.maps[target] = await _matTexFromBlob(blob, isColor);
+  }
+
+  await load('map', 'map', true);
+  if (candidates.normalMapGL) await load('normalMapGL', 'normalMap', false);
+  else if (candidates.normalMapDX) { await load('normalMapDX', 'normalMap', false); ms.maps.normalIsDirectX = true; }
+  await load('roughnessMap', 'roughnessMap', false);
+  await load('metalnessMap', 'metalnessMap', false);
+  await load('aoMap', 'aoMap', false);
+  await load('displacementMap', 'displacementMap', false);
+
+  _matState.set(f.path, ms);
+  _matApplyToPreview(idx, f);
+  _renderMatEditor(f, idx);
+}
+
+async function _matLoadSingleTex(idx, f, file) {
+  const ms = _matState.get(f.path) || { maps: {}, objectUrls: [] };
+  ms.maps = {};
+  ms.maps.map = await _matTexFromBlob(file, true);
+  _matState.set(f.path, ms);
+  _matApplyToPreview(idx, f);
+  _renderMatEditor(f, idx);
+}
+
+// ── Material auf Preview + Hauptmesh anwenden ──────────────────────
+function _matApplyToPreview(idx, f) {
+  const pv = _matPreviews.get(idx);
+  if (!pv) return;
+  const ms = _matState.get(f.path);
+  if (!ms) return;
+
+  const mode   = document.getElementById('mat-map-'  + idx)?.value || 'xz';
+  const repeat = parseFloat(document.getElementById('mat-rep-'  + idx)?.value || '1');
+  const disp   = parseFloat(document.getElementById('mat-disp-' + idx)?.value || '0');
+
+  _matCreateUVs(pv.mesh.geometry, mode, repeat);
+
+  const maps = ms.maps;
+  const mat = new THREE.MeshStandardMaterial({
+    color: maps.map ? 0xffffff : 0xb8b8b8,
+    map: maps.map || null,
+    normalMap: maps.normalMap || null,
+    roughnessMap: maps.roughnessMap || null,
+    metalnessMap: maps.metalnessMap || null,
+    aoMap: maps.aoMap || null,
+    displacementMap: maps.displacementMap || null,
+    displacementScale: disp,
+    roughness: maps.roughnessMap ? 1.0 : 0.65,
+    metalness: maps.metalnessMap ? 1.0 : 0.05,
+    side: THREE.DoubleSide
+  });
+  if (maps.normalIsDirectX) mat.normalScale = new THREE.Vector2(1, -1);
+
+  pv.mesh.material.dispose();
+  pv.mesh.material = mat;
+}
+
+window._matApply = function(idx) {
+  const parts = state.stls || [];
+  const f = parts[idx];
+  if (!f) return;
+  _matApplyToPreview(idx, f);
+
+  // Auf Hauptmesh anwenden
+  const pv = _matPreviews.get(idx);
+  const mainMesh = meshes.get(f.path);
+  if (pv && mainMesh) {
+    const mode   = document.getElementById('mat-map-'  + idx)?.value || 'xz';
+    const repeat = parseFloat(document.getElementById('mat-rep-'  + idx)?.value || '1');
+    _matCreateUVs(mainMesh.geometry, mode, repeat);
+    mainMesh.material.dispose();
+    mainMesh.material = pv.mesh.material.clone();
+    if (typeof requestRender === 'function') requestRender();
+  }
+};
+
+// ── GLB erzeugen und im state speichern ────────────────────────────
+window._matExportGlb = async function(idx) {
+  const parts = state.stls || [];
+  const f = parts[idx];
+  if (!f) return;
+
+  const pv = _matPreviews.get(idx);
+  if (!pv) return;
+
+  // Sicherstellen dass Material aktuell ist
+  _matApplyToPreview(idx, f);
+
+  const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
+  const exporter = new GLTFExporter();
+
+  exporter.parse(pv.mesh, result => {
+    const blob = result instanceof ArrayBuffer
+      ? new Blob([result], { type: 'model/gltf-binary' })
+      : new Blob([JSON.stringify(result)], { type: 'application/json' });
+
+    const ms = _matState.get(f.path) || { maps: {}, objectUrls: [] };
+    ms.glbBlob = blob;
+    ms.glbName = f.name.replace(/\.(stl|osd)$/i, '') + '.glb';
+    _matState.set(f.path, ms);
+
+    // Button aktualisieren
+    const btn = document.getElementById('mat-glb-' + idx);
+    if (btn) { btn.textContent = 'GLB erzeugen ✓'; btn.style.borderColor = 'rgba(37,235,100,.4)'; btn.style.color = '#4ade80'; }
+    _renderMatPartList();
+  }, err => { console.error(err); alert('GLB Export fehlgeschlagen'); }, { binary: true });
+};
+
+window._matClearGlb = function(idx) {
+  const parts = state.stls || [];
+  const f = parts[idx];
+  if (!f) return;
+  const ms = _matState.get(f.path);
+  if (ms) { ms.glbBlob = null; ms.glbName = null; }
+  _renderMatEditor(f, idx);
+  _renderMatPartList();
+};
+
+// ── ZIP-Export: GLBs einbetten ─────────────────────────────────────
+// Hook in den bestehenden ZIP-Save-Mechanismus
+const _origDownloadZip = window.downloadZip;
+window._injectGlbsIntoZip = function(zip) {
+  for (const [path, ms] of _matState) {
+    if (ms.glbBlob && ms.glbName) {
+      zip.file(ms.glbName, ms.glbBlob);
+    }
+  }
+  return zip;
+};

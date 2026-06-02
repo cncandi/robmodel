@@ -384,6 +384,7 @@ header.top .title    { display: none !important; }
   <div class="rib-group" style="padding-bottom:16px">
     <button class="rib-btn" id="rib-gimbal"   onclick="document.getElementById('gimbalToggle')?.click()" title="Gimbal"><svg><use href="#i-move"/></svg>Gimbal</button>
     <button class="rib-btn" id="rib-measure"  onclick="document.getElementById('measureBtn')?.click()"  title="Messen"><svg><use href="#i-ruler"/></svg>Messen</button>
+    <button class="rib-btn" id="rib-material" onclick="window.openMaterialModal?.()" title="Materialien zuweisen"><svg><use href="#i-export"/></svg>Material</button>
     <span class="rib-group-label">Werkzeuge</span>
   </div>
   <div class="rib-group" style="padding-bottom:16px">
@@ -1493,6 +1494,24 @@ function handleRibView(btn){
 }
 </script>
 <script src="../js/cable-system.js?v=20260531a"></script>
+
+<!-- ── Material-Modal ──────────────────────────────────────────── -->
+<div id="materialModal" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.7);align-items:center;justify-content:center">
+  <div style="background:#0d1a26;border:1px solid #1e3450;border-radius:8px;width:900px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #1e3450">
+      <span style="font-size:14px;font-weight:600;color:#d0dce8">Materialien</span>
+      <button onclick="document.getElementById('materialModal').style.display='none'" style="background:none;border:none;color:#7a9ab8;font-size:18px;cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;flex:1;overflow:hidden">
+      <!-- Elementliste links -->
+      <div id="matPartList" style="width:220px;min-width:180px;border-right:1px solid #1e3450;overflow-y:auto;padding:8px"></div>
+      <!-- Editor rechts -->
+      <div id="matEditor" style="flex:1;overflow-y:auto;padding:16px">
+        <div style="color:#4a6a8a;font-size:13px;margin-top:40px;text-align:center">Element links auswählen</div>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
 
