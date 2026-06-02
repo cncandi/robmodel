@@ -1504,7 +1504,46 @@ async function downloadJson() { dl(new Blob([JSON.stringify(buildJson(),null,2)]
 async function downloadZip() {
   const zip=new JSZip(), base=zipName(state.robotName||'RobModel_export');
   zip.file(base+'.json',JSON.stringify(buildJson(),null,2));
+
+  // Achsen-STLs aus meshes Map
   for(const[,mesh] of meshes) zip.file(mesh.name,exportBinaryStl(mesh));
+
+  // Alle weiteren STL-Buffers aus dem State
+  const addBuf = (name, buf) => {
+    if (!name || !buf) return;
+    if (!zip.file(name)) zip.file(name, buf instanceof Uint8Array ? buf : new Uint8Array(buf));
+  };
+
+  // axisStlParts (E-Achsen, Schienen)
+  for (const [, parts] of Object.entries(state.axisStlParts||{})) {
+    for (const p of (parts||[])) addBuf(p.name, p.buf);
+  }
+  // Effektoren
+  for (const e of (state.effektoren||[])) {
+    for (const t of (e.teile||[])) { if (t.stlFile) addBuf(t.stlFile.name, t.stlFile.buf); }
+  }
+  // Feste Objekte
+  for (const f of (state.festeObjekte||[])) {
+    if (f.stlFile) addBuf(f.stlFile.name, f.stlFile.buf);
+  }
+  // Bewegliche Objekte
+  for (const o of (state.objekte||[])) {
+    if (o.stlFile) addBuf(o.stlFile.name, o.stlFile.buf);
+  }
+  // Positionierer
+  for (const p of (state.positioners||[])) {
+    for (const part of (p.teile||[])) { if (part.stlFile) addBuf(part.stlFile.name, part.stlFile.buf); }
+  }
+  // Umfeld
+  for (const u of (state.umfElemente||[])) {
+    if (u.stlFile) addBuf(u.stlFile.name, u.stlFile.buf);
+  }
+  // Schienen fixedPart/movingPart
+  for (const s of (state.schienen||[])) {
+    if (s.fixedPart?.buf) addBuf(s.fixedPart.stl||s.fixedPart.stlName, s.fixedPart.buf);
+    if (s.movingPart?.buf) addBuf(s.movingPart.stl||s.movingPart.stlName, s.movingPart.buf);
+  }
+
   // GLBs einbetten falls vorhanden
   if (typeof window._injectGlbsIntoZip === 'function') window._injectGlbsIntoZip(zip);
   dl(await zip.generateAsync({type:'blob'}),base+'.zip');
