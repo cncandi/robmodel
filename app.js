@@ -125,7 +125,7 @@ animate();
 // ── 3D-Szene ───────────────────────────────────────────────────────
 function init3d() {
   const canvas = $('viewer');
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, alpha: true });
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0d1825);
@@ -5865,7 +5865,7 @@ function _renderMatEditor(f, idx) {
       </button>` : ''}
     </div>
 
-  \`;
+  `;
 
   // Preview-Scene aufbauen
   _initMatPreview(idx, f);
@@ -6199,18 +6199,24 @@ document.getElementById('bgImageInput')?.addEventListener('change', e => {
   if (!file) return;
   const url = URL.createObjectURL(file);
   // CSS-Hintergrund statt Three.js background → kein Verzerren
-  const canvas = document.getElementById('viewer');
-  if (canvas) {
-    canvas.style.backgroundImage = 'url(' + url + ')';
-    canvas.style.backgroundSize = 'auto 100%';
-    canvas.style.backgroundPosition = 'center';
-    canvas.style.backgroundRepeat = 'no-repeat';
-    canvas.style.backgroundColor = '#000000';
+  // Hintergrundbild: separates Div hinter dem Canvas
+  let bgDiv = document.getElementById('_robmodel_bg');
+  if (!bgDiv) {
+    bgDiv = document.createElement('div');
+    bgDiv.id = '_robmodel_bg';
+    bgDiv.style.cssText = 'position:absolute;inset:0;z-index:0;pointer-events:none';
+    const canvas = document.getElementById('viewer');
+    canvas?.parentElement?.style && (canvas.parentElement.style.position = 'relative');
+    canvas?.parentElement?.insertBefore(bgDiv, canvas);
+    if (canvas) canvas.style.position = 'relative';
+    if (canvas) canvas.style.zIndex = '1';
   }
-  // Three.js background transparent
-  if (_bgOrigColor === null && scene.background) _bgOrigColor = scene.background.clone();
-  scene.background = null;
-  renderer.setClearAlpha(0);
+  bgDiv.style.backgroundImage = 'url(' + url + ')';
+  bgDiv.style.backgroundSize = 'auto 100%';
+  bgDiv.style.backgroundPosition = 'center';
+  bgDiv.style.backgroundRepeat = 'no-repeat';
+  bgDiv.style.backgroundColor = '#000';
+  _bgTexture = url;
   _bgTexture = url; // URL merken für Cleanup
   const btn = document.getElementById('rib-bg');
   if (btn) {
@@ -6223,9 +6229,8 @@ document.getElementById('bgImageInput')?.addEventListener('change', e => {
 
 window.removeBg = function() {
   if (_bgTexture) { URL.revokeObjectURL(_bgTexture); _bgTexture = null; }
-  const canvas = document.getElementById('viewer');
-  if (canvas) { canvas.style.backgroundImage = ''; canvas.style.backgroundColor = ''; }
-  renderer.setClearAlpha(1);
+  const bgDiv = document.getElementById('_robmodel_bg');
+  if (bgDiv) bgDiv.style.backgroundImage = '';
   if (_bgOrigColor) scene.background = _bgOrigColor;
   const btn = document.getElementById('rib-bg');
   if (btn) {
