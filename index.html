@@ -785,12 +785,12 @@ header.top .title    { display: none !important; }
         <label>Höhe (mm)<input id="fm-height" type="number" value="500" step="10"></label>
         <label class="rl-span2" style="font-size:11px;color:#6a8fa8;letter-spacing:.05em">POSITION
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px">
-            <label style="font-size:10px;color:#6a8fa8">X mm<input id="fm-x" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Y mm<input id="fm-y" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Z mm<input id="fm-z" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Rx °<input id="fm-rx" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Ry °<input id="fm-ry" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Rz °<input id="fm-rz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">X mm<input id="fm-x" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Y mm<input id="fm-y" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Z mm<input id="fm-z" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rx °<input id="fm-rx" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Ry °<input id="fm-ry" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rz °<input id="fm-rz" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
           </div>
         </label>
         <label class="rl-span2" style="display:flex;align-items:center;gap:8px;cursor:pointer">
@@ -867,12 +867,12 @@ header.top .title    { display: none !important; }
         </label>
         <label class="rl-span2" style="font-size:11px;color:#6a8fa8;letter-spacing:.05em">POSITION
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px">
-            <label style="font-size:10px;color:#6a8fa8">X mm<input id="pm-ox" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Y mm<input id="pm-oy" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Z mm<input id="pm-oz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Rx °<input id="pm-orx" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Ry °<input id="pm-ory" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Rz °<input id="pm-orz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">X mm<input id="pm-ox" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Y mm<input id="pm-oy" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Z mm<input id="pm-oz" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rx °<input id="pm-orx" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Ry °<input id="pm-ory" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rz °<input id="pm-orz" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
           </div>
         </label>
         <label class="rl-span2">Dreht gemeinsam mit
@@ -947,12 +947,12 @@ header.top .title    { display: none !important; }
         </label>
         <label class="rl-span2" style="font-size:11px;color:#6a8fa8;letter-spacing:.05em">VERSCHIEBUNG
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px">
-            <label style="font-size:10px;color:#6a8fa8">X mm<input id="om-ox" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Y mm<input id="om-oy" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Z mm<input id="om-oz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Rx °<input id="om-orx" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Ry °<input id="om-ory" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
-            <label style="font-size:10px;color:#6a8fa8">Rz °<input id="om-orz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">X mm<input id="om-ox" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Y mm<input id="om-oy" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Z mm<input id="om-oz" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rx °<input id="om-orx" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Ry °<input id="om-ory" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Rz °<input id="om-orz" type="text" onblur="this.value=((s)=>{try{const r=Function('return ('+s.replace(/,/g,'.').replace(/[^0-9+\-*/.() ]/g,'')+')')();return isFinite(r)?parseFloat(r.toFixed(4)):s}catch(e){return s}})(this.value)" onkeydown="if(event.key==='Enter')this.blur()" value="0" step="1" style="width:100%;margin-top:2px"></label>
           </div>
         </label>
         <label class="rl-span2" style="display:flex;align-items:center;gap:8px;cursor:pointer">
