@@ -6558,12 +6558,49 @@ window._assignFromPanel = function(name, cat) {
   const entry = _unassignedMeshes.get(name);
   if (!entry) return;
   const buf = entry.buf;
-  scene.remove(entry.mesh);
+
+  // Aktuelle Position und Rotation merken
+  const mesh = entry.mesh;
+  const pos = mesh.position.clone();
+  const rot = mesh.rotation.clone();
+
+  scene.remove(mesh);
   _unassignedMeshes.delete(name);
   _renderUnassignedList();
   const blob = new Blob([buf], { type: 'application/octet-stream' });
   const file = new File([blob], name);
+
+  // Nach Zuweisung Position übertragen
+  const prevLen = {
+    fix: (state.festeObjekte||[]).length,
+    obj: (state.objekte||[]).length,
+    eff: (state.effektoren||[]).length,
+    umf: (state.umfElemente||[]).length,
+  };
   _dropAssignStl(file, cat);
+
+  // Position auf das neu erstellte Element übertragen
+  requestAnimationFrame(() => {
+    const deg = 180 / Math.PI;
+    if (cat === 'Festes Obj.' && state.festeObjekte.length > prevLen.fix) {
+      const i = state.festeObjekte.length - 1;
+      Object.assign(state.festeObjekte[i], { x: pos.x, y: pos.y, z: pos.z, rx: rot.x*deg, ry: rot.y*deg, rz: rot.z*deg });
+      rebuildFixMesh(i);
+    } else if (cat === 'Bew. Obj.' && state.objekte.length > prevLen.obj) {
+      const i = state.objekte.length - 1;
+      if (state.objekte[i].boxOffset) Object.assign(state.objekte[i].boxOffset, { x: pos.x, y: pos.y, z: pos.z, rx: rot.x*deg, ry: rot.y*deg, rz: rot.z*deg });
+      rebuildObjektMesh(i);
+    } else if (cat === 'Endeffektor' && state.effektoren.length > prevLen.eff) {
+      const i = state.effektoren.length - 1;
+      if (!state.effektoren[i].offset) state.effektoren[i].offset = {};
+      Object.assign(state.effektoren[i].offset, { x: pos.x, y: pos.y, z: pos.z, rx: rot.x*deg, ry: rot.y*deg, rz: rot.z*deg });
+      rebuildEffMesh(i);
+    } else if ((cat === 'Umgebung' || cat === 'Festes Obj.') && state.umfElemente.length > prevLen.umf) {
+      const i = state.umfElemente.length - 1;
+      Object.assign(state.umfElemente[i], { x: pos.x, y: pos.y, z: pos.z, rx: rot.x*deg, ry: rot.y*deg, rz: rot.z*deg });
+      rebuildUmfMesh(i);
+    }
+  });
 };
 
 window._removeUnassigned = function(name) {
