@@ -3031,9 +3031,31 @@ function _measurePick(event) {
   const hits = rc.intersectObjects(pickable, false);
   if(!hits.length) return;
 
-  const pt = hits[0].point.clone();
+  const rawPt = hits[0].point.clone();
 
   const mode = typeof _measureMode !== 'undefined' ? _measureMode : 'pp';
+
+  // ── Ebenen-Modus ──────────────────────────────────────────────
+  if (mode === 'plane') {
+    // Dreieck zur Ebene hinzufügen
+    const face = hits[0].face;
+    const mesh = hits[0].object;
+    if (face && mesh) {
+      const normal = face.normal.clone().applyMatrix3(
+        new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld)
+      ).normalize();
+      _measurePlaneFaces.push({ normal, point: rawPt.clone() });
+      _buildPlaneFromFaces(_measurePlaneFaces);
+
+      // Highlight-Kugel auf Treffpunkt
+      _measureSphere(rawPt, 0x00aaff);
+      $('msr-hint').textContent = `Ebene aus ${_measurePlaneFaces.length} Fläche(n) — weitere klicken oder P→P / 3P→3P wählen`;
+    }
+    return;
+  }
+
+  // Punkt auf Messebene projizieren falls vorhanden
+  const pt = _measurePlane ? _projectOntoPlane(rawPt) : rawPt.clone();
 
   if (mode === 'pp') {
     if(!_measureP1) {
@@ -3097,7 +3119,7 @@ $('measureBtn')?.addEventListener('click',()=>{
     btn?.classList.remove('on'); $('rib-measure')?.classList.remove('on');
     if(panel) panel.style.display='none';
     renderer.domElement.removeEventListener('click', _measurePick);
-    _measureReset(); _measureReset3c();
+    _measureReset(); _measureReset3c(); _clearMeasurePlane();
     // Rendermode wiederherstellen
     if (typeof _measurePrevRenderMode !== 'undefined') window.setRenderMode(_measurePrevRenderMode);
     // Auswahl wiederherstellen, falls vorher aktiv
@@ -6593,18 +6615,75 @@ let _circle3centers = [];
 let _circle3State = 0; // 0=Ebene1, 1-3=Pts1, 4=Ebene2, 5-7=Pts2
 let _circle3Planes = [null, null];
 
+
+// ── Messebene ──────────────────────────────────────────────────────
+let _measurePlane = null;        // THREE.Plane
+let _measurePlaneHelper = null;  // visuelles Mesh
+let _measurePlaneFaces = [];     // gesammelte Dreiecke
+let _measurePlaneSelecting = false;
+
+function _clearMeasurePlane() {
+  if (_measurePlaneHelper) { scene.remove(_measurePlaneHelper); _measurePlaneHelper = null; }
+  _measurePlane = null;
+  _measurePlaneFaces = [];
+  _measurePlaneSelecting = false;
+}
+
+function _buildPlaneFromFaces(faces) {
+  // Normale: Durchschnitt aller Dreiecks-Normalen
+  const avgN = new THREE.Vector3();
+  const avgP = new THREE.Vector3();
+  for (const f of faces) { avgN.add(f.normal); avgP.add(f.point); }
+  avgN.divideScalar(faces.length).normalize();
+  avgP.divideScalar(faces.length);
+  _measurePlane = new THREE.Plane().setFromNormalAndCoplanarPoint(avgN, avgP);
+
+  // Alten Helper entfernen
+  if (_measurePlaneHelper) scene.remove(_measurePlaneHelper);
+
+  // Ebene als halbtransparentes Rechteck darstellen
+  const size = 400;
+  const geo = new THREE.PlaneGeometry(size, size);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0x00aaff, transparent: true, opacity: 0.18,
+    side: THREE.DoubleSide, depthWrite: false
+  });
+  _measurePlaneHelper = new THREE.Mesh(geo, mat);
+
+  // Ebene ausrichten
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1), avgN);
+  _measurePlaneHelper.quaternion.copy(q);
+  _measurePlaneHelper.position.copy(avgP);
+  _measurePlaneHelper.renderOrder = 997;
+  scene.add(_measurePlaneHelper);
+
+  // Kontur
+  const edgeGeo = new THREE.EdgesGeometry(geo);
+  const edgeMat = new THREE.LineBasicMaterial({ color: 0x00aaff, depthTest: false });
+  const edgeLine = new THREE.LineSegments(edgeGeo, edgeMat);
+  _measurePlaneHelper.add(edgeLine);
+}
+
+function _projectOntoPlane(pt) {
+  if (!_measurePlane) return pt;
+  return pt.clone().sub(_measurePlane.normal.clone().multiplyScalar(_measurePlane.distanceToPoint(pt)));
+}
+
 window._setMeasureMode = function(mode) {
   _measureMode = mode;
-  document.getElementById('msr-mode-pp')?.style && (
-    document.getElementById('msr-mode-pp').style.background = mode==='pp' ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.05)',
-    document.getElementById('msr-mode-pp').style.color = mode==='pp' ? '#90c0ff' : '#6a8fa8',
-    document.getElementById('msr-mode-3c').style.background = mode==='3c' ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.05)',
-    document.getElementById('msr-mode-3c').style.color = mode==='3c' ? '#90c0ff' : '#6a8fa8'
-  );
+  ['pp','3c','plane'].forEach(m => {
+    const btn = document.getElementById('msr-mode-'+m);
+    if (!btn) return;
+    btn.style.background = m===mode ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.05)';
+    btn.style.color = m===mode ? '#90c0ff' : '#6a8fa8';
+    btn.style.borderColor = m===mode ? 'rgba(37,99,235,.6)' : 'rgba(255,255,255,.15)';
+  });
+  if (mode !== 'plane') _clearMeasurePlane();
   _measureReset3c();
   _measureReset();
   if (mode === '3c') $('msr-hint').textContent = '3 Punkte auf Kreis 1 klicken';
-  if (mode === 'pp') $('msr-hint').textContent = 'Klick: P1 setzen';
+  if (mode === 'pp') $('msr-hint').textContent = _measurePlane ? 'Ebene aktiv — P1 setzen' : 'Klick: P1 setzen';
+  if (mode === 'plane') $('msr-hint').textContent = 'Fläche(n) anklicken um Messebene zu definieren';
 };
 
 function _measureReset3c() {
