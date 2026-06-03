@@ -1099,6 +1099,9 @@ clearAll._inner = function(clearSkeleton) {
   // Reset Umgebung
   (umfGroups||[]).forEach(g=>{ if(g&&g.parent) g.parent.remove(g); });
   umfGroups.length=0; state.umfElemente=[];
+  // Reset unassigned imported meshes
+  for (const [, entry] of _unassignedMeshes) { if (entry.mesh) scene.remove(entry.mesh); }
+  _unassignedMeshes.clear();
   // File-Inputs leeren damit gleiche Dateien/Ordner erneut geladen werden können
   const _si=$('sourceZip'); if(_si) _si.value='';
   const _sf=$('sourceFolder'); if(_sf) _sf.value='';
@@ -6569,27 +6572,9 @@ window._assignFromPanel = function(name, cat) {
   scene.remove(mesh);
   _unassignedMeshes.delete(name);
   _renderUnassignedList();
-  const deg = 180 / Math.PI;
-  _pendingAssignPos = { x: pos.x, y: pos.y, z: pos.z, rx: rot.x*deg, ry: rot.y*deg, rz: rot.z*deg };
   const blob = new Blob([buf], { type: 'application/octet-stream' });
   const file = new File([blob], name);
   _dropAssignStl(file, cat);
-  // Nach Zuweisung: Gruppe direkt auf Weltposition setzen
-  requestAnimationFrame(() => {
-    const grp =
-      cat === 'Festes Obj.' ? festeGrps[festeGrps.length-1] :
-      cat === 'Bew. Obj.' ? objekteGroups[objekteGroups.length-1] :
-      cat === 'Endeffektor' ? effektorGroups[effektorGroups.length-1] :
-      cat === 'Umgebung' ? umfGroups[umfGroups.length-1] :
-      (cat === 'Schiene (fest)' || cat === 'Schiene') ? railFixGrp :
-      cat === 'Schiene (bewegl.)' ? railMovGrp : null;
-    if (grp) {
-      grp.position.copy(pos);
-      grp.rotation.copy(rot);
-      grp.updateMatrixWorld(true);
-      if (typeof requestRender === 'function') requestRender();
-    }
-  });
 };
 
 window._removeUnassigned = function(name) {
