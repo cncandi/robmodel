@@ -3043,18 +3043,15 @@ function _measurePick(event) {
 
   const mode = typeof _measureMode !== 'undefined' ? _measureMode : 'pp';
 
-  // ── Ebenen-Modus: Dreieck anklicken ──────────────────────────
+  // ── Ebenen-Modus: Klickpunkt + Kamera-Blickrichtung = Ebene ──
   if (mode === 'plane') {
-    const face = hits[0].face;
-    const hitMesh = hits[0].object;
-    if (face && hitMesh) {
-      const n3 = new THREE.Matrix3().getNormalMatrix(hitMesh.matrixWorld);
-      const normal = face.normal.clone().applyMatrix3(n3).normalize();
-      _measurePlaneFaces.push({ normal, point: rawPt.clone() });
-      _buildPlaneFromFaces(_measurePlaneFaces);
-      _measureSphere(rawPt, 0x00aaff);
-      $('msr-hint').textContent = `Ebene (${_measurePlaneFaces.length} Fläche) — weitere klicken oder zu P→P wechseln`;
-    }
+    const camDir = new THREE.Vector3();
+    camera.getWorldDirection(camDir);
+    _measurePlaneFaces = [{ normal: camDir.clone(), point: rawPt.clone() }];
+    _buildPlaneFromFaces(_measurePlaneFaces);
+    _measureSphere(rawPt, 0x00aaff);
+    $('msr-hint').textContent = 'Ebene gesetzt — zu P→P oder 3P→3P wechseln';
+    setTimeout(() => { if (_measureMode === 'plane') window._setMeasureMode('pp'); }, 600);
     return;
   }
 
