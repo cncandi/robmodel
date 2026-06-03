@@ -9,6 +9,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 let mwScene, mwCamera, mwRenderer, mwControls, mwRaf = null;
 let mwBaseInv = new THREE.Matrix4();   // Welt → Base-Koordinaten
 let mwMode = 'pp';
+let mwSnap = true;
 let mwP1 = null, mwP2 = null;
 let mwMarkers = [];
 let mwCircle = [];
@@ -119,6 +120,15 @@ function _mwInit() {
   // Ansichts-Buttons
   document.querySelectorAll('.mw-view').forEach(btn => {
     btn.addEventListener('click', () => _mwSetView(btn.dataset.view));
+  });
+
+  // Fang-Toggle
+  $('mw-snap').addEventListener('click', () => {
+    mwSnap = !mwSnap;
+    const b = $('mw-snap');
+    b.style.background = mwSnap ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.05)';
+    b.style.color = mwSnap ? '#90c0ff' : '#a0b0c0';
+    b.style.borderColor = mwSnap ? 'rgba(37,99,235,.6)' : 'rgba(255,255,255,.15)';
   });
 
   // Fenster verschieben per Titelleiste
@@ -241,7 +251,30 @@ function _mwPick(event) {
   mwScene.traverse(o => { if (o.isMesh && o.userData.mwClone) targets.push(o); });
   const hits = rc.intersectObjects(targets, false);
   if (!hits.length) return;
-  const pt = hits[0].point.clone();
+  let pt = hits[0].point.clone();
+
+  // Vertex-Fang: nächster Vertex der Klone in 3D-Nähe
+  if (mwSnap) {
+    let best = 40, bestPt = null;  // 40mm Fangradius
+    const v = new THREE.Vector3();
+    for (const o of targets) {
+      const pos = o.geometry?.attributes?.position;
+      if (!pos) continue;
+      // Klone haben Weltmatrix bereits gebacken → matrixWorld ist identity-nah, aber sicher anwenden
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+        const d = v.distanceTo(pt);
+        if (d < best) { best = d; bestPt = v.clone(); }
+      }
+    }
+    if (bestPt) {
+      pt = bestPt;
+      // gelbe Fang-Anzeige
+      const ind = new THREE.Mesh(new THREE.SphereGeometry(7, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffff00, depthTest: false }));
+      ind.position.copy(pt); ind.renderOrder = 1001;
+      mwScene.add(ind); setTimeout(() => mwScene.remove(ind), 600);
+    }
+  }
 
   if (mwMode === 'pp') {
     if (!mwP1) {
