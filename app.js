@@ -6678,7 +6678,7 @@ window._setMeasureMode = function(mode) {
     btn.style.color = m===mode ? '#90c0ff' : '#6a8fa8';
     btn.style.borderColor = m===mode ? 'rgba(37,99,235,.6)' : 'rgba(255,255,255,.15)';
   });
-  if (mode !== 'plane') _clearMeasurePlane();
+  // Ebene bleibt erhalten beim Moduswechsel - nur bei neuer Ebene oder Schliessen löschen
   _measureReset3c();
   _measureReset();
   if (mode === '3c') $('msr-hint').textContent = '3 Punkte auf Kreis 1 klicken';
