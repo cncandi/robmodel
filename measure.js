@@ -116,6 +116,11 @@ function _mwInit() {
   $('mw-mode-pp').addEventListener('click', () => _mwSetMode('pp'));
   $('mw-mode-3c').addEventListener('click', () => _mwSetMode('3c'));
 
+  // Ansichts-Buttons
+  document.querySelectorAll('.mw-view').forEach(btn => {
+    btn.addEventListener('click', () => _mwSetView(btn.dataset.view));
+  });
+
   // Fenster verschieben per Titelleiste
   const win = $('measureWindow');
   const bar = $('mw-titlebar');
@@ -293,6 +298,44 @@ function _mwCircumcenter(p1, p2, p3) {
   const ux = (cy*(bx*bx+by*by) - by*(cx*cx+cy*cy)) / d;
   const uy = (bx*(cx*cx+cy*cy) - cx*(bx*bx+by*by)) / d;
   return p1.clone().addScaledVector(u, ux).addScaledVector(w, uy);
+}
+
+function _mwSetView(view) {
+  if (!mwScene || !mwCamera || !mwControls) return;
+  // Bounding-Box aller kopierten Meshes
+  const box = new THREE.Box3();
+  mwScene.traverse(o => { if (o.isMesh && o.userData.mwClone) box.expandByObject(o); });
+  if (box.isEmpty()) return;
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z) || 500;
+  const dist = maxDim * 1.8;
+
+  // Z-up Koordinatensystem (wie RobModel)
+  const dirs = {
+    top:    new THREE.Vector3(0, 0, 1),
+    bottom: new THREE.Vector3(0, 0, -1),
+    front:  new THREE.Vector3(0, -1, 0),
+    back:   new THREE.Vector3(0, 1, 0),
+    right:  new THREE.Vector3(1, 0, 0),
+    left:   new THREE.Vector3(-1, 0, 0),
+    iso:    new THREE.Vector3(1, -1, 1).normalize(),
+  };
+  const d = dirs[view] || dirs.iso;
+  mwCamera.position.copy(center).addScaledVector(d, dist);
+  // up-Vektor: bei top/bottom auf Y, sonst Z
+  if (view === 'top' || view === 'bottom') mwCamera.up.set(0, 1, 0);
+  else mwCamera.up.set(0, 0, 1);
+  mwControls.target.copy(center);
+  mwControls.update();
+
+  // Button-Highlight
+  document.querySelectorAll('.mw-view').forEach(b => {
+    const on = b.dataset.view === view;
+    b.style.background = on ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.05)';
+    b.style.color = on ? '#90c0ff' : '#a0b0c0';
+    b.style.borderColor = on ? 'rgba(37,99,235,.6)' : 'rgba(255,255,255,.15)';
+  });
 }
 
 function _mwResize() {
