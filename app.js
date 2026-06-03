@@ -3043,24 +3043,7 @@ function _measurePick(event) {
 
   const mode = typeof _measureMode !== 'undefined' ? _measureMode : 'pp';
 
-  // ── Ebenen-Modus ──────────────────────────────────────────────
-  if (mode === 'plane') {
-    // Dreieck zur Ebene hinzufügen
-    const face = hits[0].face;
-    const mesh = hits[0].object;
-    if (face && mesh) {
-      const normal = face.normal.clone().applyMatrix3(
-        new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld)
-      ).normalize();
-      _measurePlaneFaces.push({ normal, point: rawPt.clone() });
-      _buildPlaneFromFaces(_measurePlaneFaces);
-
-      // Highlight-Kugel auf Treffpunkt
-      _measureSphere(rawPt, 0x00aaff);
-      $('msr-hint').textContent = `Ebene aus ${_measurePlaneFaces.length} Fläche(n) — weitere klicken oder P→P / 3P→3P wählen`;
-    }
-    return;
-  }
+  // ── Ebenen-Modus: ignoriert, Ebene wird aus Kamera definiert ──
 
   // Punkt auf Messebene projizieren falls vorhanden
   const pt = _measurePlane ? _projectOntoPlane(rawPt) : rawPt.clone();
@@ -6693,7 +6676,17 @@ window._setMeasureMode = function(mode) {
   _measureReset();
   if (mode === '3c') $('msr-hint').textContent = '3 Punkte auf Kreis 1 klicken';
   if (mode === 'pp') $('msr-hint').textContent = _measurePlane ? 'Ebene aktiv — P1 setzen' : 'Klick: P1 setzen';
-  if (mode === 'plane') $('msr-hint').textContent = 'Fläche(n) anklicken um Messebene zu definieren';
+  if (mode === 'plane') {
+    // Ebene = aktuelle Kamera-Blickebene durch Szenen-Mittelpunkt
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir); // Blickrichtung = Normale
+    const target = controls.target.clone(); // Szenen-Mittelpunkt
+    _measurePlaneFaces = [{ normal: dir.clone(), point: target.clone() }];
+    _buildPlaneFromFaces(_measurePlaneFaces);
+    $('msr-hint').textContent = 'Ebene aus Kameraansicht — zu P→P oder 3P→3P wechseln';
+    // Automatisch zu P→P wechseln nach kurzer Pause
+    setTimeout(() => { if (_measureMode === 'plane') window._setMeasureMode('pp'); }, 800);
+  }
 };
 
 function _measureReset3c() {
