@@ -3019,8 +3019,16 @@ function _measureUpdate(p1, p2) {
   $('msr-ayz').textContent = deg(Math.atan2(dz, horiz));
 }
 
+
+let _measureDownX = 0, _measureDownY = 0;
+function _measurePickDown(e) { _measureDownX = e.clientX; _measureDownY = e.clientY; }
+
 function _measurePick(event) {
   if(!_measureActive) return;
+  if(event.button !== 0) return;
+  // Nur auslösen wenn Maus nicht bewegt wurde (kein Orbit)
+  const moved = Math.abs(event.clientX-_measureDownX)+Math.abs(event.clientY-_measureDownY);
+  if(moved > 4) return;
   const rect = renderer.domElement.getBoundingClientRect();
   const mx = ((event.clientX-rect.left)/rect.width)*2-1;
   const my = -((event.clientY-rect.top)/rect.height)*2+1;
@@ -3108,7 +3116,8 @@ $('measureBtn')?.addEventListener('click',()=>{
     btn?.classList.add('on'); $('rib-measure')?.classList.add('on');
     if(panel) panel.style.display='';
     _measureReset(); _measureReset3c();
-    renderer.domElement.addEventListener('click', _measurePick);
+    renderer.domElement.addEventListener('pointerup', _measurePick);
+    renderer.domElement.addEventListener('pointerdown', _measurePickDown);
     // Stirnkanten für bessere Sichtbarkeit beim Messen
     _measurePrevRenderMode = _currentRenderMode;
     window.setRenderMode(2);
@@ -3118,7 +3127,8 @@ $('measureBtn')?.addEventListener('click',()=>{
   } else {
     btn?.classList.remove('on'); $('rib-measure')?.classList.remove('on');
     if(panel) panel.style.display='none';
-    renderer.domElement.removeEventListener('click', _measurePick);
+    renderer.domElement.removeEventListener('pointerup', _measurePick);
+    renderer.domElement.removeEventListener('pointerdown', _measurePickDown);
     _measureReset(); _measureReset3c(); _clearMeasurePlane();
     // Rendermode wiederherstellen
     if (typeof _measurePrevRenderMode !== 'undefined') window.setRenderMode(_measurePrevRenderMode);
@@ -6748,7 +6758,8 @@ function _circumcenter(p1, p2, p3) {
 
 // Override _measurePick für den neuen Modus
 const _measurePickOrig = _measurePick;
-renderer.domElement.removeEventListener('click', _measurePick);
+renderer.domElement.removeEventListener('pointerup', _measurePick);
+    renderer.domElement.removeEventListener('pointerdown', _measurePickDown);
 
 window._toggleMeasureSnap = function() {
   _measureSnapEnabled = !_measureSnapEnabled;
