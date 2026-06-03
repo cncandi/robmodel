@@ -2428,6 +2428,7 @@ function _attachGimbalToTargets() {
 }
 
 function _gimbalPick(event) {
+  console.log('[GIMBAL] pick fired, active:', _gimbalActive, 'dragging:', transformControls?.dragging);
   if(!_gimbalActive) return;
   if(event.button !== undefined && event.button !== 0) return; // left click only
   if(transformControls.dragging) return;
