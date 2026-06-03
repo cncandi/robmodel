@@ -2003,6 +2003,7 @@ $('om-submit')?.addEventListener('click',()=>{
   // STL → axisStlParts
   if(_omStlBuf){ const lbl='Label'+(entry.labelNum||1); state.axisStlParts[lbl]=[{name:entry.name+'.stl',color:entry.color||'#4499cc',buf:_omStlBuf}]; _omStlBuf=null; }
   rebuildObjektMesh(idx);
+  if (typeof _refreshGimbalAfterRebuild === 'function') _refreshGimbalAfterRebuild();
   renderObjRows(); renderRows();
   $('objModal').style.display='none';
   if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
@@ -2173,6 +2174,7 @@ $('pm-submit')?.addEventListener('click',()=>{
   // STL → axisStlParts
   if(_pmStlBuf){ const eAx='E'+(entry.eNum||2); state.axisStlParts[eAx]=[{name:entry.name+'.stl',color:entry.color||'#e8a020',buf:_pmStlBuf}]; _pmStlBuf=null; }
   rebuildAllPositioners();
+  if (typeof _refreshGimbalAfterRebuild === 'function') _refreshGimbalAfterRebuild();
   renderPosRows(); renderRows();
   $('posModal').style.display='none';
 });
