@@ -2220,6 +2220,7 @@ function rebuildFixMesh(i) {
   }
   if (typeof requestRender === 'function') requestRender();
   if (typeof _treeOpen !== 'undefined' && _treeOpen && typeof _renderBodyTree === 'function') _renderBodyTree();
+  if (typeof _refreshGimbalAfterRebuild === 'function') _refreshGimbalAfterRebuild();
 }
 
 function openFixModal(editIdx) {
@@ -2301,7 +2302,13 @@ $('fm-submit')?.addEventListener('click',()=>{
   _fmStlBuf=null;
   if(editIdx>=0){ state.festeObjekte[editIdx]=entry; }
   else { state.festeObjekte.push(entry); festeGrps.push(null); }
-  rebuildFixMesh(editIdx>=0?editIdx:state.festeObjekte.length-1);
+  const fixIdx = editIdx>=0 ? editIdx : state.festeObjekte.length-1;
+  rebuildFixMesh(fixIdx);
+  // Gimbal re-attachen falls diese Gruppe selektiert war
+  if (_gimbalTarget && _gimbalTarget.type === 'fix' && _gimbalTarget.idx === fixIdx) {
+    _gimbalTarget.grp = festeGrps[fixIdx];
+    if (typeof _attachGimbalToTargets === 'function') _attachGimbalToTargets();
+  }
   renderFixRows();
   $('fixModal').style.display='none';
 });
@@ -6607,6 +6614,21 @@ window.openAssignMenu = function() {
   _showCtxMenu(rect.left, rect.bottom + 4);
 };
 
+
+// ── Gimbal nach Rebuild aktualisieren ─────────────────────────────
+function _refreshGimbalAfterRebuild() {
+  if (!_gimbalTarget || !_gimbalTargets.length) return;
+  // Gruppen-Referenzen aktualisieren
+  _gimbalTargets.forEach(t => {
+    if (t.type === 'fix' && festeGrps[t.idx]) t.grp = festeGrps[t.idx];
+    else if (t.type === 'eff' && effektorGroups[t.idx]) t.grp = effektorGroups[t.idx];
+    else if (t.type === 'umf' && umfGroups[t.idx]) t.grp = umfGroups[t.idx];
+    else if (t.type === 'obj' && objekteGroups[t.idx]) t.grp = objekteGroups[t.idx];
+    else if (t.type === 'pos' && positionerGroups[t.idx]?.containerGrp) t.grp = positionerGroups[t.idx].containerGrp;
+  });
+  _gimbalTarget = _gimbalTargets[_gimbalTargets.length - 1];
+  if (typeof _attachGimbalToTargets === 'function') _attachGimbalToTargets();
+}
 // ── Strukturbaum draggable ─────────────────────────────────────────
 (function() {
   const panel = document.getElementById('bodyTreePanel');
