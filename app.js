@@ -2428,7 +2428,6 @@ function _attachGimbalToTargets() {
 }
 
 function _gimbalPick(event) {
-  console.log('[GIMBAL] pick fired, active:', _gimbalActive, 'dragging:', transformControls?.dragging);
   if(!_gimbalActive) return;
   if(event.button !== undefined && event.button !== 0) return; // left click only
   if(transformControls.dragging) return;
@@ -3131,42 +3130,23 @@ function _measurePick(event) {
 }
 
 $('measureBtn')?.addEventListener('click',()=>{
-  _measureActive = !_measureActive;
-  const btn = $('measureBtn');
-  const panel = $('measurePanel');
-  if(_measureActive){
-    btn?.classList.add('on'); $('rib-measure')?.classList.add('on');
-    if(panel) panel.style.display='';
-    _measureReset(); _measureReset3c();
-    document.addEventListener('pointerup', _measurePick);
-    document.addEventListener('pointerdown', _measurePickDown);
-    // Stirnkanten für bessere Sichtbarkeit beim Messen
-    _measurePrevRenderMode = _currentRenderMode;
-    window.setRenderMode(2);
-    // Gimbal komplett deaktivieren während des Messens
-    _gimbalWasOn = _gimbalActive;
-    if(_gimbalActive){
-      _gimbalActive = false;
-      transformControls.detach();
-      _gimbalTarget = null; _gimbalTargets = []; _gimbalPickedMesh = null;
-      if(typeof _clearSelHighlight === 'function') _clearSelHighlight();
-      $('gimbalToggle')?.classList.remove('on'); $('rib-gimbal')?.classList.remove('on');
-      const mb=$('gimbalModeBtn'); if(mb) mb.style.display='none';
-    }
-  } else {
-    btn?.classList.remove('on'); $('rib-measure')?.classList.remove('on');
-    if(panel) panel.style.display='none';
-    document.removeEventListener('pointerup', _measurePick);
-    document.removeEventListener('pointerdown', _measurePickDown);
-    _measureReset(); _measureReset3c(); _clearMeasurePlane();
-    // Rendermode wiederherstellen
-    if (typeof _measurePrevRenderMode !== 'undefined') window.setRenderMode(_measurePrevRenderMode);
-    // Gimbal-Aktivierung wiederherstellen (ohne Selektion - Nutzer klickt neu)
-    if(_gimbalWasOn){
-      _gimbalActive = true;
-      $('gimbalToggle')?.classList.add('on'); $('rib-gimbal')?.classList.add('on');
-      const mb=$('gimbalModeBtn'); if(mb) mb.style.display='';
-    }
+  // Selektierte Meshes sammeln
+  const sel = [];
+  if (_gimbalTargets && _gimbalTargets.length) {
+    _gimbalTargets.forEach(t => {
+      if (t.grp) t.grp.traverse(c => { if (c.isMesh && !c.userData.noRenderMode && !c.userData.isEdgeOverlay) sel.push(c); });
+    });
+  }
+  // Falls nichts selektiert: alle sichtbaren STL-Meshes
+  if (!sel.length) {
+    scene.traverse(c => { if (c.isMesh && c.visible && !c.userData.noRenderMode && !c.userData.isEdgeOverlay && c.geometry) sel.push(c); });
+  }
+  // Roboter-Base Weltmatrix (A1 Pivot oder robotGroup)
+  const baseMesh = (axisPivotGroups && axisPivotGroups[0]) || robotGroup;
+  if (baseMesh) baseMesh.updateMatrixWorld(true);
+  const baseMatrix = baseMesh ? baseMesh.matrixWorld.clone() : new THREE.Matrix4();
+  if (typeof window.openMeasureWindow === 'function') {
+    window.openMeasureWindow(sel, baseMatrix);
   }
 });
 
