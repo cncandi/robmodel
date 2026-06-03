@@ -3101,7 +3101,20 @@ function _measurePick(event) {
     for(let i=0;i<=64;i++){const a=(i/64)*Math.PI*2;pts3d.push(ctr.clone().addScaledVector(u,Math.cos(a)*r).addScaledVector(vv,Math.sin(a)*r));}
     const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts3d),new THREE.LineBasicMaterial({color:cCol,depthTest:false}));
     ln.renderOrder=998; scene.add(ln); _measureSpheres.push(ln);
-    if(n===3){$('msr-hint').textContent=`Kreis 1: r=${Math.round(r)}mm — 3 Punkte für Kreis 2`;}
+    if(n===3){
+      // Sofort Abstand zum Roboter-Ursprung anzeigen
+      const base = new THREE.Vector3(0,0,0);
+      const baseInv = new THREE.Matrix4();
+      const baseMesh = axisPivotGroups?.[0] || robotGroup;
+      if (baseMesh) { baseMesh.updateMatrixWorld(true); baseInv.copy(baseMesh.matrixWorld).invert(); }
+      const ctrLocal = ctr.clone().applyMatrix4(baseInv);
+      // Linie von Ursprung zum Mittelpunkt
+      const origin = new THREE.Vector3().applyMatrix4(baseMesh ? baseMesh.matrixWorld : new THREE.Matrix4());
+      _measureDrawLine(origin, ctr);
+      _measureUpdate(origin, ctr);
+      $('msr-hint').textContent=`Kreis: r=${Math.round(r)}mm  M=(${Math.round(ctrLocal.x)}, ${Math.round(ctrLocal.y)}, ${Math.round(ctrLocal.z)})mm — neue Messung: 3 Punkte`;
+      _measureReset3c();
+    }
     else{_measureDrawLine(_circle3centers[0],_circle3centers[1]);_measureUpdate(_circle3centers[0],_circle3centers[1]);$('msr-hint').textContent='Abstand Mittelpunkte';_measureReset3c();}
   } else {
     const cn=n<=3?1:2, rem=n<=3?3-n:6-n;
