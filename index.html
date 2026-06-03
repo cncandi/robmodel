@@ -1142,7 +1142,7 @@ header.top .title    { display: none !important; }
 </div><!-- .wrap -->
 
 <script type="module" src="app.js?v=20260602p"></script>
-<script type="module" src="measure.js?v=20260602p"></script>
+<script type="module" src="measure.js?v=20260602q"></script>
 <!-- ── ROBLIB UPLOAD MODAL ──────────────────────────────────── -->
 <div id="roblibModal" class="rl-overlay" style="display:none">
   <div class="rl-modal">
@@ -1537,33 +1537,32 @@ function handleRibView(btn){
 </div>
 <input type="file" id="bgImageInput" accept="image/*" style="display:none">
 <div id="ctx-menu" style="display:none;position:fixed;z-index:9999;background:#0d1825;border:1px solid #2a4060;border-radius:6px;padding:4px 0;min-width:180px;box-shadow:0 4px 16px rgba(0,0,0,.6)"></div>
-<!-- ── Separates Mess-Fenster (isolierte Three.js-Szene) ── -->
-<div id="measureWindow" style="display:none;position:fixed;inset:0;z-index:5000;background:#0a0e14;flex-direction:column">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#11171f;border-bottom:1px solid rgba(37,99,235,.4)">
-    <div style="display:flex;align-items:center;gap:16px">
-      <span style="color:#60a5fa;font-family:monospace;font-size:14px;font-weight:700;letter-spacing:.05em">MESSEN</span>
-      <div style="display:flex;gap:6px">
-        <button id="mw-mode-pp" style="font-size:12px;padding:4px 12px;border-radius:4px;cursor:pointer;background:rgba(37,99,235,.4);border:1px solid rgba(37,99,235,.6);color:#90c0ff;font-family:monospace">P→P</button>
-        <button id="mw-mode-3c" style="font-size:12px;padding:4px 12px;border-radius:4px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8;font-family:monospace">3-Punkt-Kreis</button>
+<!-- ── Separates Mess-Fenster (isolierte Three.js-Szene, schwebend) ── -->
+<div id="measureWindow" style="display:none;position:fixed;top:5%;left:5%;width:45vw;height:45vh;z-index:5000;background:#0a0e14;flex-direction:column;border:1px solid rgba(37,99,235,.6);border-radius:8px;box-shadow:0 12px 48px rgba(0,0,0,.6);overflow:hidden;resize:both;min-width:360px;min-height:280px">
+  <div id="mw-titlebar" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#11171f;border-bottom:1px solid rgba(37,99,235,.4);cursor:move;user-select:none">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="color:#60a5fa;font-family:monospace;font-size:13px;font-weight:700;letter-spacing:.05em">MESSEN</span>
+      <div style="display:flex;gap:5px">
+        <button id="mw-mode-pp" style="font-size:11px;padding:3px 10px;border-radius:4px;cursor:pointer;background:rgba(37,99,235,.4);border:1px solid rgba(37,99,235,.6);color:#90c0ff;font-family:monospace">P→P</button>
+        <button id="mw-mode-3c" style="font-size:11px;padding:3px 10px;border-radius:4px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#6a8fa8;font-family:monospace">3-Punkt-Kreis</button>
       </div>
-      <button id="mw-reset" style="font-size:12px;padding:4px 12px;border-radius:4px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#a0b0c0;font-family:monospace">Zurücksetzen</button>
+      <button id="mw-reset" style="font-size:11px;padding:3px 10px;border-radius:4px;cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#a0b0c0;font-family:monospace">Zurücksetzen</button>
     </div>
-    <button id="mw-close" style="font-size:13px;padding:4px 16px;border-radius:4px;cursor:pointer;background:rgba(204,51,51,.2);border:1px solid rgba(204,51,51,.5);color:#f87171;font-family:monospace">✕ Schließen</button>
+    <button id="mw-close" style="font-size:12px;padding:3px 12px;border-radius:4px;cursor:pointer;background:rgba(204,51,51,.2);border:1px solid rgba(204,51,51,.5);color:#f87171;font-family:monospace">✕</button>
   </div>
   <div style="flex:1;position:relative;min-height:0">
     <canvas id="mw-canvas" style="width:100%;height:100%;display:block"></canvas>
-    <div id="mw-info" style="position:absolute;top:16px;left:16px;background:rgba(5,11,20,.9);border:1px solid rgba(37,99,235,.5);border-radius:6px;padding:14px 18px;font-family:monospace;font-size:13px;color:#d8e8f0;min-width:240px;pointer-events:none">
-      <div style="color:#60a5fa;font-size:10px;letter-spacing:.08em;margin-bottom:8px">ERGEBNIS (Bezug: Roboter-Base)</div>
-      <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 18px">
-        <span style="color:#6a8fa8">Abstand</span><span id="mw-dist" style="color:#fff;font-size:15px;font-weight:bold">—</span>
+    <div id="mw-info" style="position:absolute;top:12px;left:12px;background:rgba(5,11,20,.9);border:1px solid rgba(37,99,235,.5);border-radius:6px;padding:10px 14px;font-family:monospace;font-size:12px;color:#d8e8f0;min-width:210px;pointer-events:none">
+      <div style="color:#60a5fa;font-size:9px;letter-spacing:.08em;margin-bottom:6px">ERGEBNIS (Bezug: Roboter-Base)</div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 14px">
+        <span style="color:#6a8fa8">Abstand</span><span id="mw-dist" style="color:#fff;font-size:14px;font-weight:bold">—</span>
         <span style="color:#6a8fa8">ΔX</span><span id="mw-dx">—</span>
         <span style="color:#6a8fa8">ΔY</span><span id="mw-dy">—</span>
         <span style="color:#6a8fa8">ΔZ</span><span id="mw-dz">—</span>
         <span style="color:#6a8fa8">P1</span><span id="mw-p1">—</span>
       </div>
-      <div id="mw-hint" style="margin-top:10px;color:#4a6a8a;font-size:11px">Klick: P1 setzen</div>
+      <div id="mw-hint" style="margin-top:8px;color:#4a6a8a;font-size:10px">Klick: P1 setzen</div>
     </div>
-    <div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);font-family:monospace;font-size:11px;color:#3a4a5a">LMB: Drehen | MMB: Pan | Rad: Zoom</div>
   </div>
 </div>
 </body>

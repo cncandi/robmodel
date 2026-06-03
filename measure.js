@@ -116,6 +116,35 @@ function _mwInit() {
   $('mw-mode-pp').addEventListener('click', () => _mwSetMode('pp'));
   $('mw-mode-3c').addEventListener('click', () => _mwSetMode('3c'));
 
+  // Fenster verschieben per Titelleiste
+  const win = $('measureWindow');
+  const bar = $('mw-titlebar');
+  let dragging = false, dragOX = 0, dragOY = 0, startL = 0, startT = 0;
+  bar.addEventListener('pointerdown', e => {
+    if (e.target.tagName === 'BUTTON') return;
+    dragging = true;
+    dragOX = e.clientX; dragOY = e.clientY;
+    const rect = win.getBoundingClientRect();
+    startL = rect.left; startT = rect.top;
+    // bei erstem Verschieben rechts/unten-Positionierung auf px fixieren
+    win.style.left = startL + 'px'; win.style.top = startT + 'px';
+    win.style.right = 'auto'; win.style.bottom = 'auto';
+    bar.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  bar.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    win.style.left = (startL + e.clientX - dragOX) + 'px';
+    win.style.top  = (startT + e.clientY - dragOY) + 'px';
+  });
+  bar.addEventListener('pointerup', e => { dragging = false; try { bar.releasePointerCapture(e.pointerId); } catch(_){} });
+
+  // Resize des Fensters → Renderer/Canvas anpassen
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => { if (win.style.display !== 'none') _mwResize(); });
+    ro.observe(win);
+  }
+
   window.addEventListener('resize', () => { if ($('measureWindow').style.display !== 'none') _mwResize(); });
 
   mwInited = true;
