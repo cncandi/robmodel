@@ -2309,11 +2309,6 @@ $('fm-submit')?.addEventListener('click',()=>{
   else { state.festeObjekte.push(entry); festeGrps.push(null); }
   const fixIdx = editIdx>=0 ? editIdx : state.festeObjekte.length-1;
   rebuildFixMesh(fixIdx);
-  // Gimbal re-attachen falls diese Gruppe selektiert war
-  if (_gimbalTarget && _gimbalTarget.type === 'fix' && _gimbalTarget.idx === fixIdx) {
-    _gimbalTarget.grp = festeGrps[fixIdx];
-    if (typeof _attachGimbalToTargets === 'function') _attachGimbalToTargets();
-  }
   renderFixRows();
   $('fixModal').style.display='none';
 });
@@ -6630,7 +6625,8 @@ window.openAssignMenu = function() {
 
 // ── Gimbal nach Rebuild aktualisieren ─────────────────────────────
 function _refreshGimbalAfterRebuild() {
-  if (!_gimbalTarget || !_gimbalTargets.length) return;
+  if (!_gimbalTarget || !_gimbalTargets.length) { console.log('[GIMBAL] refresh skipped - no target'); return; }
+  console.log('[GIMBAL] refresh, targets:', _gimbalTargets.length, 'mode:', _gimbalMode);
   // Gruppen-Referenzen aktualisieren
   _gimbalTargets.forEach(t => {
     if (t.type === 'fix' && festeGrps[t.idx]) t.grp = festeGrps[t.idx];
@@ -6640,7 +6636,11 @@ function _refreshGimbalAfterRebuild() {
     else if (t.type === 'pos' && positionerGroups[t.idx]?.containerGrp) t.grp = positionerGroups[t.idx].containerGrp;
   });
   _gimbalTarget = _gimbalTargets[_gimbalTargets.length - 1];
-  if (typeof _attachGimbalToTargets === 'function') _attachGimbalToTargets();
+  if (transformControls && _gimbalTarget?.grp) {
+    transformControls.detach();
+    _attachGimbalToTargets();
+    console.log('[GIMBAL] re-attached to', _gimbalTarget.type, _gimbalTarget.idx);
+  }
 }
 // ── Strukturbaum draggable ─────────────────────────────────────────
 (function() {
