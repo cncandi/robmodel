@@ -3142,9 +3142,16 @@ $('measureBtn')?.addEventListener('click',()=>{
     // Stirnkanten für bessere Sichtbarkeit beim Messen
     _measurePrevRenderMode = _currentRenderMode;
     window.setRenderMode(2);
-    // Gimbal/Auswahl während des Messens pausieren
+    // Gimbal komplett deaktivieren während des Messens
     _gimbalWasOn = _gimbalActive;
-    if(_gimbalActive) $('gimbalToggle').click();
+    if(_gimbalActive){
+      _gimbalActive = false;
+      transformControls.detach();
+      _gimbalTarget = null; _gimbalTargets = []; _gimbalPickedMesh = null;
+      if(typeof _clearSelHighlight === 'function') _clearSelHighlight();
+      $('gimbalToggle')?.classList.remove('on'); $('rib-gimbal')?.classList.remove('on');
+      const mb=$('gimbalModeBtn'); if(mb) mb.style.display='none';
+    }
   } else {
     btn?.classList.remove('on'); $('rib-measure')?.classList.remove('on');
     if(panel) panel.style.display='none';
@@ -3153,8 +3160,12 @@ $('measureBtn')?.addEventListener('click',()=>{
     _measureReset(); _measureReset3c(); _clearMeasurePlane();
     // Rendermode wiederherstellen
     if (typeof _measurePrevRenderMode !== 'undefined') window.setRenderMode(_measurePrevRenderMode);
-    // Auswahl wiederherstellen, falls vorher aktiv
-    if(_gimbalWasOn && !_gimbalActive) $('gimbalToggle').click();
+    // Gimbal-Aktivierung wiederherstellen (ohne Selektion - Nutzer klickt neu)
+    if(_gimbalWasOn){
+      _gimbalActive = true;
+      $('gimbalToggle')?.classList.add('on'); $('rib-gimbal')?.classList.add('on');
+      const mb=$('gimbalModeBtn'); if(mb) mb.style.display='';
+    }
   }
 });
 
