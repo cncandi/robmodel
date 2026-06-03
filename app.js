@@ -3004,7 +3004,17 @@ function _measureDrawLine(p1, p2) {
 }
 
 function _measureUpdate(p1, p2) {
-  const dx = p2.x-p1.x, dy = p2.y-p1.y, dz = p2.z-p1.z;
+  // Punkte in Roboter-Base-Koordinaten umrechnen (A1 Ursprung)
+  const baseInv = new THREE.Matrix4();
+  const baseMesh = axisPivotGroups?.[0] || robotGroup;
+  if (baseMesh) {
+    baseMesh.updateMatrixWorld(true);
+    baseInv.copy(baseMesh.matrixWorld).invert();
+  }
+  const lp1 = p1.clone().applyMatrix4(baseInv);
+  const lp2 = p2.clone().applyMatrix4(baseInv);
+
+  const dx = lp2.x-lp1.x, dy = lp2.y-lp1.y, dz = lp2.z-lp1.z;
   const dist = Math.sqrt(dx*dx+dy*dy+dz*dz);
   const r = v => Math.round(v);
   const deg = v => (v*180/Math.PI).toFixed(1)+'°';
@@ -3012,11 +3022,9 @@ function _measureUpdate(p1, p2) {
   $('msr-dx').textContent = r(dx)+' mm';
   $('msr-dy').textContent = r(dy)+' mm';
   $('msr-dz').textContent = r(dz)+' mm';
-  // Angle in XY plane (horizontal)
-  $('msr-axy').textContent = deg(Math.atan2(dy, dx));
-  // Inclination from XY plane (elevation)
-  const horiz = Math.sqrt(dx*dx+dy*dy);
-  $('msr-ayz').textContent = deg(Math.atan2(dz, horiz));
+  // P1 absolute Position in Base-Koordinaten
+  $('msr-axy').textContent = `X${r(lp1.x)} Y${r(lp1.y)}`;
+  $('msr-ayz').textContent = `Z${r(lp1.z)}`;
 }
 
 
