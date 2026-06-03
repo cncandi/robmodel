@@ -3117,8 +3117,8 @@ $('measureBtn')?.addEventListener('click',()=>{
     btn?.classList.add('on'); $('rib-measure')?.classList.add('on');
     if(panel) panel.style.display='';
     _measureReset(); _measureReset3c();
-    renderer.domElement.addEventListener('pointerup', _measurePick);
-    renderer.domElement.addEventListener('pointerdown', _measurePickDown);
+    document.addEventListener('pointerup', _measurePick);
+    document.addEventListener('pointerdown', _measurePickDown);
     // Stirnkanten für bessere Sichtbarkeit beim Messen
     _measurePrevRenderMode = _currentRenderMode;
     window.setRenderMode(2);
@@ -3128,8 +3128,8 @@ $('measureBtn')?.addEventListener('click',()=>{
   } else {
     btn?.classList.remove('on'); $('rib-measure')?.classList.remove('on');
     if(panel) panel.style.display='none';
-    renderer.domElement.removeEventListener('pointerup', _measurePick);
-    renderer.domElement.removeEventListener('pointerdown', _measurePickDown);
+    document.removeEventListener('pointerup', _measurePick);
+    document.removeEventListener('pointerdown', _measurePickDown);
     _measureReset(); _measureReset3c(); _clearMeasurePlane();
     // Rendermode wiederherstellen
     if (typeof _measurePrevRenderMode !== 'undefined') window.setRenderMode(_measurePrevRenderMode);
