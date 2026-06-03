@@ -5387,7 +5387,8 @@ async function _dropAssignStl(file, cat) {
       const mesh=new THREE.Mesh(geom,new THREE.MeshStandardMaterial({color:cat==='Podest'?'#334455':'#2563eb',roughness:.6,metalness:.1}));mesh.name=dn;meshes.set(dn,mesh);
       rebuildRobotKinematics();applyTransforms();
     } else if(cat==='Endeffektor'){
-      const eff={name:dn.replace('.stl',''),color:'#607080',offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0},ePos:0,
+      const _ep=_pendingAssignPos||{x:0,y:0,z:0,rx:0,ry:0,rz:0}; _pendingAssignPos=null;
+      const eff={name:dn.replace('.stl',''),color:'#607080',offset:{x:_ep.x,y:_ep.y,z:_ep.z,rx:_ep.rx,ry:_ep.ry,rz:_ep.rz},ePos:0,
         teile:[{name:dn,objectType:'stl',color:'#607080',offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0},stlFile:{name:dn,buf:stlBuf}}]};
       state.effektoren.push(eff); effektorGroups.push(null);
       state.activeEff=state.effektoren.length-1; rebuildEffMesh(state.activeEff); renderEffRow?.();
@@ -5407,7 +5408,7 @@ async function _dropAssignStl(file, cat) {
       const eAx='E1';
       if(!state.axisStlParts[eAx]) state.axisStlParts[eAx]=[];
       state.axisStlParts[eAx]=[{name:dn,color:'#2563eb',buf:stlBuf}];
-      state.schienen[0].fixedPart={type:'stl',x:0,y:0,z:0,rx:0,ry:0,rz:0,stlName:dn,buf:stlBuf};
+      const _sfp=_pendingAssignPos||{x:0,y:0,z:0,rx:0,ry:0,rz:0}; _pendingAssignPos=null; state.schienen[0].fixedPart={type:'stl',x:_sfp.x,y:_sfp.y,z:_sfp.z,rx:_sfp.rx,ry:_sfp.ry,rz:_sfp.rz,stlName:dn,buf:stlBuf};
       rebuildRailMeshes(); renderRailRows?.();
     } else if(cat==='Schiene (bewegl.)'){
       if(!state.schienen.length) state.schienen=[{name:'Schiene',length_mm:2000,height_mm:200,width_mm:400,axis:'X+',eNumber:1,eMin:0,eMax:2000,ePos:0,showBox:false,boxOffset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}}];
@@ -5415,11 +5416,11 @@ async function _dropAssignStl(file, cat) {
       rebuildRailMeshes(); renderRailRows?.();
     } else if(cat==='Festes Obj.'){
       const fidx=state.festeObjekte.length;
-      state.festeObjekte.push({name:dn.replace('.stl',''),stlFile:{name:dn,buf:stlBuf},color:'#606060',x:0,y:0,z:0,rx:0,ry:0,rz:0});
+      const _fop=_pendingAssignPos||{x:0,y:0,z:0,rx:0,ry:0,rz:0}; state.festeObjekte.push({name:dn.replace('.stl',''),stlFile:{name:dn,buf:stlBuf},color:'#606060',x:_fop.x,y:_fop.y,z:_fop.z,rx:_fop.rx,ry:_fop.ry,rz:_fop.rz}); _pendingAssignPos=null;
       festeGrps.push(null); rebuildFixMesh(fidx); renderFixRows?.();
     } else if(cat==='Bew. Obj.'){
       const oidx=state.objekte.length, lbl='Label'+(oidx+1);
-      state.objekte.push({name:dn.replace('.stl',''),labelNum:oidx+1,axis:'Y+',ePos:0,mountMode:'fixed',showBox:false,boxOffset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}});
+      const _op=_pendingAssignPos||{x:0,y:0,z:0,rx:0,ry:0,rz:0}; _pendingAssignPos=null; state.objekte.push({name:dn.replace('.stl',''),labelNum:oidx+1,axis:'Y+',ePos:0,mountMode:'fixed',showBox:false,boxOffset:{x:_op.x,y:_op.y,z:_op.z,rx:_op.rx,ry:_op.ry,rz:_op.rz}});
       state.axisStlParts[lbl]=[{name:dn,color:'#4499cc',buf:stlBuf}];
       objekteGroups.push(null); rebuildObjektMesh(oidx); renderObjRows?.();
     }
@@ -6542,6 +6543,7 @@ window.toggleSkeleton = function() {
 
 // ── STL Import (neutral, ohne sofortige Zuweisung) ─────────────────
 const _unassignedMeshes = new Map(); // name → {mesh, buf}
+let _pendingAssignPos = null; // {x,y,z,rx,ry,rz} für nächste Zuweisung
 
 function _renderUnassignedList() {
   // Strukturbaum öffnen und aktualisieren
@@ -6567,40 +6569,11 @@ window._assignFromPanel = function(name, cat) {
   scene.remove(mesh);
   _unassignedMeshes.delete(name);
   _renderUnassignedList();
+  const deg = 180 / Math.PI;
+  _pendingAssignPos = { x: pos.x, y: pos.y, z: pos.z, rx: rot.x*deg, ry: rot.y*deg, rz: rot.z*deg };
   const blob = new Blob([buf], { type: 'application/octet-stream' });
   const file = new File([blob], name);
-
-  // Nach Zuweisung Position übertragen
-  const prevLen = {
-    fix: (state.festeObjekte||[]).length,
-    obj: (state.objekte||[]).length,
-    eff: (state.effektoren||[]).length,
-    umf: (state.umfElemente||[]).length,
-  };
   _dropAssignStl(file, cat);
-
-  // Position auf das neu erstellte Element übertragen
-  requestAnimationFrame(() => {
-    const deg = 180 / Math.PI;
-    if (cat === 'Festes Obj.' && state.festeObjekte.length > prevLen.fix) {
-      const i = state.festeObjekte.length - 1;
-      Object.assign(state.festeObjekte[i], { x: pos.x, y: pos.y, z: pos.z, rx: rot.x*deg, ry: rot.y*deg, rz: rot.z*deg });
-      rebuildFixMesh(i);
-    } else if (cat === 'Bew. Obj.' && state.objekte.length > prevLen.obj) {
-      const i = state.objekte.length - 1;
-      if (state.objekte[i].boxOffset) Object.assign(state.objekte[i].boxOffset, { x: pos.x, y: pos.y, z: pos.z, rx: rot.x*deg, ry: rot.y*deg, rz: rot.z*deg });
-      rebuildObjektMesh(i);
-    } else if (cat === 'Endeffektor' && state.effektoren.length > prevLen.eff) {
-      const i = state.effektoren.length - 1;
-      if (!state.effektoren[i].offset) state.effektoren[i].offset = {};
-      Object.assign(state.effektoren[i].offset, { x: pos.x, y: pos.y, z: pos.z, rx: rot.x*deg, ry: rot.y*deg, rz: rot.z*deg });
-      rebuildEffMesh(i);
-    } else if ((cat === 'Umgebung' || cat === 'Festes Obj.') && state.umfElemente.length > prevLen.umf) {
-      const i = state.umfElemente.length - 1;
-      Object.assign(state.umfElemente[i], { x: pos.x, y: pos.y, z: pos.z, rx: rot.x*deg, ry: rot.y*deg, rz: rot.z*deg });
-      rebuildUmfMesh(i);
-    }
-  });
 };
 
 window._removeUnassigned = function(name) {
