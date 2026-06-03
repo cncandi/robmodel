@@ -6574,6 +6574,22 @@ window._assignFromPanel = function(name, cat) {
   const blob = new Blob([buf], { type: 'application/octet-stream' });
   const file = new File([blob], name);
   _dropAssignStl(file, cat);
+  // Nach Zuweisung: Gruppe direkt auf Weltposition setzen
+  requestAnimationFrame(() => {
+    const grp =
+      cat === 'Festes Obj.' ? festeGrps[festeGrps.length-1] :
+      cat === 'Bew. Obj.' ? objekteGroups[objekteGroups.length-1] :
+      cat === 'Endeffektor' ? effektorGroups[effektorGroups.length-1] :
+      cat === 'Umgebung' ? umfGroups[umfGroups.length-1] :
+      (cat === 'Schiene (fest)' || cat === 'Schiene') ? railFixGrp :
+      cat === 'Schiene (bewegl.)' ? railMovGrp : null;
+    if (grp) {
+      grp.position.copy(pos);
+      grp.rotation.copy(rot);
+      grp.updateMatrixWorld(true);
+      if (typeof requestRender === 'function') requestRender();
+    }
+  });
 };
 
 window._removeUnassigned = function(name) {
