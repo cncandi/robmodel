@@ -3043,7 +3043,20 @@ function _measurePick(event) {
 
   const mode = typeof _measureMode !== 'undefined' ? _measureMode : 'pp';
 
-  // ── Ebenen-Modus: ignoriert, Ebene wird aus Kamera definiert ──
+  // ── Ebenen-Modus: Dreieck anklicken ──────────────────────────
+  if (mode === 'plane') {
+    const face = hits[0].face;
+    const hitMesh = hits[0].object;
+    if (face && hitMesh) {
+      const n3 = new THREE.Matrix3().getNormalMatrix(hitMesh.matrixWorld);
+      const normal = face.normal.clone().applyMatrix3(n3).normalize();
+      _measurePlaneFaces.push({ normal, point: rawPt.clone() });
+      _buildPlaneFromFaces(_measurePlaneFaces);
+      _measureSphere(rawPt, 0x00aaff);
+      $('msr-hint').textContent = `Ebene (${_measurePlaneFaces.length} Fläche) — weitere klicken oder zu P→P wechseln`;
+    }
+    return;
+  }
 
   // Punkt auf Messebene projizieren falls vorhanden
   const pt = _measurePlane ? _projectOntoPlane(rawPt) : rawPt.clone();
@@ -6677,15 +6690,10 @@ window._setMeasureMode = function(mode) {
   if (mode === '3c') $('msr-hint').textContent = '3 Punkte auf Kreis 1 klicken';
   if (mode === 'pp') $('msr-hint').textContent = _measurePlane ? 'Ebene aktiv — P1 setzen' : 'Klick: P1 setzen';
   if (mode === 'plane') {
-    // Ebene = aktuelle Kamera-Blickebene durch Szenen-Mittelpunkt
-    const dir = new THREE.Vector3();
-    camera.getWorldDirection(dir); // Blickrichtung = Normale
-    const target = controls.target.clone(); // Szenen-Mittelpunkt
-    _measurePlaneFaces = [{ normal: dir.clone(), point: target.clone() }];
-    _buildPlaneFromFaces(_measurePlaneFaces);
-    $('msr-hint').textContent = 'Ebene aus Kameraansicht — zu P→P oder 3P→3P wechseln';
-    // Automatisch zu P→P wechseln nach kurzer Pause
-    setTimeout(() => { if (_measureMode === 'plane') window._setMeasureMode('pp'); }, 800);
+    _measurePlaneFaces = [];
+    if (_measurePlaneHelper) { scene.remove(_measurePlaneHelper); _measurePlaneHelper = null; }
+    _measurePlane = null;
+    $('msr-hint').textContent = 'Fläche anklicken um Messebene zu definieren';
   }
 };
 
@@ -6748,11 +6756,6 @@ function _circumcenter(p1, p2, p3) {
 
   return p1.clone().addScaledVector(u, ux).addScaledVector(w, uy);
 }
-
-// Override _measurePick für den neuen Modus
-const _measurePickOrig = _measurePick;
-renderer.domElement.removeEventListener('pointerup', _measurePick);
-    renderer.domElement.removeEventListener('pointerdown', _measurePickDown);
 
 window._toggleMeasureSnap = function() {
   _measureSnapEnabled = !_measureSnapEnabled;
