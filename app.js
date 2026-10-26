@@ -8,6 +8,7 @@ import { OrbitControls }    from 'three/addons/controls/OrbitControls.js';
 import { STLLoader }        from 'three/addons/loaders/STLLoader.js';
 import { ColladaLoader }    from 'three/addons/loaders/ColladaLoader.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
+import { initGfx }          from './gfx.js?v=20261026a';   // Grafikqualität Standard/Hoch/Maximal
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────
 // console.log nur mit ?debug in der URL (Produktiv: still; warn/error bleiben)
@@ -75,6 +76,7 @@ const state = {
 };
 
 // ── Three.js Variablen ────────────────────────────────────────────
+let gfx = null;   // Grafikqualität (gfx.js)
 let scene, camera, perspCamera, orthoCamera, isOrtho=false, renderer, controls, grid, robotGroup, toolGroup, tcpMarker, kinematicsRoot, railGroup;
 let railFixGrp, railMovGrp;
 let axisPointGroup, axisLine, transformControls, raycaster, mouse, csHelperGroup;
@@ -87,7 +89,7 @@ function requestRender(n) { _renderFrames = Math.max(_renderFrames, n || 5); }
 
 function animate() {
   requestAnimationFrame(animate);
-  renderer.render(scene, camera);
+  if (gfx) gfx.render(); else renderer.render(scene, camera);
 }var objekteGroups = [];
 var effektorGroups = [];
 var positionerGroups = [];
@@ -163,7 +165,8 @@ function init3d() {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x94a3b8, 1.8));
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x94a3b8, 1.8);
+  scene.add(hemi);
   const d = new THREE.DirectionalLight(0xffffff, 2.6);
   d.position.set(1500, -2000, 2500);
   d.castShadow = true;
@@ -179,6 +182,9 @@ function init3d() {
   const fill = new THREE.DirectionalLight(0xffffff, 0.6);
   fill.position.set(-1500, 1500, 800);
   scene.add(fill);
+  // Grafikqualität: Umgebung, PBR, Schattenboden, Tonemapping, AO (gfx.js)
+  gfx = initGfx({ renderer, scene, getCamera: () => camera, getTarget: () => controls.target, sun: d, fill, hemi });
+  window.RMGfx = gfx;
 
   grid = new THREE.GridHelper(4000, 40, 0x1b3454, 0x0f2038);
   grid.rotation.x = Math.PI / 2;
@@ -335,6 +341,7 @@ function resize() {
   const w = r.width || window.innerWidth;
   const h = r.height || window.innerHeight;
   renderer.setSize(w, h, false);
+  if (gfx) gfx.resize(w, h);
   if (isOrtho) {
     _orthoUpdateFrustum(w / h);
   } else {
