@@ -403,7 +403,7 @@ function setInputs(p, tr) {
   ['X','Y','Z','Rx','Ry','Rz'].forEach(k => $(p+k).value = tr[k.toLowerCase()] || 0);
 }
 // ── Tool-Mount-Modus ────────────────────────────────────────────
-let toolMountMode = 'world'; // 'world' | 'a6'
+let toolMountMode = 'a6';    // 'world' | 'a6'
 
 function setToolMode(mode) {
   toolMountMode = mode;
@@ -4357,7 +4357,7 @@ function buildFixtureJson(idx) {
 
 function buildEffectorJson(idx) {
   const e=(state.effektoren||[])[idx]; if(!e) return null;
-  return { type:'endeffektor', name:e.name||'Endeffektor', mountMode:e.mountMode||'world',
+  return { type:'endeffektor', name:e.name||'Endeffektor', mountMode:e.mountMode||'a6',
     stlFile:e.stlFile?`stl/eff_${idx}.stl`:undefined, offset:e.offset||{} };
 }
 
@@ -4936,7 +4936,7 @@ function applyFixtureConfig(cfg, stlBufs) {
 
 function applyEffectorConfig(cfg, stlBufs) {
   const buf = stlBufs['eff_0'] || Object.values(stlBufs)[0] || null;
-  const eff = { name: cfg.name||'Endeffektor', mountMode: cfg.mountMode||'world',
+  const eff = { name: cfg.name||'Endeffektor', mountMode: cfg.mountMode||'a6',
     offset: cfg.offset||{}, stlFile: buf ? { name: cfg.name+'.stl', buf } : null };
   state.effektoren = state.effektoren||[];
   state.effektoren.push(eff);
