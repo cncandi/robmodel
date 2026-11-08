@@ -28,12 +28,14 @@ const colors = { Base:'#333333', A1:'#ffffff', A2:'#999999', A3:'#ff7f00', A4:'#
 // ── KR8-Zielwerte (default) ───────────────────────────────────────
 const KR8_TARGET = [
   { x: 150,  y: 0, z: 450  },  // A1 Rz  — X=horizontal (Three.X), Z=vertikal (Three.Z)
-  { x: 0,    y: 0, z: 610  },  // A2 Ry — z-offset (normales Mapping)
+  { x: 610,  y: 0, z: 0    },  // A2 Ry — fachliches 0°-System (wie RobSimul/Library)
   { x: 0,    y: 0, z: 200  },  // A3 Ry
   { x: 630,  y: 0, z: 0    },  // A4 Rx
   { x: 80,   y: 0, z: 0    },  // A5 Ry
   { x: 0,    y: 0, z: 0    },  // A6 Rx
 ];
+// Gelenk-Vorzeichen wie RobSimul (fkAll)
+const FK_SIGNS = [-1, 1, 1, -1, 1, -1];
 function defOffset(i) { return { ...KR8_TARGET[i] }; }
 
 // ── State ─────────────────────────────────────────────────────────
@@ -487,26 +489,43 @@ function fixedAxisType(i)    { return ['Rz','Ry','Ry','Rx','Ry','Rx'][i] || 'Rz'
 function nominalAxisVec(i)   { return ['z','y','y','x','y','x'][i] || 'z'; }
 function axisDirectionLabel(i) { return fixedAxisType(i) + ' · ' + nominalAxisVec(i).toUpperCase(); }
 
+// Kinematik wie RobSimul (fkAll): Offsets im fachlichen 0°-System,
+// Achspunkte werden in der STL-Referenzpose (stlRefAngles) berechnet.
+function _axisRotMat(i, rad) {
+  const m = new THREE.Matrix4();
+  const v = nominalAxisVec(i);
+  if (v === 'x') m.makeRotationX(rad); else if (v === 'y') m.makeRotationY(rad); else m.makeRotationZ(rad);
+  return m;
+}
+// frames[k] = Rotation nach Gelenk k in der Referenzpose (Frame, in dem axisPoints[k] gilt)
+function referenceFrames() {
+  const ref = parseReferencePose();
+  const frames = [];
+  let rot = new THREE.Matrix4();
+  for (let i = 0; i < 6; i++) {
+    rot = rot.clone().multiply(_axisRotMat(i, (ref[i] || 0) * FK_SIGNS[i] * Math.PI / 180));
+    frames.push(rot.clone());
+  }
+  return frames;
+}
 function cumulativeAxisPositions() {
-  let x=0, y=0, z=0;
-  const pts = [new THREE.Vector3(0,0,0)];
-  for (let i=0; i<5; i++) {
+  const frames = referenceFrames();
+  const pos = new THREE.Vector3(0, 0, 0);
+  const pts = [pos.clone()];
+  for (let i = 0; i < 5; i++) {
     const p = state.axisPoints[i];
-    if (!p) { pts.push(new THREE.Vector3(x,y,z)); continue; }
-    x += num(p.x)||0; z += num(p.z)||0;  // einheitliches Mapping für alle Achsen
-    y += num(p.y)||0;
-    pts.push(new THREE.Vector3(x,y,z));
+    if (p) pos.add(new THREE.Vector3(num(p.x)||0, num(p.y)||0, num(p.z)||0).applyMatrix4(frames[i]));
+    pts.push(pos.clone());
   }
   return pts;
 }
+// Welt-Offset (Referenzpose) -> fachlicher 0°-Offset fuer axisPoints[k]
+function worldOffsetToJointOffset(k, v) {
+  const inv = referenceFrames()[k].clone().transpose();
+  return v.clone().applyMatrix4(inv);
+}
 
 function syncJointsFromAxisPoints() {
-  // Altes Format migrieren: axisPoints[1].x wurde früher als z-Offset gespeichert
-  const ap1 = state.axisPoints[1];
-  if (ap1 && num(ap1.x) !== 0 && (num(ap1.z) || 0) === 0 && ap1.source !== 'manuell') {
-    ap1.z = ap1.x; ap1.x = 0;
-    if (state.joints[1]?.offset) { state.joints[1].offset.z = state.joints[1].offset.x; state.joints[1].offset.x = 0; }
-  }
   state.axisPoints.forEach((p, i) => {
     if (!state.joints[i]) return;
     p.x = num(p.x) ?? 0; p.y = num(p.y) ?? 0; p.z = num(p.z) ?? 0;
@@ -778,7 +797,7 @@ function onAxisObjectMoved() {
   const apIdx = idx - 1;  // axisPoints-Index
   const pts = cumulativeAxisPositions();
   const prev = pts[idx - 1] || new THREE.Vector3(0,0,0);
-  const local = mesh.position.clone().sub(prev);
+  const local = worldOffsetToJointOffset(apIdx, mesh.position.clone().sub(prev));
   const p = state.axisPoints[apIdx];
   if (!p) return;
 
@@ -801,11 +820,13 @@ function updateCSHelper() {
   const pos = pts[state.selectedAxis] || new THREE.Vector3();
   const L = 380;   // Pfeillänge mm
   const H = 30;    // Pfeilkopf
-  // Display X-Spalte = Three.Z (oben), Display Z-Spalte = Three.X (horizontal)
+  // Koordinatensystem, in dem der Offset dieses Achspunkts gilt (fachliches 0°-System, Referenzpose)
+  const _si = state.selectedAxis || 0;
+  const _fr = _si > 0 ? referenceFrames()[_si - 1] : new THREE.Matrix4();
   const axes = [
-    { dir: new THREE.Vector3(0,0,1), color: 0xff3333, label: 'X' },  // X → oben
-    { dir: new THREE.Vector3(0,1,0), color: 0x33dd33, label: 'Y' },
-    { dir: new THREE.Vector3(1,0,0), color: 0x3388ff, label: 'Z' },  // Z → horizontal
+    { dir: new THREE.Vector3(1,0,0).applyMatrix4(_fr).normalize(), color: 0xff3333, label: 'X' },
+    { dir: new THREE.Vector3(0,1,0).applyMatrix4(_fr).normalize(), color: 0x33dd33, label: 'Y' },
+    { dir: new THREE.Vector3(0,0,1).applyMatrix4(_fr).normalize(), color: 0x3388ff, label: 'Z' },
   ];
   axes.forEach(({ dir, color, label }) => {
     const arrow = new THREE.ArrowHelper(dir, pos, L, color, H, H * 0.6);
@@ -1405,6 +1426,8 @@ function parseAxisPositions(xml) {
   state.axisPoints[3]={name:'A4',x:px4,y:py4,z:pz4,rx:0,ry:0,rz:0,source:'XML AxisA4Pos'};
   state.axisPoints[4]={name:'A5',x:px5,y:py5,z:pz5,rx:0,ry:0,rz:0,source:'XML AxisA5Pos'};
   state.axisPoints[5]={name:'A6',x:0,y:0,z:0,rx:0,ry:0,rz:0,source:'Ende / 0'};
+  // bisher als Welt-Offsets der Referenzpose interpretiert -> ins fachliche 0°-System umrechnen
+  state.axisPoints.forEach((p,k)=>{const v=worldOffsetToJointOffset(k,new THREE.Vector3(p.x||0,p.y||0,p.z||0));p.x=+v.x.toFixed(3);p.y=+v.y.toFixed(3);p.z=+v.z.toFixed(3);});
   syncJointsFromAxisPoints(); return found;
 }
 
@@ -5205,7 +5228,7 @@ $('sourceFolder').addEventListener('change', e => {
 });
 $('checkZip').addEventListener('change',  e => e.target.files[0] && loadPackageZip(e.target.files[0]).catch(err=>alert(err.message)));
 $('jsonInput').addEventListener('change',  e => e.target.files[0] && loadJsonFile(e.target.files[0]));
-if($('refPose'))$('refPose').addEventListener('input',()=>{setJointAnglesToReferencePose();applyJointRotations();});
+if($('refPose'))$('refPose').addEventListener('input',()=>{setJointAnglesToReferencePose();if(axisPivotGroups.length){rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();}else applyJointRotations();});
 // Hidden inputs for JS compat — still trigger applyTransforms
 ['rX','rY','rZ','rRx','rRy','rRz','tX','tY','tZ','tRx','tRy','tRz'].forEach(id=>{const el=$(id);if(el)el.addEventListener('input',applyTransforms);});
 qsa('.tab').forEach(t=>t.onclick=()=>{state.activeTcp=t.dataset.mode;renderTcp();});
