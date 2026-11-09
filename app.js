@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v46
+//  RobModel — Robot Kinematik Editor  v47
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -577,7 +577,7 @@ function rebuildRobotKinematics() {
     } else { robotGroup.add(mesh); }
   }
   applyJointRotations();
-  // Re-attach a6-mounted labels to new A6 pivot
+  if (window._rmMode === 4 && typeof window.setRenderMode === 'function') window.setRenderMode(4); // Durchsichtig auch für neu geladene Teile
   (state.objekte||[]).forEach((_,i)=>{ if(state.objekte[i]?.mountMode==='a6') rebuildObjektMesh(i); });
   // Re-attach Endeffektoren to new A6 pivot
   (state.effektoren||[]).forEach((_,i)=>rebuildEffMesh(i));
@@ -6339,7 +6339,7 @@ async function tryLoadAxisPng(buffers) {
 let _currentRenderMode = 2;
 
 window.setRenderMode = function setRenderMode(mode) {
-  _currentRenderMode = mode;
+  _currentRenderMode = mode; window._rmMode = mode;
   for (let i = 0; i <= 6; i++) {
     const btn = document.getElementById('renderMode' + i);
     if (btn) btn.classList.toggle('active', i === mode);
@@ -6379,8 +6379,10 @@ window.setRenderMode = function setRenderMode(mode) {
       newMat.needsUpdate = true;
     }
 
-    const m = obj.material;
-    switch (mode) {
+    // gfx (Grafik Hoch/Maximal) ersetzt das Material durch eine Physical-Kopie und übernimmt
+    // Transparenz/Opazität jedes Bild aus dem Standard-Material → beide setzen
+    const _mats = [obj.userData.matStd, obj.userData.matPhys, obj.material].filter((x, i, a) => x && a.indexOf(x) === i);
+    for (const m of _mats) { switch (mode) {
       case 0: m.wireframe = true;  m.transparent = false; m.opacity = 1;   m.metalness = 0;    m.roughness = 1;    break;
       case 1: m.wireframe = false; m.transparent = false; m.opacity = 1;   m.metalness = 0.3;  m.roughness = 0.7;  break;
       case 2: m.wireframe = false; m.transparent = false; m.opacity = 1;   m.metalness = 0.55; m.roughness = 0.42; break;
@@ -6389,7 +6391,8 @@ window.setRenderMode = function setRenderMode(mode) {
       case 5: m.wireframe = false; m.transparent = false; m.opacity = 1;   m.metalness = 0.85; m.roughness = 0.2;  break;
       case 6: m.wireframe = false; m.transparent = false; m.opacity = 1;   m.metalness = 0.85; m.roughness = 0.2;  break;
     }
-    m.needsUpdate = true;
+    m.depthWrite = mode !== 4;
+    m.needsUpdate = true; }
   });
   if (typeof requestRender === 'function') requestRender();
 }
