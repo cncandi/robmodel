@@ -9,7 +9,7 @@
   <script type="importmap">
     {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"}}
   </script>
-  <link rel="stylesheet" href="style.css?v=20261109c">
+  <link rel="stylesheet" href="style.css?v=20261109d">
 
 <style>
 /* ── Menüleiste ──────────────────────────────────────────────── */
@@ -264,7 +264,7 @@ header.top .title    { display: none !important; }
 
   <!-- ─── HEADER ──────────────────────────────────────────────── -->
   <header class="top">
-  <div class="appname"><svg class="ico"><use href="#i-kin"/></svg>RobModel <span>v42</span></div>
+  <div class="appname"><svg class="ico"><use href="#i-kin"/></svg>RobModel <span>v43</span></div>
 
   <nav class="menubar" id="mainMenubar">
 
@@ -532,6 +532,7 @@ header.top .title    { display: none !important; }
           <div style="display:flex;gap:4px;align-items:center">
             <span class="badge info" id="fixBadge">0</span>
             <button id="fixAddBtn" onclick="openFixModal(-1)" title="Neues festes Objekt" style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 6px;font-size:13px;cursor:pointer">+</button>
+            <button id="fixFromModelBtn" title="Teil aus dem Robotermodell lösen: im Viewport anklicken, es wird zum eigenständigen festen Objekt (einzeln verschiebbar)" style="background:rgba(37,99,235,.2);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 6px;font-size:12px;cursor:pointer;white-space:nowrap">⇱ Aus Modell</button>
             <button id="fixLibRefreshBtn" title="Aus Library laden" style="background:rgba(255,96,0,.15);border:1px solid rgba(255,96,0,.4);color:#ff6000;border-radius:4px;padding:6px 16px;font-size:16px;cursor:pointer">↻</button>
           </div>
         </div>
@@ -1147,7 +1148,7 @@ header.top .title    { display: none !important; }
 
 </div><!-- .wrap -->
 
-<script type="module" src="app.js?v=20261109c"></script>
+<script type="module" src="app.js?v=20261109d"></script>
 <script type="module" src="measure.js?v=20260602s"></script>
 <!-- ── ROBLIB UPLOAD MODAL ──────────────────────────────────── -->
 <div id="roblibModal" class="rl-overlay" style="display:none">

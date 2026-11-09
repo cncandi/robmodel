@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v42
+//  RobModel — Robot Kinematik Editor  v43
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -2706,6 +2706,36 @@ function _deleteElementOfMesh(mesh) {
   return false;
 }
 
+// Roboter-Mesh (meshes-Map) samt Puffer/Zuordnungen entfernen
+function _removeRobotMesh(mesh, dispose) {
+  for (const [k, m] of meshes) if (m === mesh) {
+    if (m.parent) m.parent.remove(m);
+    if (dispose) m.geometry?.dispose?.();
+    meshes.delete(k); state.buffers?.delete?.(k);
+    state.stls = state.stls.filter(f => f.path !== k);
+    Object.keys(state.axisStlMap).forEach(a => { if (state.axisStlMap[a] && norm(state.axisStlMap[a]) === norm(m.name)) state.axisStlMap[a] = null; });
+    Object.values(state.axisStlParts || {}).forEach(arr => { if (!arr) return; for (let i = arr.length - 1; i >= 0; i--) if (norm(arr[i].name) === norm(m.name)) arr.splice(i, 1); });
+    if (state.toolName && norm(state.toolName) === norm(m.name)) state.toolName = '';
+    return true;
+  }
+  return false;
+}
+
+// Teil aus dem Robotermodell lösen → eigenständiges festes Objekt an gleicher Weltposition
+function detachMeshAsFixed(mesh) {
+  scene.updateMatrixWorld(true);
+  const buf = new Uint8Array(exportBinaryStl(mesh));        // Weltkoordinaten → Objekt bei 0/0/0, Rotation 0
+  const hex = mesh.userData._linkOrig !== undefined ? mesh.userData._linkOrig : (mesh.userData.matStd || mesh.material).color.getHex();
+  const name = String(mesh.name || 'Teil').replace(/\.(stl|osd)$/i, '');
+  if (!_removeRobotMesh(mesh, false)) return false;
+  const fidx = state.festeObjekte.length;
+  state.festeObjekte.push({ name, stlFile: { name: name + '.stl', buf }, color: '#' + hex.toString(16).padStart(6, '0'), x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 });
+  festeGrps.push(null); rebuildFixMesh(fidx); renderFixRows?.();
+  rebuildRobotKinematics(); applyTransforms(); renderAll(); requestRender();
+  if (_treeOpen) _renderBodyTree();
+  return true;
+}
+
 // Element/Part löschen (mit Bestätigung) – wiederverwendbar für Entf-Taste und Struktur-Baum
 function _deleteMesh(mesh) {
   if (!mesh) return;
@@ -2716,14 +2746,7 @@ function _deleteMesh(mesh) {
   if (found) _deletePartAt(found.ax, found.idx);
   else if (!_deleteElementOfMesh(mesh)) {
     // Roboter-Teil aus Archiv-/Ordner-Import (ohne Teile-Eintrag) vollständig entfernen
-    for (const [k, m] of meshes) if (m === mesh) {
-      if (m.parent) m.parent.remove(m);
-      m.geometry?.dispose?.();
-      meshes.delete(k); state.buffers?.delete?.(k);
-      state.stls = state.stls.filter(f => f.path !== k);
-      Object.keys(state.axisStlMap).forEach(a => { if (state.axisStlMap[a] && norm(state.axisStlMap[a]) === norm(m.name)) state.axisStlMap[a] = null; });
-      if (state.toolName && norm(state.toolName) === norm(m.name)) state.toolName = '';
-    }
+    _removeRobotMesh(mesh, true);
     _rebuildAllAfterDelete();
   }
   if (_linkLastMesh === mesh) _linkLastMesh = null;
@@ -5371,6 +5394,7 @@ function startLinkPick(ax) {
   if (_linkTargetAx === ax) { stopLinkPick(); return; }
   _linkTargetAx = ax; _linkLastMesh = null;
   document.body.classList.add('link-picking');
+  if (ax === '__fix__') { _linkUntintAll(); _linkHint('Aus Modell lösen: Teil anklicken (z. B. Podest) — wird festes Objekt, einzeln verschiebbar. Esc beendet'); $('fixFromModelBtn')?.classList.add('on'); return; }
   if (ax === '__origin__') { _linkUntintAll(); _linkHint('Auf 0,0,0: Grundkörper des Roboters anklicken — Esc bricht ab'); $('originPickBtn')?.classList.add('on'); return; }
   _linkHint(`Verknüpfung ${ax}: Teil anklicken (grün = ${ax} zugeordnet, erneuter Klick hebt auf, Entf löscht) — Esc beendet`);
   renderRows();
@@ -5378,7 +5402,7 @@ function startLinkPick(ax) {
 }
 function stopLinkPick() {
   _linkTargetAx = null; _linkDown = null; _linkLastMesh = null;
-  $('originPickBtn')?.classList.remove('on');
+  $('originPickBtn')?.classList.remove('on'); $('fixFromModelBtn')?.classList.remove('on');
   document.body.classList.remove('link-picking');
   _linkHint(null);
   _linkUntintAll();
@@ -5457,6 +5481,11 @@ function _linkPickAt(ev) {
   const hits = rc.intersectObjects([...robot, ...unassigned], false).filter(h => h.object.isMesh);
   if (!hits.length) { _linkHint(`Verknüpfung ${_linkTargetAx}: kein Teil getroffen — erneut klicken oder Esc`); return; }
   const obj = hits[0].object, ax = _linkTargetAx;
+  if (ax === '__fix__') {
+    if (!robot.includes(obj)) { _linkHint('Aus Modell lösen: bitte ein Teil des Robotermodells anklicken — Esc beendet'); return; }
+    const nm = obj.name; if (detachMeshAsFixed(obj)) _linkHint(`${nm} ist jetzt ein festes Objekt. Weiteres Teil anklicken oder Esc`);
+    return;
+  }
   if (ax === '__origin__') {
     if (!robot.includes(obj)) { _linkHint('Auf 0,0,0: bitte ein Teil des Roboters anklicken — Esc bricht ab'); return; }
     moveRobotBaseToOrigin(obj); stopLinkPick(); return;
@@ -5492,6 +5521,7 @@ function moveRobotBaseToOrigin(baseMesh) {
   setTimeout(() => alert(`Robotermodell verschoben um X ${d(delta.x)}  Y ${d(delta.y)}  Z ${d(delta.z)} mm.\nGrundkörper steht jetzt auf 0,0,0. Achspunkte (A1–A6) ggf. anpassen.`), 50);
 }
 $('originPickBtn')?.addEventListener('click', () => startLinkPick('__origin__'));
+$('fixFromModelBtn')?.addEventListener('click', () => startLinkPick('__fix__'));
 
 renderer.domElement.addEventListener('pointerdown', ev => {
   if (_linkTargetAx && ev.button === 0) _linkDown = { x: ev.clientX, y: ev.clientY };
