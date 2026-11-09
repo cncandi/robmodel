@@ -19,6 +19,7 @@ const num = v => { if (v === null || v === undefined || v === '') return null; c
 const deg = v => THREE.MathUtils.degToRad(Number(v) || 0);
 const fmt = b => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : (b / 1024).toFixed(1) + ' KB';
 const norm = s => String(s || '').toLowerCase().replace(/\\/g, '/').split('/').pop().replace(/\.stl$/i, '').trim();
+var _linkTargetAx = null; // Achse im Verknüpfungsmodus (+ Verknüpfung)
 const zipName = s => (s || 'RobModel_export').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'RobModel_export';
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -552,10 +553,14 @@ function rebuildRobotKinematics() {
     mesh.position.set(0,0,0); mesh.scale.set(1,1,1);
     mesh.rotation.set(deg(state.robotTr.rx), deg(state.robotTr.ry), deg(state.robotTr.rz));
     const file = state.stls.find(f => f.path === path) || { name: mesh.name };
-    if (isTool(file)) { toolGroup.add(mesh); continue; }
-    // Manuelle Zuweisung prüfen
+    // Manuelle Zuweisung prüfen: zuerst Teile-Listen (auch per Verknüpfung), dann axisStlMap
     let assignedAxis = null;
+    for (const ax of ['A1','A2','A3','A4','A5','A6']) {
+      if ((state.axisStlParts[ax]||[]).some(p => norm(p.name) === norm(file.name))) { assignedAxis = ax; break; }
+    }
+    if (!assignedAxis && isTool(file)) { toolGroup.add(mesh); continue; }
     for (const [ax, stlName] of Object.entries(state.axisStlMap)) {
+      if (assignedAxis) break;
       if (stlName && norm(stlName) === norm(file.name)) { assignedAxis = ax; break; }
     }
     const key = assignedAxis || partKey(file.name);
@@ -935,6 +940,7 @@ function osdToBinaryStl(arrayBuffer) {
   let cur = null, snx=0,sny=0,snz=0;
   for (let i=headerSize; i<data.length; ) {
     const code=data[i], ls=i+1, cs=CMD[code]??0;
+    if (ls + cs > data.length) break;
     i += 1 + cs;
     switch(code) {
       case 0: { const t=view.getInt32(ls,true); if(t<10){cur={t,vx:[],vy:[],vz:[],nx:[],ny:[],nz:[]};prims.push(cur);} break; }
@@ -949,21 +955,30 @@ function osdToBinaryStl(arrayBuffer) {
   const tris=[];
   const cn=(ax,ay,az,bx,by,bz,cx,cy,cz)=>{const ux=bx-ax,uy=by-ay,uz=bz-az,vx=cx-ax,vy=cy-ay,vz=cz-az;const nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const l=Math.sqrt(nx*nx+ny*ny+nz*nz);return l>1e-10?[nx/l,ny/l,nz/l]:[0,0,1];};
   for(const p of prims){
-    if(LINE.has(p.t)) continue;
+    if(p.t<4) continue; // Punkte/Linien
     const n=p.vx.length; if(n<3) continue;
-    let idx;
-    if(p.t===5){idx=[];for(let i=0;i<n-2;i++){if(i%2===0){idx.push(i,i+1,i+2);}else{idx.push(i+1,i,i+2);}}}
-    else if(p.t===6){idx=[];for(let i=1;i<n-1;i++)idx.push(0,i,i+1);}
-    else{idx=Array.from({length:n},(_,i)=>i);}
+    const idx=[];
+    if(p.t===4){for(let i=0;i+2<n;i+=3)idx.push(i,i+1,i+2);}                                   // GL_TRIANGLES
+    else if(p.t===5){for(let i=0;i<n-2;i++){if(i%2===0)idx.push(i,i+1,i+2);else idx.push(i+1,i,i+2);}} // GL_TRIANGLE_STRIP
+    else if(p.t===6||p.t===9){for(let i=1;i<n-1;i++)idx.push(0,i,i+1);}                        // GL_TRIANGLE_FAN, GL_POLYGON
+    else if(p.t===7){for(let i=0;i+3<n;i+=4)idx.push(i,i+1,i+2,i,i+2,i+3);}                    // GL_QUADS
+    else if(p.t===8){for(let i=0;i+3<n;i+=2)idx.push(i,i+1,i+3,i,i+3,i+2);}                    // GL_QUAD_STRIP
+    const hasN=p.nx.length===n;
     for(let i=0;i+2<idx.length;i+=3){
-      const ia=idx[i],ib=idx[i+1],ic=idx[i+2];
-      const ax=p.vx[ia],ay=p.vy[ia],az=p.vz[ia];
-      const bx=p.vx[ib],by=p.vy[ib],bz=p.vz[ib];
-      const cx=p.vx[ic],cy=p.vy[ic],cz=p.vz[ic];
-      let fn=p.nx.length===n?[p.nx[ia],p.ny[ia],p.nz[ia]]:null;
-      if(fn){const l=Math.sqrt(fn[0]*fn[0]+fn[1]*fn[1]+fn[2]*fn[2]);if(l>1e-10){fn=[fn[0]/l,fn[1]/l,fn[2]/l];}else fn=cn(ax,ay,az,bx,by,bz,cx,cy,cz);}else fn=cn(ax,ay,az,bx,by,bz,cx,cy,cz);
-      tris.push(fn[0],fn[1],fn[2],ax,ay,az,bx,by,bz,cx,cy,cz);
-      tris.push(-fn[0],-fn[1],-fn[2],ax,ay,az,cx,cy,cz,bx,by,bz);
+      let ia=idx[i],ib=idx[i+1],ic=idx[i+2];
+      let fn=cn(p.vx[ia],p.vy[ia],p.vz[ia],p.vx[ib],p.vy[ib],p.vz[ib],p.vx[ic],p.vy[ic],p.vz[ic]);
+      const ux=p.vx[ib]-p.vx[ia],uy=p.vy[ib]-p.vy[ia],uz=p.vz[ib]-p.vz[ia],wx=p.vx[ic]-p.vx[ia],wy=p.vy[ic]-p.vy[ia],wz=p.vz[ic]-p.vz[ia];
+      if(Math.hypot(uy*wz-uz*wy,uz*wx-ux*wz,ux*wy-uy*wx)<1e-12) continue; // degeneriert
+      if(hasN){
+        // Umlaufsinn an den mitgelieferten Normalen ausrichten → einseitige, saubere Flächen
+        const sx=p.nx[ia]+p.nx[ib]+p.nx[ic],sy=p.ny[ia]+p.ny[ib]+p.ny[ic],sz=p.nz[ia]+p.nz[ib]+p.nz[ic];
+        if(sx*fn[0]+sy*fn[1]+sz*fn[2]<0){const t=ib;ib=ic;ic=t;fn=[-fn[0],-fn[1],-fn[2]];}
+        tris.push(fn[0],fn[1],fn[2],p.vx[ia],p.vy[ia],p.vz[ia],p.vx[ib],p.vy[ib],p.vz[ib],p.vx[ic],p.vy[ic],p.vz[ic]);
+      } else {
+        // ohne Normalen: Orientierung unbekannt → beidseitig
+        tris.push(fn[0],fn[1],fn[2],p.vx[ia],p.vy[ia],p.vz[ia],p.vx[ib],p.vy[ib],p.vz[ib],p.vx[ic],p.vy[ic],p.vz[ic]);
+        tris.push(-fn[0],-fn[1],-fn[2],p.vx[ia],p.vy[ia],p.vz[ia],p.vx[ic],p.vy[ic],p.vz[ic],p.vx[ib],p.vy[ib],p.vz[ib]);
+      }
     }
   }
   const tc=tris.length/12, out=new ArrayBuffer(84+tc*50), dv=new DataView(out);
@@ -1820,7 +1835,7 @@ function renderRows(){
       <td><input data-j="${i}" data-f="max" value="${j.max??''}"></td>
       <td><select class="dirSel" data-j="${i}" data-f="rotationSign"><option value="1" ${(num(j.rotationSign)??1)>=0?'selected':''}>+</option><option value="-1" ${(num(j.rotationSign)??1)<0?'selected':''}>−</option></select></td>
       <td><label style="display:inline-block;width:26px;height:22px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden" title="Farbe ${ax}"><input type="color" data-axis-color="${ax}" value="${col}" style="opacity:0;width:1px;height:1px;position:absolute"></label></td>
-      <td><button class="axis-stl-btn" data-ax="${ax}" style="font-size:10px;padding:3px 7px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:3px;cursor:pointer;color:${parts.length?'#d8e8f0':'#6a8fa8'};width:100%">${parts.length?parts.length+' Part'+(parts.length>1?'s':''):'+ STL'}</button></td>
+      <td><div class="ax-stl-pair"><button class="axis-stl-btn ax-mini" data-ax="${ax}" title="STL/OSD-Datei für ${ax} laden" style="color:${parts.length?'#d8e8f0':'#6a8fa8'}">${parts.length?parts.length+' Part'+(parts.length>1?'s':''):'+ STL'}</button><button class="ax-link-btn ax-mini${_linkTargetAx===ax?' on':''}" data-link-ax="${ax}" title="Teil im Viewport anklicken und ${ax} zuweisen (Esc = Abbrechen)">+ Verknüpfung</button></div></td>
       <td><button class="simBtn" data-sim-axis="${i}">▶</button></td>
     </tr>`;}).join('');
 }
@@ -2458,6 +2473,7 @@ function _attachGimbalToTargets() {
 }
 
 function _gimbalPick(event) {
+  if(_linkTargetAx) return; // Verknüpfungsmodus hat Vorrang
   if(!_gimbalActive) return;
   if(event.button !== undefined && event.button !== 0) return; // left click only
   if(transformControls.dragging) return;
@@ -5307,6 +5323,82 @@ document.addEventListener('change', e => {
 
 renderer.domElement.addEventListener('pointerdown', pickAxisPoint);
 renderer.domElement.addEventListener('pointerdown', _gimbalPick);
+
+// ── Verknüpfung: Teil im Viewport anklicken und Achse zuweisen ──────
+var _linkDown = null;
+function _linkHint(text) {
+  let h = document.getElementById('linkPickHint');
+  if (!text) { if (h) h.remove(); return; }
+  if (!h) { h = document.createElement('div'); h.id = 'linkPickHint'; document.body.appendChild(h); }
+  h.textContent = text;
+}
+function startLinkPick(ax) {
+  if (_linkTargetAx === ax) { stopLinkPick(); return; }
+  _linkTargetAx = ax;
+  document.body.classList.add('link-picking');
+  _linkHint(`Verknüpfung ${ax}: Teil im Viewport anklicken (mehrere nacheinander möglich) — Esc beendet`);
+  renderRows();
+}
+function stopLinkPick() {
+  _linkTargetAx = null; _linkDown = null;
+  document.body.classList.remove('link-picking');
+  _linkHint(null);
+  renderRows();
+}
+function _linkFlash(mesh) {
+  const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  mats.forEach(m => { if (m && m.emissive) { const old = m.emissive.getHex(); m.emissive.setHex(0x664400); requestRender(); setTimeout(() => { m.emissive.setHex(old); requestRender(); }, 350); } });
+}
+function linkMeshToAxis(mesh, ax) {
+  let path = null;
+  for (const [k, m] of meshes) if (m === mesh) { path = k; break; }
+  if (path === null) return false;
+  const name = mesh.name || path;
+  let raw = state.buffers.get(path);
+  let buf;
+  if (raw && /\.osd$/i.test(name)) buf = new Uint8Array(osdToBinaryStl(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength)));
+  else if (raw) buf = raw;
+  else buf = new Uint8Array(exportBinaryStl(mesh));
+  // aus allen Achsen entfernen
+  ['A1','A2','A3','A4','A5','A6'].forEach(a => {
+    const arr = state.axisStlParts[a];
+    if (arr) { const i = arr.findIndex(p => norm(p.name) === norm(name)); if (i >= 0) arr.splice(i, 1); }
+    if (state.axisStlMap[a] && norm(state.axisStlMap[a]) === norm(name)) state.axisStlMap[a] = state.axisStlParts[a]?.[0]?.name || null;
+  });
+  if (!state.axisStlParts[ax]) state.axisStlParts[ax] = [];
+  const col = '#' + (mesh.material?.color?.getHexString?.() || 'e8a020');
+  state.axisStlParts[ax].push({ name, color: col, buf });
+  if (!state.axisStlMap[ax]) state.axisStlMap[ax] = name;
+  rebuildRobotKinematics(); applyTransforms(); renderAxisStlRows(); renderAll();
+  _linkFlash(mesh);
+  return true;
+}
+function _linkPickAt(ev) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const v = new THREE.Vector2(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
+  const rc = new THREE.Raycaster(); rc.setFromCamera(v, camera);
+  const robot = [...meshes.values()].filter(m => m.visible !== false);
+  const unassigned = [..._unassignedMeshes.entries()].map(([n, e]) => { e.mesh.userData._linkName = n; return e.mesh; });
+  const hits = rc.intersectObjects([...robot, ...unassigned], false).filter(h => h.object.isMesh);
+  if (!hits.length) { _linkHint(`Verknüpfung ${_linkTargetAx}: kein Teil getroffen — erneut klicken oder Esc`); return; }
+  const obj = hits[0].object, ax = _linkTargetAx;
+  if (unassigned.includes(obj)) { window._assignFromPanel(obj.userData._linkName, ax); _linkHint(`${obj.userData._linkName} → ${ax}. Weiteres Teil anklicken oder Esc`); return; }
+  if (linkMeshToAxis(obj, ax)) _linkHint(`${obj.name} → ${ax}. Weiteres Teil anklicken oder Esc`);
+}
+renderer.domElement.addEventListener('pointerdown', ev => {
+  if (_linkTargetAx && ev.button === 0) _linkDown = { x: ev.clientX, y: ev.clientY };
+}, true);
+renderer.domElement.addEventListener('pointerup', ev => {
+  if (!_linkTargetAx || !_linkDown || ev.button !== 0) return;
+  const moved = Math.hypot(ev.clientX - _linkDown.x, ev.clientY - _linkDown.y) > 4;
+  _linkDown = null;
+  if (!moved) _linkPickAt(ev); // Ziehen = Kamera drehen, kein Pick
+}, true);
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && _linkTargetAx) stopLinkPick(); });
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-link-ax]');
+  if (b) { ev.stopPropagation(); startLinkPick(b.dataset.linkAx); }
+});
 
 // Drag & Drop auf Viewer
 const dz=$('dropZone');
