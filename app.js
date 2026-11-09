@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v45
+//  RobModel — Robot Kinematik Editor  v46
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -1022,7 +1022,9 @@ function partKey(n) {
   if (/podest|base/.test(s)) return 'Base';
   return 'A1';
 }
-function isTool(f) { const n = norm(f.name||f); const tool = norm(state.tcp.auftragen.toolStl||state.toolName); return n===tool||/tool1_tcp|tool|tcp|meltio/.test(n); }
+// Roboter-Strukturteile (Sockel, Gelenke) sind nie Werkzeug – auch wenn ein falscher Werkzeugname gespeichert ist
+const NOT_TOOL_RE = /(^|[\s_\-])(base|podest|sockel|pedestal|joint|link|axis)([\s_\-]*\d*)?($|[\s_\-.])/i;
+function isTool(f) { const n = norm(f.name||f); if (NOT_TOOL_RE.test(n)) return false; const tool = norm(state.tcp.auftragen.toolStl||state.toolName); return (!!tool && n===tool)||/tool1_tcp|tool|tcp|meltio/.test(n); }
 function findStl(stem) { const s = norm(stem); if (!s) return null; return state.stls.find(f=>norm(f.name)===s)?.name || state.stls.find(f=>norm(f.name).includes(s)||s.includes(norm(f.name)))?.name || null; }
 function clearGroup(g) {
   while (g.children.length) {
