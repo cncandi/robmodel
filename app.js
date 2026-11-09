@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v40
+//  RobModel — Robot Kinematik Editor  v41
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -5336,24 +5336,61 @@ function startLinkPick(ax) {
   if (_linkTargetAx === ax) { stopLinkPick(); return; }
   _linkTargetAx = ax;
   document.body.classList.add('link-picking');
-  _linkHint(`Verknüpfung ${ax}: Teil im Viewport anklicken (mehrere nacheinander möglich) — Esc beendet`);
+  _linkHint(`Verknüpfung ${ax}: Teil anklicken (grün = ${ax} zugeordnet, erneuter Klick hebt auf) — Esc beendet`);
   renderRows();
+  _linkTintAxis(ax);
 }
 function stopLinkPick() {
   _linkTargetAx = null; _linkDown = null;
   document.body.classList.remove('link-picking');
   _linkHint(null);
-  renderRows();
+  _linkUntintAll();
+  renderRows(); requestRender();
 }
-function _linkFlash(mesh) {
-  const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-  mats.forEach(m => { if (m && m.emissive) { const old = m.emissive.getHex(); m.emissive.setHex(0x664400); requestRender(); setTimeout(() => { m.emissive.setHex(old); requestRender(); }, 350); } });
+// Hervorhebung: alle Teile der aktiven Verknüpfungsachse leuchtend grün, bis der Modus endet
+const LINK_HL = 0x22c55e;
+function _linkMats(mesh) {
+  const u = mesh.userData, out = [];
+  [u.matStd, u.matPhys, mesh.material].forEach(m => { if (m && m.color && !out.includes(m)) out.push(m); });
+  return out;
+}
+function _linkTint(mesh) {
+  if (!mesh || !mesh.isMesh) return;
+  const mats = _linkMats(mesh);
+  if (mesh.userData._linkOrig === undefined) mesh.userData._linkOrig = (mesh.userData.matStd || mesh.material).color.getHex();
+  mats.forEach(m => m.color.setHex(LINK_HL));
+}
+function _linkUntintAll() {
+  for (const [, m] of meshes) {
+    if (m.userData._linkOrig === undefined) continue;
+    const c = m.userData._linkOrig; delete m.userData._linkOrig;
+    _linkMats(m).forEach(x => x.color.setHex(c));
+  }
+}
+function _linkTintAxis(ax) {
+  _linkUntintAll();
+  if (!ax) { requestRender(); return; }
+  const names = (state.axisStlParts[ax] || []).map(p => norm(p.name));
+  for (const [, m] of meshes) if (names.includes(norm(m.name))) _linkTint(m);
+  requestRender();
 }
 function linkMeshToAxis(mesh, ax) {
   let path = null;
   for (const [k, m] of meshes) if (m === mesh) { path = k; break; }
   if (path === null) return false;
   const name = mesh.name || path;
+  const origHex = mesh.userData._linkOrig !== undefined ? mesh.userData._linkOrig : (mesh.userData.matStd || mesh.material).color.getHex();
+  // erneuter Klick auf ein Teil dieser Achse: Zuordnung aufheben
+  const own = state.axisStlParts[ax] || [];
+  const ownIdx = own.findIndex(p => norm(p.name) === norm(name));
+  if (ownIdx >= 0) {
+    own.splice(ownIdx, 1);
+    if (state.axisStlMap[ax] && norm(state.axisStlMap[ax]) === norm(name)) state.axisStlMap[ax] = own[0]?.name || null;
+    _linkUntintAll();
+    rebuildRobotKinematics(); applyTransforms(); renderAxisStlRows(); renderAll();
+    _linkTintAxis(ax);
+    return 'removed';
+  }
   let raw = state.buffers.get(path);
   let buf;
   if (raw && /\.osd$/i.test(name)) buf = new Uint8Array(osdToBinaryStl(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength)));
@@ -5366,11 +5403,12 @@ function linkMeshToAxis(mesh, ax) {
     if (state.axisStlMap[a] && norm(state.axisStlMap[a]) === norm(name)) state.axisStlMap[a] = state.axisStlParts[a]?.[0]?.name || null;
   });
   if (!state.axisStlParts[ax]) state.axisStlParts[ax] = [];
-  const col = '#' + (mesh.material?.color?.getHexString?.() || 'e8a020');
+  const col = '#' + origHex.toString(16).padStart(6, '0');
   state.axisStlParts[ax].push({ name, color: col, buf });
   if (!state.axisStlMap[ax]) state.axisStlMap[ax] = name;
+  _linkUntintAll();
   rebuildRobotKinematics(); applyTransforms(); renderAxisStlRows(); renderAll();
-  _linkFlash(mesh);
+  _linkTintAxis(ax);
   return true;
 }
 function _linkPickAt(ev) {
@@ -5382,8 +5420,10 @@ function _linkPickAt(ev) {
   const hits = rc.intersectObjects([...robot, ...unassigned], false).filter(h => h.object.isMesh);
   if (!hits.length) { _linkHint(`Verknüpfung ${_linkTargetAx}: kein Teil getroffen — erneut klicken oder Esc`); return; }
   const obj = hits[0].object, ax = _linkTargetAx;
-  if (unassigned.includes(obj)) { window._assignFromPanel(obj.userData._linkName, ax); _linkHint(`${obj.userData._linkName} → ${ax}. Weiteres Teil anklicken oder Esc`); return; }
-  if (linkMeshToAxis(obj, ax)) _linkHint(`${obj.name} → ${ax}. Weiteres Teil anklicken oder Esc`);
+  if (unassigned.includes(obj)) { window._assignFromPanel(obj.userData._linkName, ax); setTimeout(() => _linkTintAxis(ax), 300); _linkHint(`${obj.userData._linkName} → ${ax} (grün markiert). Weiteres Teil anklicken oder Esc`); return; }
+  const r = linkMeshToAxis(obj, ax);
+  if (r === 'removed') _linkHint(`${obj.name}: Zuordnung zu ${ax} aufgehoben. Weiteres Teil anklicken oder Esc`);
+  else if (r) _linkHint(`${obj.name} → ${ax} (grün markiert). Weiteres Teil anklicken oder Esc`);
 }
 renderer.domElement.addEventListener('pointerdown', ev => {
   if (_linkTargetAx && ev.button === 0) _linkDown = { x: ev.clientX, y: ev.clientY };
