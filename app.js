@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v43
+//  RobModel — Robot Kinematik Editor  v44
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -2263,7 +2263,7 @@ function rebuildFixMesh(i) {
   g.rotation.set((o.rx||0)*deg,(o.ry||0)*deg,(o.rz||0)*deg,'XYZ');
   if(o.stlFile?.buf){
     const geo=loader.parse(o.stlFile.buf.buffer||o.stlFile.buf); geo.computeVertexNormals();
-    g.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:o.color||0x607080,metalness:.55,roughness:.4})));
+    const fm=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:o.color||0x607080,metalness:.55,roughness:.4})); fm.name=o.name||''; g.add(fm);
   } else if(o.showBox!==false){
     const L=o.length||500,H=o.height||500,W=o.width||500,R=o.radius||200;
     const geo=o.type==='cylinder'?new THREE.CylinderGeometry(R,R,H,32):new THREE.BoxGeometry(L,H,W);
@@ -2704,6 +2704,83 @@ function _deleteElementOfMesh(mesh) {
   i = (festeGrps||[]).findIndex(g=>inG(g,mesh));
   if (i>=0) { if(festeGrps[i]&&festeGrps[i].parent) festeGrps[i].parent.remove(festeGrps[i]); festeGrps.splice(i,1); state.festeObjekte.splice(i,1); if(typeof renderFixRows==='function')renderFixRows(); renderAll(); return true; }
   return false;
+}
+
+// ── Netz in Körper trennen (zusammenhängende Teile, Kleinteile innerhalb größerer bleiben dabei) ──
+function splitGeometryBodies(geo) {
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  const pos = g.getAttribute('position'), nT = Math.floor(pos.count / 3);
+  if (nT < 2) return [g];
+  const parent = new Int32Array(nT); for (let i = 0; i < nT; i++) parent[i] = i;
+  const find = x => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const owner = new Map(), q = v => Math.round(v * 100);
+  for (let t = 0; t < nT; t++) for (let k = 0; k < 3; k++) {
+    const v = t * 3 + k, key = q(pos.getX(v)) + ',' + q(pos.getY(v)) + ',' + q(pos.getZ(v));
+    const o = owner.get(key);
+    if (o === undefined) owner.set(key, t); else { const a = find(o), b = find(t); if (a !== b) parent[b] = a; }
+  }
+  const comps = new Map();
+  for (let t = 0; t < nT; t++) { const r = find(t); let c = comps.get(r); if (!c) { c = { tris: [], box: new THREE.Box3() }; comps.set(r, c); } c.tris.push(t); }
+  if (comps.size < 2) return [g];
+  const v = new THREE.Vector3();
+  const list = [...comps.values()];
+  list.forEach(c => { c.tris.forEach(t => { for (let k = 0; k < 3; k++) c.box.expandByPoint(v.fromBufferAttribute(pos, t * 3 + k)); }); const s = c.box.getSize(new THREE.Vector3()); c.vol = (s.x + 1) * (s.y + 1) * (s.z + 1); });
+  list.sort((a, b) => b.vol - a.vol);
+  // Kleinteile, deren Box in einer größeren Box liegt, dem größten umschließenden Körper zuschlagen
+  const tol = 0.5, groups = [];
+  for (const c of list) {
+    const host = groups.find(gr => gr.box.min.x - tol <= c.box.min.x && gr.box.min.y - tol <= c.box.min.y && gr.box.min.z - tol <= c.box.min.z && gr.box.max.x + tol >= c.box.max.x && gr.box.max.y + tol >= c.box.max.y && gr.box.max.z + tol >= c.box.max.z);
+    if (host) host.tris.push(...c.tris); else groups.push({ tris: c.tris.slice(), box: c.box.clone() });
+  }
+  if (groups.length < 2) return [g];
+  const nrm = g.getAttribute('normal');
+  return groups.map(gr => {
+    const P = new Float32Array(gr.tris.length * 9), N = nrm ? new Float32Array(gr.tris.length * 9) : null;
+    gr.tris.forEach((t, i) => { for (let k = 0; k < 9; k++) { P[i * 9 + k] = pos.array[t * 9 + k]; if (N) N[i * 9 + k] = nrm.array[t * 9 + k]; } });
+    const ng = new THREE.BufferGeometry(); ng.setAttribute('position', new THREE.BufferAttribute(P, 3));
+    if (N) ng.setAttribute('normal', new THREE.BufferAttribute(N, 3)); else ng.computeVertexNormals();
+    ng.computeBoundingBox(); ng.computeBoundingSphere();
+    return ng;
+  });
+}
+function _meshColorHex(mesh) { return mesh.userData._linkOrig !== undefined ? mesh.userData._linkOrig : (mesh.userData.matStd || mesh.material).color.getHex(); }
+// Angeklicktes Teil trennen: Roboter-Mesh → mehrere Meshes (gleiche Achse), festes Objekt → mehrere feste Objekte
+function splitPickedMesh(mesh) {
+  const parts = splitGeometryBodies(mesh.geometry);
+  if (parts.length < 2) return 0;
+  const hex = _meshColorHex(mesh), col = '#' + hex.toString(16).padStart(6, '0');
+  // festes Objekt?
+  const fi = (festeGrps || []).findIndex(g => { let f = false; if (g && g.traverse) g.traverse(c => { if (c === mesh) f = true; }); return f; });
+  if (fi >= 0) {
+    const o = state.festeObjekte[fi];
+    const neu = parts.map((pg, i) => ({ ...o, name: (o.name || 'Objekt') + '_' + (i + 1), color: o.color || col, stlFile: { name: (o.name || 'Objekt') + '_' + (i + 1) + '.stl', buf: new Uint8Array(stlFromGeometry(pg)) } }));
+    if (festeGrps[fi]?.parent) festeGrps[fi].parent.remove(festeGrps[fi]);
+    festeGrps.splice(fi, 1, ...neu.map(() => null)); state.festeObjekte.splice(fi, 1, ...neu);
+    neu.forEach((_, k) => rebuildFixMesh(fi + k)); renderFixRows?.(); renderAll(); requestRender();
+    if (_treeOpen) _renderBodyTree();
+    return parts.length;
+  }
+  // Roboter-Mesh
+  let path = null; for (const [k, m] of meshes) if (m === mesh) { path = k; break; }
+  if (path === null) return 0;
+  const base = String(mesh.name || 'Teil').replace(/\.(stl|osd)$/i, '');
+  const ax = mesh.userData.axisKey;
+  const explicit = /^A[1-6]$/.test(ax || '') && (state.axisStlParts[ax] || []).some(p => norm(p.name) === norm(mesh.name));
+  const parentGrp = mesh.parent;
+  _removeRobotMesh(mesh, false);
+  parts.forEach((pg, i) => {
+    const name = base + '_' + (i + 1) + '.stl', u8 = new Uint8Array(stlFromGeometry(pg));
+    state.buffers.set(name, u8); state.stls.push({ path: name, name, type: 'STL', size: u8.byteLength });
+    const m = new THREE.Mesh(pg, new THREE.MeshStandardMaterial({ color: hex, roughness: .42, metalness: .55 }));
+    m.name = name; m.castShadow = true; m.receiveShadow = true;
+    m.add(new THREE.LineSegments(new THREE.EdgesGeometry(pg, 20), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 })));
+    meshes.set(name, m);
+    if (explicit) state.axisStlParts[ax].push({ name, color: col, buf: u8 });
+    else if (/^A[1-6]$/.test(ax || '')) { if (!state.axisStlParts[ax]) state.axisStlParts[ax] = []; state.axisStlParts[ax].push({ name, color: col, buf: u8 }); }
+  });
+  rebuildRobotKinematics(); applyTransforms(); renderAll(); requestRender();
+  if (_treeOpen) _renderBodyTree();
+  return parts.length;
 }
 
 // Roboter-Mesh (meshes-Map) samt Puffer/Zuordnungen entfernen
@@ -5394,6 +5471,7 @@ function startLinkPick(ax) {
   if (_linkTargetAx === ax) { stopLinkPick(); return; }
   _linkTargetAx = ax; _linkLastMesh = null;
   document.body.classList.add('link-picking');
+  if (ax === '__split__') { _linkUntintAll(); _linkHint('Trennen: Teil anklicken, das aus mehreren Körpern besteht — Esc beendet'); $('splitPickBtn')?.classList.add('on'); return; }
   if (ax === '__fix__') { _linkUntintAll(); _linkHint('Aus Modell lösen: Teil anklicken (z. B. Podest) — wird festes Objekt, einzeln verschiebbar. Esc beendet'); $('fixFromModelBtn')?.classList.add('on'); return; }
   if (ax === '__origin__') { _linkUntintAll(); _linkHint('Auf 0,0,0: Grundkörper des Roboters anklicken — Esc bricht ab'); $('originPickBtn')?.classList.add('on'); return; }
   _linkHint(`Verknüpfung ${ax}: Teil anklicken (grün = ${ax} zugeordnet, erneuter Klick hebt auf, Entf löscht) — Esc beendet`);
@@ -5402,7 +5480,7 @@ function startLinkPick(ax) {
 }
 function stopLinkPick() {
   _linkTargetAx = null; _linkDown = null; _linkLastMesh = null;
-  $('originPickBtn')?.classList.remove('on'); $('fixFromModelBtn')?.classList.remove('on');
+  $('originPickBtn')?.classList.remove('on'); $('fixFromModelBtn')?.classList.remove('on'); $('splitPickBtn')?.classList.remove('on');
   document.body.classList.remove('link-picking');
   _linkHint(null);
   _linkUntintAll();
@@ -5478,9 +5556,15 @@ function _linkPickAt(ev) {
   const rc = new THREE.Raycaster(); rc.setFromCamera(v, camera);
   const robot = [...meshes.values()].filter(m => m.visible !== false);
   const unassigned = [..._unassignedMeshes.entries()].map(([n, e]) => { e.mesh.userData._linkName = n; return e.mesh; });
-  const hits = rc.intersectObjects([...robot, ...unassigned], false).filter(h => h.object.isMesh);
+  const fixed = []; (festeGrps || []).forEach(g => g && g.traverse(c => { if (c.isMesh) fixed.push(c); }));
+  const hits = rc.intersectObjects([...robot, ...unassigned, ...(_linkTargetAx === '__split__' ? fixed : [])], false).filter(h => h.object.isMesh);
   if (!hits.length) { _linkHint(`Verknüpfung ${_linkTargetAx}: kein Teil getroffen — erneut klicken oder Esc`); return; }
   const obj = hits[0].object, ax = _linkTargetAx;
+  if (ax === '__split__') {
+    const nm = obj.name || 'Teil', n = splitPickedMesh(obj);
+    _linkHint(n ? `${nm}: in ${n} Teile getrennt. Weiteres Teil anklicken oder Esc` : `${nm}: besteht nur aus einem Körper, nicht trennbar. Esc beendet`);
+    return;
+  }
   if (ax === '__fix__') {
     if (!robot.includes(obj)) { _linkHint('Aus Modell lösen: bitte ein Teil des Robotermodells anklicken — Esc beendet'); return; }
     const nm = obj.name; if (detachMeshAsFixed(obj)) _linkHint(`${nm} ist jetzt ein festes Objekt. Weiteres Teil anklicken oder Esc`);
@@ -5522,6 +5606,7 @@ function moveRobotBaseToOrigin(baseMesh) {
 }
 $('originPickBtn')?.addEventListener('click', () => startLinkPick('__origin__'));
 $('fixFromModelBtn')?.addEventListener('click', () => startLinkPick('__fix__'));
+$('splitPickBtn')?.addEventListener('click', () => startLinkPick('__split__'));
 
 renderer.domElement.addEventListener('pointerdown', ev => {
   if (_linkTargetAx && ev.button === 0) _linkDown = { x: ev.clientX, y: ev.clientY };
