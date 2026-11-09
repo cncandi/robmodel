@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v41
+//  RobModel — Robot Kinematik Editor  v42
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -19,7 +19,8 @@ const num = v => { if (v === null || v === undefined || v === '') return null; c
 const deg = v => THREE.MathUtils.degToRad(Number(v) || 0);
 const fmt = b => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : (b / 1024).toFixed(1) + ' KB';
 const norm = s => String(s || '').toLowerCase().replace(/\\/g, '/').split('/').pop().replace(/\.stl$/i, '').trim();
-var _linkTargetAx = null; // Achse im Verknüpfungsmodus (+ Verknüpfung)
+var _linkTargetAx = null; // Achse im Verknüpfungsmodus (+ Verknüpfung) bzw. '__origin__'
+var _linkLastMesh = null; // zuletzt im Pick-Modus angeklicktes Teil (Entf löscht es)
 const zipName = s => (s || 'RobModel_export').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'RobModel_export';
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -2429,13 +2430,13 @@ function _getGimbalMeshes() {
   if (meshes.size) {
     for (const [path, mesh] of meshes) {
       const f = state.stls.find(s => s.path === path) || { name: mesh.name };
-      const key = partKey(f.name);
+      const key = mesh.userData.axisKey || partKey(f.name);
       const axMatch = key.match(/^A([1-6])$/);
       if (axMatch) {
         const i = parseInt(axMatch[1]) - 1;
         const grp = axisPivotGroups[i] || robotGroup;
         result.push({ mesh, type: 'axis', idx: i, grp });
-      } else if (key === 'Podest') {
+      } else if (key === 'Podest' || key === 'Base') {
         result.push({ mesh, type: 'podest', idx: 0, grp: robotGroup });
       } else if (key === 'Tool') {
         result.push({ mesh, type: 'tool', idx: 0, grp: toolGroup });
@@ -2713,7 +2714,19 @@ function _deleteMesh(mesh) {
   if (!window.confirm('Löschen: ' + label + ' ?')) return;
   transformControls.detach(); _gimbalTarget = null; _gimbalPickedMesh = null; _clearSelHighlight();
   if (found) _deletePartAt(found.ax, found.idx);
-  else if (!_deleteElementOfMesh(mesh)) { _rebuildAllAfterDelete(); }
+  else if (!_deleteElementOfMesh(mesh)) {
+    // Roboter-Teil aus Archiv-/Ordner-Import (ohne Teile-Eintrag) vollständig entfernen
+    for (const [k, m] of meshes) if (m === mesh) {
+      if (m.parent) m.parent.remove(m);
+      m.geometry?.dispose?.();
+      meshes.delete(k); state.buffers?.delete?.(k);
+      state.stls = state.stls.filter(f => f.path !== k);
+      Object.keys(state.axisStlMap).forEach(a => { if (state.axisStlMap[a] && norm(state.axisStlMap[a]) === norm(m.name)) state.axisStlMap[a] = null; });
+      if (state.toolName && norm(state.toolName) === norm(m.name)) state.toolName = '';
+    }
+    _rebuildAllAfterDelete();
+  }
+  if (_linkLastMesh === mesh) _linkLastMesh = null;
   if (_treeOpen) _renderBodyTree();
   requestRender();
 }
@@ -2723,6 +2736,7 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Delete') return;
   const t = e.target, tag = (t && t.tagName) || '';
   if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (t && t.isContentEditable)) return;
+  if (_linkTargetAx && _linkLastMesh) { _deleteMesh(_linkLastMesh); _linkTintAxis(_linkTargetAx); return; }
   if (!_gimbalActive || !_gimbalPickedMesh || !transformControls.object) return;
   _deleteMesh(_gimbalPickedMesh);
 });
@@ -5266,6 +5280,27 @@ qsa('[data-view]').forEach(b=>{b.addEventListener('click',e=>{if(e.button===0)se
   el.addEventListener('auxclick', e=>{ if(e.button===1) e.preventDefault(); });
 })();
 
+// Mausrad auf Zahlenfeldern: ±1, mit Strg ±0.1 (löst input/change wie bei Eingabe aus)
+document.addEventListener('wheel', e => {
+  const t = e.target;
+  if (!t || t.tagName !== 'INPUT' || t.disabled || t.readOnly) return;
+  const type = (t.type || 'text').toLowerCase();
+  if (type !== 'number' && type !== 'text') return;
+  const raw = String(t.value).trim().replace(',', '.');
+  if (raw !== '' && !/^[-+]?\d*\.?\d+(e[-+]?\d+)?$/i.test(raw)) return;   // nur Zahlenwerte
+  if (type === 'text' && raw === '' && !t.closest('#jointRows')) return;
+  e.preventDefault();
+  const step = (e.ctrlKey || e.metaKey) ? 0.1 : 1;
+  const dir = e.deltaY < 0 ? 1 : -1;
+  let v = Math.round(((parseFloat(raw) || 0) + dir * step) * 10) / 10;
+  const mn = t.min !== '' ? parseFloat(t.min) : NaN, mx = t.max !== '' ? parseFloat(t.max) : NaN;
+  if (Number.isFinite(mn) && v < mn) v = mn;
+  if (Number.isFinite(mx) && v > mx) v = mx;
+  t.value = String(v);
+  t.dispatchEvent(new Event('input', { bubbles: true }));
+  t.dispatchEvent(new Event('change', { bubbles: true }));
+}, { passive: false });
+
 document.addEventListener('input',e=>{
   const t=e.target;
   if(t.dataset.jointAngle!==undefined){state.jointAngles[Number(t.dataset.jointAngle)]=num(t.value)||0;applyJointRotations();return;}
@@ -5334,14 +5369,16 @@ function _linkHint(text) {
 }
 function startLinkPick(ax) {
   if (_linkTargetAx === ax) { stopLinkPick(); return; }
-  _linkTargetAx = ax;
+  _linkTargetAx = ax; _linkLastMesh = null;
   document.body.classList.add('link-picking');
-  _linkHint(`Verknüpfung ${ax}: Teil anklicken (grün = ${ax} zugeordnet, erneuter Klick hebt auf) — Esc beendet`);
+  if (ax === '__origin__') { _linkUntintAll(); _linkHint('Auf 0,0,0: Grundkörper des Roboters anklicken — Esc bricht ab'); $('originPickBtn')?.classList.add('on'); return; }
+  _linkHint(`Verknüpfung ${ax}: Teil anklicken (grün = ${ax} zugeordnet, erneuter Klick hebt auf, Entf löscht) — Esc beendet`);
   renderRows();
   _linkTintAxis(ax);
 }
 function stopLinkPick() {
-  _linkTargetAx = null; _linkDown = null;
+  _linkTargetAx = null; _linkDown = null; _linkLastMesh = null;
+  $('originPickBtn')?.classList.remove('on');
   document.body.classList.remove('link-picking');
   _linkHint(null);
   _linkUntintAll();
@@ -5420,11 +5457,42 @@ function _linkPickAt(ev) {
   const hits = rc.intersectObjects([...robot, ...unassigned], false).filter(h => h.object.isMesh);
   if (!hits.length) { _linkHint(`Verknüpfung ${_linkTargetAx}: kein Teil getroffen — erneut klicken oder Esc`); return; }
   const obj = hits[0].object, ax = _linkTargetAx;
+  if (ax === '__origin__') {
+    if (!robot.includes(obj)) { _linkHint('Auf 0,0,0: bitte ein Teil des Roboters anklicken — Esc bricht ab'); return; }
+    moveRobotBaseToOrigin(obj); stopLinkPick(); return;
+  }
+  _linkLastMesh = robot.includes(obj) ? obj : null;
   if (unassigned.includes(obj)) { window._assignFromPanel(obj.userData._linkName, ax); setTimeout(() => _linkTintAxis(ax), 300); _linkHint(`${obj.userData._linkName} → ${ax} (grün markiert). Weiteres Teil anklicken oder Esc`); return; }
   const r = linkMeshToAxis(obj, ax);
   if (r === 'removed') _linkHint(`${obj.name}: Zuordnung zu ${ax} aufgehoben. Weiteres Teil anklicken oder Esc`);
   else if (r) _linkHint(`${obj.name} → ${ax} (grün markiert). Weiteres Teil anklicken oder Esc`);
 }
+// Gesamtes Robotermodell so verschieben, dass Unterseite-Mitte des Grundkörpers auf 0,0,0 liegt.
+// Die Verschiebung wird in Geometrie und STL-Puffer eingerechnet (Export/RobSimul übernehmen sie).
+function moveRobotBaseToOrigin(baseMesh) {
+  scene.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(baseMesh);
+  if (box.isEmpty()) return;
+  const center = new THREE.Vector3(); box.getCenter(center);
+  const delta = new THREE.Vector3(-center.x, -center.y, -box.min.z);
+  if (delta.length() < 1e-6) { _linkHint(null); return; }
+  const q = new THREE.Quaternion();
+  for (const [path, m] of meshes) {
+    m.getWorldQuaternion(q);
+    const local = delta.clone().applyQuaternion(q.invert());
+    m.geometry.translate(local.x, local.y, local.z);
+    m.children.forEach(c => { if (c.geometry && c.geometry !== m.geometry) c.geometry.translate(local.x, local.y, local.z); });
+    m.geometry.computeBoundingBox(); m.geometry.computeBoundingSphere();
+    const u8 = new Uint8Array(stlFromGeometry(m.geometry));
+    state.buffers.set(path, u8);
+    Object.values(state.axisStlParts || {}).forEach(arr => (arr || []).forEach(pt => { if (norm(pt.name) === norm(m.name)) pt.buf = u8; }));
+  }
+  rebuildRobotKinematics(); applyTransforms(); renderAll(); requestRender();
+  const d = v => Math.round(v * 10) / 10;
+  setTimeout(() => alert(`Robotermodell verschoben um X ${d(delta.x)}  Y ${d(delta.y)}  Z ${d(delta.z)} mm.\nGrundkörper steht jetzt auf 0,0,0. Achspunkte (A1–A6) ggf. anpassen.`), 50);
+}
+$('originPickBtn')?.addEventListener('click', () => startLinkPick('__origin__'));
+
 renderer.domElement.addEventListener('pointerdown', ev => {
   if (_linkTargetAx && ev.button === 0) _linkDown = { x: ev.clientX, y: ev.clientY };
 }, true);

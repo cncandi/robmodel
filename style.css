@@ -187,3 +187,4 @@ body.bg-matrix{--bg:#000800;--bg2:#010d01;--bg3:#021202;--bg4:#031803;--bdr:#0a3
 input[type=number]::-webkit-outer-spin-button,
 input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 input[type=number]{-moz-appearance:textfield}
+#originPickBtn.on{background:rgba(255,138,0,.25)!important;border-color:#ff8a00!important;color:#ffb366!important}
