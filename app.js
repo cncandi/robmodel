@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v44
+//  RobModel — Robot Kinematik Editor  v45
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -1023,7 +1023,7 @@ function partKey(n) {
   return 'A1';
 }
 function isTool(f) { const n = norm(f.name||f); const tool = norm(state.tcp.auftragen.toolStl||state.toolName); return n===tool||/tool1_tcp|tool|tcp|meltio/.test(n); }
-function findStl(stem) { const s = norm(stem); return state.stls.find(f=>norm(f.name)===s)?.name || state.stls.find(f=>norm(f.name).includes(s)||s.includes(norm(f.name)))?.name || null; }
+function findStl(stem) { const s = norm(stem); if (!s) return null; return state.stls.find(f=>norm(f.name)===s)?.name || state.stls.find(f=>norm(f.name).includes(s)||s.includes(norm(f.name)))?.name || null; }
 function clearGroup(g) {
   while (g.children.length) {
     const c = g.children[0];
@@ -1405,7 +1405,8 @@ function parseTools(xml) {
   while(n&&n.tagName!=='SCType'){if(n.tagName==='ToolData')toolData=n;if(n.tagName==='ImageFile')img=n;n=n.nextElementSibling}
   toolData=toolData||holder.parentElement?.querySelector('ToolData'); img=img||holder.parentElement?.querySelector('ImageFile'); if(!toolData)return;
   const stem=(img?.getAttribute('DefaultValue')||'').replace(/\\/g,'/').split('/').pop().replace(/\.osd$/i,'');
-  const stl=findStl(stem)||findStl('tool1_tcp')||stem+'.stl'; state.toolName=stl;
+  // Ohne Werkzeug-Datei (ImageFile leer) kein beliebiges Teil zum Werkzeug machen (sonst landet z. B. der Sockel an A6)
+  const stl=(stem&&findStl(stem))||findStl('tool1_tcp')||(stem?stem+'.stl':''); state.toolName=stl;
   const orientation=readToolOrientation(toolData);
   const tcp={x:num(direct(toolData,'X')),y:num(direct(toolData,'Z')),z:num(direct(toolData,'Y')),rz:orientation?orientation.rz:num(direct(toolData,'A')),ry:orientation?orientation.ry:num(direct(toolData,'B')),rx:orientation?orientation.rx:num(direct(toolData,'C')),toolLength:num(direct(toolData,'ToolLength'))??0,toolStl:stl,status:'gefunden'};
   cleanTcpOrientation(tcp); state.tcp.auftragen=tcp; state.tcp.abtragen={...tcp,status:'vorgeschlagen'};
@@ -5479,7 +5480,7 @@ function startLinkPick(ax) {
   _linkTintAxis(ax);
 }
 function stopLinkPick() {
-  _linkTargetAx = null; _linkDown = null; _linkLastMesh = null;
+  _linkTargetAx = null; _linkDown = null; _linkLastMesh = null; _pickMark(null);
   $('originPickBtn')?.classList.remove('on'); $('fixFromModelBtn')?.classList.remove('on'); $('splitPickBtn')?.classList.remove('on');
   document.body.classList.remove('link-picking');
   _linkHint(null);
@@ -5505,6 +5506,20 @@ function _linkUntintAll() {
     const c = m.userData._linkOrig; delete m.userData._linkOrig;
     _linkMats(m).forEach(x => x.color.setHex(c));
   }
+}
+// Pick-Markierung (orange) für das zuletzt getroffene Teil in Trennen/Aus-Modell/0,0,0
+let _pickMarked = null;
+function _pickMark(mesh) {
+  if (_pickMarked && _pickMarked !== mesh && _pickMarked.userData._pickOrig !== undefined) {
+    const c = _pickMarked.userData._pickOrig; delete _pickMarked.userData._pickOrig;
+    _linkMats(_pickMarked).forEach(x => x.color.setHex(c));
+  }
+  _pickMarked = mesh || null;
+  if (mesh && mesh.isMesh) {
+    if (mesh.userData._pickOrig === undefined) mesh.userData._pickOrig = (mesh.userData.matStd || mesh.material).color.getHex();
+    _linkMats(mesh).forEach(x => x.color.setHex(0xff8a00));
+  }
+  requestRender();
 }
 function _linkTintAxis(ax) {
   _linkUntintAll();
@@ -5561,8 +5576,11 @@ function _linkPickAt(ev) {
   if (!hits.length) { _linkHint(`Verknüpfung ${_linkTargetAx}: kein Teil getroffen — erneut klicken oder Esc`); return; }
   const obj = hits[0].object, ax = _linkTargetAx;
   if (ax === '__split__') {
-    const nm = obj.name || 'Teil', n = splitPickedMesh(obj);
-    _linkHint(n ? `${nm}: in ${n} Teile getrennt. Weiteres Teil anklicken oder Esc` : `${nm}: besteht nur aus einem Körper, nicht trennbar. Esc beendet`);
+    const nm = obj.name || 'Teil';
+    _pickMark(null);
+    const n = splitPickedMesh(obj);
+    if (!n) _pickMark(obj);   // getroffenes Teil sichtbar machen
+    _linkHint(n ? `${nm}: in ${n} Teile getrennt. Weiteres Teil anklicken oder Esc` : `Getroffen: ${nm} (orange markiert) — besteht nur aus einem Körper, nicht trennbar. Esc beendet`);
     return;
   }
   if (ax === '__fix__') {
