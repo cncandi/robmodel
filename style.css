@@ -190,3 +190,13 @@ input[type=number]{-moz-appearance:textfield}
 #originPickBtn.on{background:rgba(255,138,0,.25)!important;border-color:#ff8a00!important;color:#ffb366!important}
 #fixFromModelBtn.on{background:rgba(255,138,0,.25)!important;border-color:#ff8a00!important;color:#ffb366!important}
 #splitPickBtn.on{background:rgba(255,138,0,.25)!important;border-color:#ff8a00!important;color:#ffb366!important}
+
+/* ── Helle Themes: helle Inline-Schriften lesbar machen (nicht in dunklen Dialogen) ── */
+body:is(.bg-white,.bg-minimal,.bg-win11) :is([style*="color:#d8e8f0"],[style*="color: rgb(216, 232, 240)"],[style*="color:#d0dce8"],[style*="color: rgb(208, 220, 232)"],[style*="color:#e0eaf5"],[style*="color:#c8d8e8"]):not([style*="background:#0"],[style*="background:#1"],:is([style*="background:#0"],[style*="background:#1"],[style*="background: rgb(1"],[style*="background: rgb(2"],[style*="background: rgb(0"]) *){color:var(--txt)!important}
+body:is(.bg-white,.bg-minimal,.bg-win11) :is([style*="color:#60a5fa"],[style*="color:#93c5fd"]):not([style*="background:#0"],[style*="background:#1"],:is([style*="background:#0"],[style*="background:#1"]) *){color:#1d5fd0!important}
+body:is(.bg-white,.bg-minimal,.bg-win11) .badge.info{color:#1d5fd0}
+body:is(.bg-white,.bg-minimal,.bg-win11) .simBtn{color:#1d5fd0}
+body:is(.bg-white,.bg-minimal,.bg-win11) :is(.ax-mini,#applyStlRotBtn,#splitPickBtn,#originPickBtn){background:var(--bg3)!important;border-color:var(--bdr)!important;color:var(--txt2)!important}
+body:is(.bg-white,.bg-minimal,.bg-win11) :is(.ax-mini,#applyStlRotBtn,#splitPickBtn,#originPickBtn):hover{background:var(--acc)!important;color:#fff!important}
+body:is(.bg-white,.bg-minimal,.bg-win11) :is(.ax-link-btn.on,#splitPickBtn.on,#originPickBtn.on,#fixFromModelBtn.on){background:#ffe2c2!important;border-color:#ff8a00!important;color:#a04400!important}
+body:is(.bg-white,.bg-minimal,.bg-win11) #fixFromModelBtn{color:#1d5fd0!important}
