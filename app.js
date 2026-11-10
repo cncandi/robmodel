@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v51
+//  RobModel — Robot Kinematik Editor  v52
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -2444,6 +2444,7 @@ var _proxyStartPos = new THREE.Vector3(); // Proxy-Position beim Drag-Start
 var _groupStartPositions = []; // [{grp, startPos}] beim Drag-Start
 
 function _clearSelHighlight() {
+  try { if (!_linkTargetAx) { _pickMark(null); _linkHint(null); } } catch (e) {}
   _selHighlight.forEach(o => { try { o.mat.emissive.copy(o.emissive); o.mat.emissiveIntensity = o.intensity; } catch(e){} });
   _selHighlight = [];
 }
@@ -2588,6 +2589,7 @@ function _gimbalPick(event) {
   }
 
   _gimbalPickedMesh = hits[0].object;
+  window._gimbalHitThisClick = true;
   // Unassigned Mesh für Zuweisung merken + Button zeigen
   if (_gimbalPickedMesh?.userData?.isUnassigned) {
     window._lastUnassignedSel = _gimbalPickedMesh;
@@ -2599,6 +2601,7 @@ function _gimbalPick(event) {
     if (btn) btn.style.display = 'none';
   }
   _attachGimbalToTargets();
+  try { _selMesh = null; _pickMark(_gimbalPickedMesh); _linkHint(`Ausgewählt: ${_gimbalPickedMesh.name || 'Teil'} (orange) — Entf löscht, Esc hebt Auswahl auf`); } catch (e) {}
   requestRender();
 }
 
@@ -2891,7 +2894,8 @@ function _deleteMesh(mesh) {
   const found = _findPartByName(mesh.name);
   const label = found ? (found.part.name + '  (' + found.ax + ')') : (mesh.name || 'Element');
   if (!window.confirm('Löschen: ' + label + ' ?')) return;
-  transformControls.detach(); _gimbalTarget = null; _gimbalPickedMesh = null; _clearSelHighlight();
+  if (_selMesh === mesh) { _pickMark(null); _selMesh = null; _linkHint(null); }
+  transformControls?.detach?.(); _gimbalTarget = null; _gimbalPickedMesh = null; _clearSelHighlight();
   if (found) _deletePartAt(found.ax, found.idx);
   else if (!_deleteElementOfMesh(mesh)) {
     // Roboter-Teil aus Archiv-/Ordner-Import (ohne Teile-Eintrag) vollständig entfernen
@@ -2909,8 +2913,8 @@ document.addEventListener('keydown', e => {
   const t = e.target, tag = (t && t.tagName) || '';
   if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (t && t.isContentEditable)) return;
   if (_linkTargetAx && _linkLastMesh) { _deleteMesh(_linkLastMesh); _linkTintAxis(_linkTargetAx); return; }
-  if (!_gimbalActive || !_gimbalPickedMesh || !transformControls.object) return;
-  _deleteMesh(_gimbalPickedMesh);
+  if (_gimbalActive && _gimbalPickedMesh && transformControls?.object) { _deleteMesh(_gimbalPickedMesh); return; }
+  if (_selMesh) { _deleteMesh(_selMesh); return; }
 });
 
 // ── Körper-Struktur (Baum): ein-/ausblendbar, anklicken + löschen ──
@@ -5700,6 +5704,37 @@ $('splitPickBtn')?.addEventListener('click', () => startLinkPick('__split__'));
 renderer.domElement.addEventListener('pointerdown', ev => {
   if (_linkTargetAx && ev.button === 0) _linkDown = { x: ev.clientX, y: ev.clientY };
 }, true);
+// ── Auswahl per Klick (ohne Gimbal/Pick-Modus): Teil orange markieren, Entf löscht, Esc hebt auf ──
+var _selMesh = null, _selDown = null;
+function _selectCandidates() {
+  const out = [...meshes.values()].filter(m => m.visible !== false);
+  [festeGrps, effektorGroups, umfGroups, objekteGroups].forEach(arr => (arr || []).forEach(g => g && g.traverse && g.traverse(c => { if (c.isMesh && c.visible !== false) out.push(c); })));
+  return out;
+}
+function _selectAt(ev) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const v = new THREE.Vector2(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
+  const rc = new THREE.Raycaster(); rc.setFromCamera(v, camera);
+  const hit = rc.intersectObjects(_selectCandidates(), false).find(h => h.object.isMesh);
+  if (!hit) { if (_selMesh) { _pickMark(null); _selMesh = null; _linkHint(null); } return; }
+  _selMesh = hit.object; _pickMark(_selMesh);
+  let nm = _selMesh.name; if (!nm) { let p = _selMesh.parent; while (p && !nm) { nm = p.name; p = p.parent; } }
+  _linkHint(`Ausgewählt: ${nm || 'Teil'} (orange) — Entf löscht, Esc hebt Auswahl auf`);
+}
+renderer.domElement.addEventListener('pointerdown', ev => { window._gimbalHitThisClick = false; if (ev.button === 0 && !_linkTargetAx) _selDown = { x: ev.clientX, y: ev.clientY }; }, true);
+renderer.domElement.addEventListener('pointerup', ev => {
+  if (!_selDown || ev.button !== 0 || _linkTargetAx) { _selDown = null; return; }
+  const moved = Math.hypot(ev.clientX - _selDown.x, ev.clientY - _selDown.y) > 4; _selDown = null;
+  if (moved || window._gimbalHitThisClick || transformControls?.dragging) return;   // Kamera gedreht oder Gimbal hat gewählt
+  if (typeof _measureActive !== 'undefined' && _measureActive) return;
+  _selectAt(ev);   // auch Teile, die der Gimbal nicht greifen kann (z. B. Umgebungsteile aus ENCY)
+}, true);
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Escape' || _linkTargetAx) return;
+  if (_selMesh) { _pickMark(null); _selMesh = null; _linkHint(null); }
+  else if (_gimbalPickedMesh) { try { transformControls?.detach?.(); _gimbalTarget = null; _gimbalTargets = []; _gimbalPickedMesh = null; _clearSelHighlight(); requestRender(); } catch (e) {} }
+});
+
 renderer.domElement.addEventListener('pointerup', ev => {
   if (!_linkTargetAx || !_linkDown || ev.button !== 0) return;
   const moved = Math.hypot(ev.clientX - _linkDown.x, ev.clientY - _linkDown.y) > 4;
