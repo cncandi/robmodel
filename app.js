@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v56
+//  RobModel — Robot Kinematik Editor  v57
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -1617,18 +1617,18 @@ function buildJson() {
   const axNames = ['A1','A2','A3','A4','A5','A6'];
   const stlFiles = Object.fromEntries(axNames.map((ax, i) => {
     const parts = state.axisStlParts[ax]||[];
-    if (parts.length>0) return [ax, parts.map(p=>({name:norm(p.name),color:p.color||'#e8a020'}))];
+    if (parts.length>0) return [ax, parts.map(p=>({name:norm(p.name).replace(/\.osd$/i,''),color:p.color||'#e8a020'}))];
     const s = state.axisStlMap[ax]||state.stls.find(f=>partKey(f.name)===ax)?.name||'';
-    return [ax, [{name:norm(s)||('a'+(i+1)),color:colors[ax]||'#e8a020'}]];
+    return [ax, [{name:norm(s).replace(/\.osd$/i,'')||('a'+(i+1)),color:colors[ax]||'#e8a020'}]];
   }));
   const tcp = state.tcp.auftragen;
-  const toolName = norm(state.toolName || tcp.toolStl || '') || 'tool1_tcp';
+  const toolName = norm(state.toolName || tcp.toolStl || '').replace(/\.osd$/i,'') || 'tool1_tcp';
   const eo = state.effektoren[state.activeEff]?.offset || {};
   const tcpX = eo.x??num(tcp.x)??0, tcpY = eo.y??num(tcp.y)??0, tcpZ = eo.z??num(tcp.z)??0;
   const tcpA = eo.rz??num(tcp.rz)??0, tcpB = eo.ry??num(tcp.ry)??0, tcpC = eo.rx??num(tcp.rx)??0;
   const result = {
     name: state.robotName || 'Robot',
-    stlRotation: {rx:stlRx, ry:stlRy, rz:stlRz},
+    stlRotation: {rx:0, ry:0, rz:0},   // Rotation ist in den exportierten STL bereits enthalten (vorher: ${stlRx},${stlRy},${stlRz})
     joints: state.joints.map((j,i) => ({
       name: j.name,
       axis: fixedAxisType(i),
@@ -1674,7 +1674,7 @@ async function downloadZip() {
   zip.file(base+'.json',JSON.stringify(buildJson(),null,2));
 
   // Achsen-STLs aus meshes Map
-  for(const[,mesh] of meshes) zip.file(mesh.name,exportBinaryStl(mesh));
+  exportRobotMeshes(zip, '');
 
   // Alle weiteren STL-Buffers aus dem State
   const addBuf = (name, buf) => {
@@ -1718,6 +1718,20 @@ async function downloadZip() {
 }
 function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);}
 
+// ── Roboterteile für RobSimul exportieren ─────────────────────────
+// RobSimul liest nur *.stl und erwartet die Teile in Weltkoordinaten der Referenzpose (stlRefAngles),
+// die STL-Rotation ist dabei bereits eingerechnet (stlRotation im JSON = 0).
+function exportStlName(n) { return String(n || 'teil').replace(/\\/g, '/').split('/').pop().replace(/\.(stl|osd)$/i, '') + '.stl'; }
+function exportRobotMeshes(zip, prefix) {
+  const saved = (state.jointAngles || []).slice();
+  try {
+    state.jointAngles = parseReferencePose().slice();
+    applyJointRotations(); scene.updateMatrixWorld(true);
+    for (const [, mesh] of meshes) zip.file((prefix || '') + exportStlName(mesh.name), exportBinaryStl(mesh));
+  } finally {
+    state.jointAngles = saved; applyJointRotations(); scene.updateMatrixWorld(true);
+  }
+}
 function exportBinaryStl(mesh) {
   scene.updateMatrixWorld(true); mesh.updateMatrixWorld(true);
   const g=mesh.geometry.index?mesh.geometry.toNonIndexed():mesh.geometry.clone();
@@ -4638,7 +4652,7 @@ async function buildComponentZip(type, idx) {
   if(type==='robot'){
     const prevMode=toolMountMode; if(prevMode!=='world'){detachToolFromA6();scene.updateMatrixWorld(true);}
     cfg = buildJson();
-    for(const [,mesh] of meshes) zip.file(`stl/${mesh.name}`,exportBinaryStl(mesh));
+    exportRobotMeshes(zip, 'stl/');
     state.effektoren.forEach((e,i)=>{ if(e.stlFile?.buf) zip.file(`stl/eff_${i}.stl`,e.stlFile.buf); });
     // Feste Objekte
     (state.festeObjekte||[]).forEach((f,i)=>{ if(f.stlFile?.buf) zip.file(`stl/fix_${i}.stl`,f.stlFile.buf); });
@@ -4693,7 +4707,7 @@ async function buildStationJson(zip) {
   if(selected.has('robot') && (state.joints||[]).length){
     const prevMode=toolMountMode; if(prevMode!=='world'){detachToolFromA6();scene.updateMatrixWorld(true);}
     cfg.components.robot=buildJson();
-    for(const [,mesh] of meshes) zip.file(`stl/${mesh.name}`,exportBinaryStl(mesh));
+    exportRobotMeshes(zip, 'stl/');
     if(prevMode!=='world') attachToolToA6();
   }
   if(selected.has('rail') && state.schienen[0]){
@@ -7431,5 +7445,5 @@ document.addEventListener('keydown', e => {
   else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redoStep(); }
 });
 setTimeout(undoCommit, 1500);
-window._rmDebug = { pivots: () => cumulativeAxisPositions().map(v => [v.x, v.y, v.z].map(n => Math.round(n * 1000) / 1000)), axisPoints: () => state.axisPoints, tcp: () => state.tcp.auftragen, joints: () => state.joints.map(j => [j.min, j.max]), toolName: () => state.toolName, boxes: () => { scene.updateMatrixWorld(true); return [...meshes].map(([k, m]) => { const b = new THREE.Box3().setFromObject(m); return [m.name, [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].map(v => Math.round(v))]; }); } };
+window._rmDebug = { pivots: () => cumulativeAxisPositions().map(v => [v.x, v.y, v.z].map(n => Math.round(n * 1000) / 1000)), axisPoints: () => state.axisPoints, tcp: () => state.tcp.auftragen, joints: () => state.joints.map(j => [j.min, j.max]), toolName: () => state.toolName, exportTest: async () => { const zip = new JSZip(); exportRobotMeshes(zip, 'stl/'); const cfg = buildJson(); const out = {}; for (const [n, f] of Object.entries(zip.files)) { if (f.dir) continue; const b = await f.async('arraybuffer'); const dv = new DataView(b); const t = dv.getUint32(80, true); const mn = [1e9,1e9,1e9], mx = [-1e9,-1e9,-1e9]; for (let i = 0; i < t; i++) for (let v = 0; v < 3; v++) for (let k = 0; k < 3; k++) { const x = dv.getFloat32(84 + i*50 + 12 + v*12 + k*4, true); if (x < mn[k]) mn[k] = x; if (x > mx[k]) mx[k] = x; } out[n] = [...mn, ...mx].map(Math.round); } return { files: out, stlRotation: cfg.stlRotation, stlRefAngles: cfg.stlRefAngles, stlFiles: Object.fromEntries(Object.entries(cfg.stlFiles).map(([k, v]) => [k, v.map(x => x.name)])) }; }, boxes: () => { scene.updateMatrixWorld(true); return [...meshes].map(([k, m]) => { const b = new THREE.Box3().setFromObject(m); return [m.name, [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].map(v => Math.round(v))]; }); } };
 window.setJointAnglesToReferencePose = setJointAnglesToReferencePose; window.applyJointRotations = applyJointRotations; window.renderRows = renderRows;   // für onclick im HTML (Kanonenstellung 'Setzen')
