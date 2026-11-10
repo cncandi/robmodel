@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v54
+//  RobModel — Robot Kinematik Editor  v55
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -628,8 +628,16 @@ function applyJointRotations() {
   requestRender();
 }
 
+function writeRefPoseField(kuka) {
+  const el = $('refPose'); if (!el) return;
+  const arr = (kuka || state.referencePose || [0,-90,90,0,0,0]).map((v, i) => state.angleMap ? kukaToCtrl(i, v) : v);
+  el.value = arr.map(v => Math.round(v * 1000) / 1000).join(',');
+  const lb = document.getElementById('refPoseLabel'); if (lb) lb.textContent = '🎯 Kanonenstellung' + (state.angleMap ? ' (' + state.angleMap.brand + ')' : '');
+}
 function parseReferencePose() {
-  const raw = ($('refPose')?.value || '0,-90,90,0,0,0').split(',').map(v => Number(String(v).trim().replace(',','.')));
+  let raw = ($('refPose')?.value || '0,-90,90,0,0,0').split(',').map(v => Number(String(v).trim().replace(',','.')));
+  // Bei Steuerungs-Konvention (z. B. ABB) steht das Feld in Steuerungs-Winkeln → intern RobSimul-Konvention
+  if (raw.length === 6 && raw.every(Number.isFinite) && state.angleMap) raw = raw.map((v, i) => ctrlToKuka(i, v));
   if (raw.length === 6 && raw.every(Number.isFinite)) { state.referencePose = raw; return raw; }
   state.referencePose = [0,-90,90,0,0,0]; return state.referencePose;
 }
@@ -1103,7 +1111,7 @@ function resetData() {
   state.files=[]; state.stls=[]; state.xmls=[]; state.jsons=[];
   state.buffers=new Map(); state.packageJson=null; state.mode='leer'; state.robotName='';
   state.jointAngles=[0,-90,90,0,0,0]; state.referencePose=[0,-90,90,0,0,0]; state.angleMap=null;
-  if ($('refPose')) $('refPose').value='0,-90,90,0,0,0';
+  if ($('refPose')) $('refPose').value='0,-90,90,0,0,0'; { const lb=document.getElementById('refPoseLabel'); if(lb) lb.textContent='🎯 Kanonenstellung'; }
   state.robotTr={x:0,y:0,z:0,rx:0,ry:0,rz:0}; state.toolTr={x:0,y:0,z:0,rx:0,ry:0,rz:0};
   state.axisPoints=['A1','A2','A3','A4','A5','A6'].map((name,i)=>({name,...defOffset(i),rx:0,ry:0,rz:0,source:'KR8 Zielwert'}));
   state.selectedAxis=0; clearAxisPointVisuals();
@@ -1419,6 +1427,7 @@ function parseRobotSize(xml) {
   ];
   const tmpl = xml.querySelector('SCType[Type$="RobotTemplate"]')?.getAttribute('Type') || 'RobotSize';
   state.angleMap = /^Abb/i.test(tmpl) ? { ...ANGLE_MAPS.ABB, sign: ANGLE_MAPS.ABB.sign.slice(), offset: ANGLE_MAPS.ABB.offset.slice() } : null;
+  writeRefPoseField(state.referencePose || [0,-90,90,0,0,0]);   // Feld sofort in die neue Konvention bringen (referenceFrames liest es)
   state.axisPoints = world.map((w, k) => {
     const v = worldOffsetToJointOffset(k, w);
     return { name: 'A' + (k + 1), x: +v.x.toFixed(3), y: +v.y.toFixed(3), z: +v.z.toFixed(3), rx: 0, ry: 0, rz: 0, source: 'XML RobotSize (' + tmpl + ')' };
@@ -1431,6 +1440,7 @@ function parseXml(text) {
   const xml = new DOMParser().parseFromString(text,'application/xml');
   state.robotName = (state._machineXmlName || state.xmls[0]?.name || '').replace(/\.xml$/i,'') || 'Robot';
   const gotAxis = parseRobotSize(xml);   // Schwenkpunkte aus RobotSize (falls vorhanden)
+  writeRefPoseField(state.referencePose || [0,-90,90,0,0,0]);   // Feld in Steuerungs-Konvention anzeigen (ABB: 0,0,0,0,0,0)
   // parseAxisPositions(xml);  ← alte Heuristik deaktiviert
   if (!gotAxis && /irb\s*4600|4600-40-2_55/i.test(text)) {
     const mins=[-180,-90,-180,-179,-125,-179], maxs=[180,150,75,179,120,179];
@@ -1551,7 +1561,7 @@ function applyJsonToState(j) {
   if(!j)return;
   state.robotName=j.name||state.robotName;
   state.angleMap = (j.angleMap && Array.isArray(j.angleMap.sign) && Array.isArray(j.angleMap.offset)) ? { brand: j.angleMap.brand || 'Steuerung', sign: j.angleMap.sign.map(Number), offset: j.angleMap.offset.map(Number) } : null;
-  if(Array.isArray(j.stlRefAngles)&&j.stlRefAngles.length===6){state.referencePose=j.stlRefAngles.map(v=>Number(v)||0);if($('refPose'))$('refPose').value=state.referencePose.join(',');}
+  if(Array.isArray(j.stlRefAngles)&&j.stlRefAngles.length===6){state.referencePose=j.stlRefAngles.map(v=>Number(v)||0);writeRefPoseField(state.referencePose);}else writeRefPoseField(state.referencePose);
   if(Array.isArray(j.jointAngles)&&j.jointAngles.length===6)state.jointAngles=j.jointAngles.map(v=>Number(v)||0);
   if(Array.isArray(j.joints)){state.joints=j.joints.map((v,i)=>({name:v.name||('A'+(i+1)),axis:fixedAxisType(i),offset:{x:num(v.offset?.x)??null,y:num(v.offset?.y)??null,z:num(v.offset?.z)??null},min:num(v.min),max:num(v.max),rotationSign:num(v.rotationSign??v.rotationDirection??v.dir)??1,status:v.status||'JSON'}));state.axisPoints=state.joints.map((v,i)=>({name:v.name||('A'+(i+1)),x:num(v.offset?.x),y:num(v.offset?.y),z:num(v.offset?.z),rx:0,ry:0,rz:0,source:'JSON'}));}
   // Endeffektoren: neues Format (Array) + backward compat (Singular)
@@ -7351,7 +7361,7 @@ function undoCommit() {
 function _undoApply(s) {
   UNDO_KEYS.forEach(k => { if (k in s) state[k] = _undoClone(s[k]); });
   setInputs('r', state.robotTr || {}); setInputs('t', state.toolTr || {});
-  if ($('refPose') && Array.isArray(state.referencePose)) $('refPose').value = state.referencePose.join(',');
+  if (Array.isArray(state.referencePose)) writeRefPoseField(state.referencePose);
   // Gruppen der Komponenten neu aufbauen (Anzahl kann sich geändert haben)
   [objekteGroups, effektorGroups, umfGroups, festeGrps].forEach(arr => { arr.forEach(g => { if (g && g.parent) g.parent.remove(g); }); arr.length = 0; });
   (state.festeObjekte || []).forEach((_, i) => rebuildFixMesh(i));
@@ -7399,3 +7409,4 @@ document.addEventListener('keydown', e => {
 });
 setTimeout(undoCommit, 1500);
 window._rmDebug = { pivots: () => cumulativeAxisPositions().map(v => [v.x, v.y, v.z].map(n => Math.round(n * 1000) / 1000)), axisPoints: () => state.axisPoints, tcp: () => state.tcp.auftragen, joints: () => state.joints.map(j => [j.min, j.max]), toolName: () => state.toolName, boxes: () => { scene.updateMatrixWorld(true); return [...meshes].map(([k, m]) => { const b = new THREE.Box3().setFromObject(m); return [m.name, [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].map(v => Math.round(v))]; }); } };
+window.setJointAnglesToReferencePose = setJointAnglesToReferencePose; window.applyJointRotations = applyJointRotations; window.renderRows = renderRows;   // für onclick im HTML (Kanonenstellung 'Setzen')

@@ -264,7 +264,7 @@ header.top .title    { display: none !important; }
 
   <!-- ─── HEADER ──────────────────────────────────────────────── -->
   <header class="top">
-  <div class="appname"><svg class="ico"><use href="#i-kin"/></svg>RobModel <span>v54</span></div>
+  <div class="appname"><svg class="ico"><use href="#i-kin"/></svg>RobModel <span>v55</span></div>
 
   <nav class="menubar" id="mainMenubar">
 
@@ -1141,7 +1141,7 @@ header.top .title    { display: none !important; }
       </table>
       <!-- Kanonenstellung / Referenzpose -->
       <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid rgba(255,255,255,.08);margin-top:4px">
-        <label style="font-size:11px;color:#6a8fa8;white-space:nowrap;font-family:monospace">🎯 Kanonenstellung</label>
+        <label id="refPoseLabel" style="font-size:11px;color:#6a8fa8;white-space:nowrap;font-family:monospace">🎯 Kanonenstellung</label>
         <input id="refPose" type="text" value="0,-90,90,0,0,0"
           title="Referenzpose (Kanonenstellung): Winkel in Grad für A1–A6, kommagetrennt. Bsp: 0,-90,90,0,0,0 oder 0,0,0,0,0,0"
           placeholder="0,-90,90,0,0,0"
@@ -1155,7 +1155,7 @@ header.top .title    { display: none !important; }
 
 </div><!-- .wrap -->
 
-<script type="module" src="app.js?v=20261110f"></script>
+<script type="module" src="app.js?v=20261110g"></script>
 <script type="module" src="measure.js?v=20260602s"></script>
 <!-- ── ROBLIB UPLOAD MODAL ──────────────────────────────────── -->
 <div id="roblibModal" class="rl-overlay" style="display:none">
