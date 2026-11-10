@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v58
+//  RobModel — Robot Kinematik Editor  v59
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -1041,7 +1041,10 @@ function partKey(n) {
   const j = s.match(/joint[_ \-]*([1-6])/i); if (j) return 'A' + j[1];
   if (/tool|tcp|meltio/.test(s)) return 'Tool';
   if (/podest|base/.test(s)) return 'Base';
-  return state.robotMeta?.template ? 'Base' : 'A1';   // ENCY-Archiv: unbekannte Teile (Portal, E-Achsen, Flansch) fest statt an A1
+  // Unbekannte Teile (Portal, E-Achsen, Flansch, Tisch) sind fest, sobald es benannte Achsteile gibt.
+  // Nur wenn keine Datei als A1..A6 erkennbar ist (alte Einzelteil-Modelle), bleibt A1 als Rueckfall.
+  const hasAxisNames = (state.stls || []).some(f => /a[1-6]$/.test(norm(f.name).replace(/\.(osd|stl)$/i, '')));
+  return (hasAxisNames || state.robotMeta?.template) ? 'Base' : 'A1';
 }
 // Roboter-Strukturteile (Sockel, Gelenke) sind nie Werkzeug – auch wenn ein falscher Werkzeugname gespeichert ist
 const NOT_TOOL_RE = /(^|[\s_\-])(base|podest|sockel|pedestal|joint|link|axis)([\s_\-]*\d*)?($|[\s_\-.])/i;
