@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v50
+//  RobModel — Robot Kinematik Editor  v51
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -1171,7 +1171,7 @@ async function loadSourceZip(file) {
   const hasOsd=(state.stls||[]).some(f=>f.name&&/\.osd$/i.test(f.name));
   state.robotTr=hasOsd?{x:0,y:0,z:0,rx:0,ry:0,rz:0}:defaultRobotTr(); setInputs('r', state.robotTr);
   state.toolTr=defaultToolTr();  setInputs('t', state.toolTr);
-  if (state.xmls[0]) parseXml(new TextDecoder('utf-8').decode(state.buffers.get(state.xmls[0].path)));
+  { const mx = _pickMachineXml(); if (mx) parseXml(mx); }
   setJointAnglesToReferencePose();
   ['rRx','rRy','rRz'].forEach(function(id,i){ const el=document.getElementById(id); if(el) el.value=[90,0,-90][i]; });
   await loadStls(); enableSave(); renderAll(); setView('iso');
@@ -1207,7 +1207,7 @@ async function loadSourceFolder(files) {
   setInputs('r', state.robotTr);
   state.toolTr = defaultToolTr(); setInputs('t', state.toolTr);
 
-  if (state.xmls[0]) parseXml(new TextDecoder('utf-8').decode(state.buffers.get(state.xmls[0].path)));
+  { const mx = _pickMachineXml(); if (mx) parseXml(mx); }
   setJointAnglesToReferencePose();
 
   // Rotation vor loadStls setzen
@@ -1371,12 +1371,53 @@ function parseMachineStateParameters(xml) {
   }
 }
 
+// Maschinen-XML im Ordner/Archiv wählen: bevorzugt die Datei mit Roboter-Vorlage bzw. Maschinenparametern
+function _pickMachineXml() {
+  let best = null, bestScore = -1;
+  for (const f of state.xmls || []) {
+    const buf = state.buffers.get(f.path); if (!buf) continue;
+    const t = new TextDecoder('utf-8').decode(buf);
+    const sc = (/RobotTemplate/.test(t) ? 4 : 0) + (/<RobotSize/.test(t) ? 2 : 0) + (/<MachineStateParameters/.test(t) ? 2 : 0) + (/<ToolData/.test(t) ? 1 : 0);
+    if (sc > bestScore) { best = { f, t }; bestScore = sc; }
+  }
+  if (!best) return null;
+  state._machineXmlName = best.f.name;
+  return best.t;
+}
+
+// Achsmaße aus der ENCY-Roboter-Vorlage (MachineDimensions > RobotSize):
+// A12X/A12Z = A1→A2, A23Z = A2→A3, A34Z = A3→Unterarmachse, A35X = A3→A5, A56X = A5→Flansch, A14Y = seitlicher Versatz.
+// Die Maße gelten in der Nullstellung der Vorlage (Oberarm senkrecht, Unterarm waagerecht nach vorn) –
+// das ist die Referenzpose von RobModel (0,-90,90,0,0,0). Umrechnung ins 0°-System wie beim Gimbal.
+function parseRobotSize(xml) {
+  const rs = xml.querySelector('MachineDimensions > RobotSize') || xml.querySelector('RobotSize');
+  if (!rs) return false;
+  const g = k => { const v = num(direct(rs, k)); return v == null || isNaN(v) ? null : v; };
+  const a12x = g('A12X') ?? 0, a12z = g('A12Z'), a23z = g('A23Z'), a34z = g('A34Z') ?? 0, a35x = g('A35X'), a14y = g('A14Y') ?? 0, a56x = g('A56X') ?? 0;
+  if (a12z == null || a23z == null || a35x == null) return false;
+  const world = [
+    new THREE.Vector3(a12x, 0, a12z),    // A1 → A2
+    new THREE.Vector3(0, 0, a23z),       // A2 → A3
+    new THREE.Vector3(0, a14y, a34z),    // A3 → A4 (auf der Unterarmachse)
+    new THREE.Vector3(a35x, 0, 0),       // A4 → A5
+    new THREE.Vector3(a56x, 0, 0),       // A5 → A6 (Flansch)
+    new THREE.Vector3(0, 0, 0),          // A6
+  ];
+  const tmpl = xml.querySelector('SCType[Type$="RobotTemplate"]')?.getAttribute('Type') || 'RobotSize';
+  state.axisPoints = world.map((w, k) => {
+    const v = worldOffsetToJointOffset(k, w);
+    return { name: 'A' + (k + 1), x: +v.x.toFixed(3), y: +v.y.toFixed(3), z: +v.z.toFixed(3), rx: 0, ry: 0, rz: 0, source: 'XML RobotSize (' + tmpl + ')' };
+  });
+  state.robotSizeXml = { A12X: a12x, A12Z: a12z, A23Z: a23z, A34Z: a34z, A35X: a35x, A14Y: a14y, A56X: a56x, template: tmpl };
+  return true;
+}
+
 function parseXml(text) {
   const xml = new DOMParser().parseFromString(text,'application/xml');
-  state.robotName = state.xmls[0]?.name?.replace(/\.xml$/i,'') || 'Robot';
-  const gotAxis = false; // Achsendpunkte aus XML ignorieren — Skelett bleibt wie es ist
-  // parseAxisPositions(xml);  ← deaktiviert
-  if (/irb\s*4600|4600-40-2_55/i.test(text)) {
+  state.robotName = (state._machineXmlName || state.xmls[0]?.name || '').replace(/\.xml$/i,'') || 'Robot';
+  const gotAxis = parseRobotSize(xml);   // Schwenkpunkte aus RobotSize (falls vorhanden)
+  // parseAxisPositions(xml);  ← alte Heuristik deaktiviert
+  if (!gotAxis && /irb\s*4600|4600-40-2_55/i.test(text)) {
     const mins=[-180,-90,-180,-179,-125,-179], maxs=[180,150,75,179,120,179];
     state.joints.forEach((j,i)=>{j.min=mins[i];j.max=maxs[i];if(!gotAxis){j.offset=defOffset(i);state.axisPoints[i]={...state.axisPoints[i],...defOffset(i),source:'KR8 Zielwert'}}j.status=gotAxis?'XML AxisPos':'vorgeschlagen'});
   }
@@ -1405,7 +1446,29 @@ function cleanTcpOrientation(tcp) {
   if (hasFrac) { tcp.rz=0;tcp.ry=0;tcp.rx=0;return tcp; }
   tcp.rz=raw.rz??0; tcp.ry=raw.ry??0; tcp.rx=raw.rx??0; return tcp;
 }
+// ToolData der Roboter-Vorlage (MachineDimensions > ToolData: X, Y, Z, q1..q4 = Quaternion w,x,y,z)
+function parseToolDataQuat(xml) {
+  const td = xml.querySelector('MachineDimensions > ToolData'); if (!td) return false;
+  const g = k => num(direct(td, k));
+  const q = [g('q1'), g('q2'), g('q3'), g('q4')];
+  if (q.some(v => v == null || isNaN(v))) return false;
+  const quat = new THREE.Quaternion(q[1], q[2], q[3], q[0]).normalize();
+  const e = new THREE.Euler().setFromQuaternion(quat, 'ZYX');      // A = Rz, B = Ry, C = Rx
+  const r = v => Math.abs(v) < 1e-6 ? 0 : +(v * 180 / Math.PI).toFixed(3);
+  const tcp = { x: g('X') ?? 0, y: g('Y') ?? 0, z: g('Z') ?? 0, rz: r(e.z), ry: r(e.y), rx: r(e.x),
+    toolLength: g('ToolLength') ?? 0, toolStl: '', status: 'XML ToolData', quat: { q1: q[0], q2: q[1], q3: q[2], q4: q[3] } };
+  // Werkzeugmodell: ImageFile im Werkzeugblock (ToolBlockEnd), nicht das erste ImageFile der Datei
+  const img = xml.querySelector('ToolBlockEnd > ImageFile') || xml.querySelector('ToolBlock ImageFile');
+  const stem = (img?.getAttribute('DefaultValue') || '').replace(/\\/g, '/').split('/').pop().replace(/\.(osd|stl)$/i, '');
+  const stl = stem ? findStl(stem) : null;
+  state.toolName = stl ? (stl.name || stl) : '';
+  tcp.toolStl = state.toolName;
+  state.tcp.auftragen = tcp; state.tcp.abtragen = { ...tcp, status: 'vorgeschlagen' };
+  return true;
+}
+
 function parseTools(xml) {
+  if (!xml.querySelector('SCType[Type="TAdditiveToolHolder"]') && parseToolDataQuat(xml)) return;
   const sc=[...xml.querySelectorAll('SCType')]; let holder=sc.find(n=>/TAdditiveToolHolder/i.test(n.getAttribute('Type')||''))||sc.find(n=>n.parentElement?.querySelector('ToolData')); if(!holder)return;
   let n=holder.nextElementSibling,toolData=null,img=null;
   while(n&&n.tagName!=='SCType'){if(n.tagName==='ToolData')toolData=n;if(n.tagName==='ImageFile')img=n;n=n.nextElementSibling}
@@ -7273,3 +7336,4 @@ document.addEventListener('keydown', e => {
   else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redoStep(); }
 });
 setTimeout(undoCommit, 1500);
+window._rmDebug = { pivots: () => cumulativeAxisPositions().map(v => [v.x, v.y, v.z].map(n => Math.round(n * 1000) / 1000)), axisPoints: () => state.axisPoints, tcp: () => state.tcp.auftragen, joints: () => state.joints.map(j => [j.min, j.max]), toolName: () => state.toolName };
