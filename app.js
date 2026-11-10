@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v52
+//  RobModel — Robot Kinematik Editor  v53
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -950,7 +950,7 @@ function osdToBinaryStl(arrayBuffer) {
     switch(code) {
       case 0: { const t=view.getInt32(ls,true); if(t<10){cur={t,vx:[],vy:[],vz:[],nx:[],ny:[],nz:[]};prims.push(cur);} break; }
       case 1: {
-        if(cur){ for(let j=0;j<cur.vx.length;j++){const x=cur.vx[j],y=cur.vy[j],z=cur.vz[j];cur.vx[j]=-z;cur.vy[j]=x;cur.vz[j]=y;} for(let j=0;j<cur.nx.length;j++){const x=cur.nx[j],y=cur.ny[j],z=cur.nz[j];cur.nx[j]=-z;cur.ny[j]=x;cur.nz[j]=y;} }
+        if(cur){ /* (x,y,z)->(-z,x,-y): zusammen mit STL-Rotation 90,0,-90 ergibt das exakt die ENCY-Weltkoordinaten (vorher (-z,x,y) = Spiegelung an Y) */ for(let j=0;j<cur.vx.length;j++){const x=cur.vx[j],y=cur.vy[j],z=cur.vz[j];cur.vx[j]=-z;cur.vy[j]=x;cur.vz[j]=-y;} for(let j=0;j<cur.nx.length;j++){const x=cur.nx[j],y=cur.ny[j],z=cur.nz[j];cur.nx[j]=-z;cur.ny[j]=x;cur.nz[j]=-y;} }
         cur=null; break;
       }
       case 2: { snx=view.getFloat32(ls,true);sny=view.getFloat32(ls+4,true);snz=view.getFloat32(ls+8,true); if(cur){cur.nx.push(snx);cur.ny.push(sny);cur.nz.push(snz);} break; }
@@ -1019,7 +1019,7 @@ async function readStlFile(file) {
 
 // ── STL laden ──────────────────────────────────────────────────────
 function partKey(n) {
-  const s = norm(n);
+  const s = norm(n).replace(/\.osd$/i, '');   // A2.osd → a2 (vorher landeten OSD-Dateien A1..A6 alle auf A1)
   const a = s.match(/a([1-6])$/); if (a) return 'A' + a[1];
   const j = s.match(/joint[_ \-]*([1-6])/i); if (j) return 'A' + j[1];
   if (/tool|tcp|meltio/.test(s)) return 'Tool';
@@ -7371,4 +7371,4 @@ document.addEventListener('keydown', e => {
   else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redoStep(); }
 });
 setTimeout(undoCommit, 1500);
-window._rmDebug = { pivots: () => cumulativeAxisPositions().map(v => [v.x, v.y, v.z].map(n => Math.round(n * 1000) / 1000)), axisPoints: () => state.axisPoints, tcp: () => state.tcp.auftragen, joints: () => state.joints.map(j => [j.min, j.max]), toolName: () => state.toolName };
+window._rmDebug = { pivots: () => cumulativeAxisPositions().map(v => [v.x, v.y, v.z].map(n => Math.round(n * 1000) / 1000)), axisPoints: () => state.axisPoints, tcp: () => state.tcp.auftragen, joints: () => state.joints.map(j => [j.min, j.max]), toolName: () => state.toolName, boxes: () => { scene.updateMatrixWorld(true); return [...meshes].map(([k, m]) => { const b = new THREE.Box3().setFromObject(m); return [m.name, [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].map(v => Math.round(v))]; }); } };
