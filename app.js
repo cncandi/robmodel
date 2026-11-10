@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v55
+//  RobModel — Robot Kinematik Editor  v56
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -1110,7 +1110,7 @@ function resetData() {
   meshes.clear();
   state.files=[]; state.stls=[]; state.xmls=[]; state.jsons=[];
   state.buffers=new Map(); state.packageJson=null; state.mode='leer'; state.robotName='';
-  state.jointAngles=[0,-90,90,0,0,0]; state.referencePose=[0,-90,90,0,0,0]; state.angleMap=null;
+  state.jointAngles=[0,-90,90,0,0,0]; state.referencePose=[0,-90,90,0,0,0]; state.angleMap=null; state.robotMeta=null;
   if ($('refPose')) $('refPose').value='0,-90,90,0,0,0'; { const lb=document.getElementById('refPoseLabel'); if(lb) lb.textContent='🎯 Kanonenstellung'; }
   state.robotTr={x:0,y:0,z:0,rx:0,ry:0,rz:0}; state.toolTr={x:0,y:0,z:0,rx:0,ry:0,rz:0};
   state.axisPoints=['A1','A2','A3','A4','A5','A6'].map((name,i)=>({name,...defOffset(i),rx:0,ry:0,rz:0,source:'KR8 Zielwert'}));
@@ -1432,6 +1432,18 @@ function parseRobotSize(xml) {
     const v = worldOffsetToJointOffset(k, w);
     return { name: 'A' + (k + 1), x: +v.x.toFixed(3), y: +v.y.toFixed(3), z: +v.z.toFixed(3), rx: 0, ry: 0, rz: 0, source: 'XML RobotSize (' + tmpl + ')' };
   });
+  // Stammdaten für die Bibliothek (RobLib-Dialog): Name/Marke/Modell aus der Vorlage, Reichweite = A1-Achse bis Handwurzel (A5) gestreckt
+  {
+    const root = xml.querySelector('SCType[Type$="RobotTemplate"]');
+    const caption = (root?.getAttribute('Caption') || direct(root, 'Name') || '').trim();
+    const brands = { abb: 'ABB', kuka: 'KUKA', fanuc: 'FANUC', yaskawa: 'Yaskawa', motoman: 'Yaskawa', staubli: 'Stäubli', comau: 'Comau', kawasaki: 'Kawasaki', nachi: 'Nachi', universal: 'Universal Robots' };
+    const key = Object.keys(brands).find(k => new RegExp('^' + k, 'i').test(tmpl) || new RegExp('^' + k + '\\b', 'i').test(caption));
+    const marke = key ? brands[key] : '';
+    const modell = marke ? caption.replace(new RegExp('^' + marke.replace(/[^a-z0-9]/gi, '.?') + '\\s*', 'i'), '').trim() : caption;
+    const reach = Math.round(a12x + a23z + Math.hypot(a35x, a34z));
+    const dev = (direct(root, 'Developer') || '').trim();
+    state.robotMeta = { name: caption, marke, modell, achsen: 6, reichweite_mm: reach, template: tmpl, developer: dev };
+  }
   state.robotSizeXml = { A12X: a12x, A12Z: a12z, A23Z: a23z, A34Z: a34z, A35X: a35x, A14Y: a14y, A56X: a56x, template: tmpl };
   return true;
 }
@@ -4493,6 +4505,17 @@ function openRoblibModal() {
     }, 'image/jpeg', 0.92);
   } catch(e) { /* kein Screenshot möglich */ }
 
+  // Werte aus der Maschinen-XML ergänzen (nur leere Felder, nur für Roboter/Station)
+  try {
+    const m = state.robotMeta, ty = $('rl-type')?.value;
+    if (m && (ty === 'robot' || ty === 'station')) {
+      const fill = (id, v) => { const el = $(id); if (el && (el.value === '' || el.value == null) && v !== '' && v != null) el.value = v; };
+      if (ty === 'robot' && m.name && (!r || !r.name || (r.type && r.type !== 'robot'))) $('rl-name').value = m.name;   // nicht den Namen eines zuvor geladenen Effektors übernehmen
+      fill('rl-name', m.name); fill('rl-marke', m.marke); fill('rl-modell', m.modell);
+      fill('rl-achsen', m.achsen); fill('rl-reichweite', m.reichweite_mm);
+      const d = $('rl-beschreibung'); if (d && !d.value) d.value = `ENCY-Vorlage ${m.template}${m.developer ? ', Entwickler: ' + m.developer : ''}`;
+    }
+  } catch (e) { console.warn('robotMeta', e); }
   $('roblibModal').style.display = 'flex';
 }
 
