@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v57
+//  RobModel — Robot Kinematik Editor  v58
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -1041,7 +1041,7 @@ function partKey(n) {
   const j = s.match(/joint[_ \-]*([1-6])/i); if (j) return 'A' + j[1];
   if (/tool|tcp|meltio/.test(s)) return 'Tool';
   if (/podest|base/.test(s)) return 'Base';
-  return 'A1';
+  return state.robotMeta?.template ? 'Base' : 'A1';   // ENCY-Archiv: unbekannte Teile (Portal, E-Achsen, Flansch) fest statt an A1
 }
 // Roboter-Strukturteile (Sockel, Gelenke) sind nie Werkzeug – auch wenn ein falscher Werkzeugname gespeichert ist
 const NOT_TOOL_RE = /(^|[\s_\-])(base|podest|sockel|pedestal|joint|link|axis)([\s_\-]*\d*)?($|[\s_\-.])/i;
@@ -1671,10 +1671,9 @@ function buildJson() {
 async function downloadJson() { dl(new Blob([JSON.stringify(buildJson(),null,2)],{type:'application/json'}),zipName(state.robotName)+'.json'); }
 async function downloadZip() {
   const zip=new JSZip(), base=zipName(state.robotName||'RobModel_export');
-  zip.file(base+'.json',JSON.stringify(buildJson(),null,2));
-
-  // Achsen-STLs aus meshes Map
-  exportRobotMeshes(zip, '');
+  // Achsen-STLs aus meshes Map (inkl. Podest/Werkzeug zusammengefasst)
+  const _xi = exportRobotMeshes(zip, '');
+  zip.file(base+'.json',JSON.stringify(applyExportInfo(buildJson(), _xi),null,2));
 
   // Alle weiteren STL-Buffers aus dem State
   const addBuf = (name, buf) => {
@@ -1722,15 +1721,90 @@ function dl(blob,name){const a=document.createElement('a');a.href=URL.createObje
 // RobSimul liest nur *.stl und erwartet die Teile in Weltkoordinaten der Referenzpose (stlRefAngles),
 // die STL-Rotation ist dabei bereits eingerechnet (stlRotation im JSON = 0).
 function exportStlName(n) { return String(n || 'teil').replace(/\\/g, '/').split('/').pop().replace(/\.(stl|osd)$/i, '') + '.stl'; }
-function exportRobotMeshes(zip, prefix) {
-  const saved = (state.jointAngles || []).slice();
-  try {
-    state.jointAngles = parseReferencePose().slice();
-    applyJointRotations(); scene.updateMatrixWorld(true);
-    for (const [, mesh] of meshes) zip.file((prefix || '') + exportStlName(mesh.name), exportBinaryStl(mesh));
-  } finally {
-    state.jointAngles = saved; applyJointRotations(); scene.updateMatrixWorld(true);
+function _fkRefFlange(angles) {
+  // Nachbildung von RobSimul fkAll(): Flansch-Lage (pts[6], rots[6]) in der Referenzpose
+  const r = Math.PI / 180, axes = ['z','y','y','x','y','x'];
+  const rot = new THREE.Matrix4(), pos = new THREE.Vector3();
+  for (let i = 0; i < 6; i++) {
+    const a = (angles[i] || 0) * FK_SIGNS[i] * r;
+    rot.multiply(axes[i] === 'z' ? new THREE.Matrix4().makeRotationZ(a) : axes[i] === 'y' ? new THREE.Matrix4().makeRotationY(a) : new THREE.Matrix4().makeRotationX(a));
+    const o = state.joints[i]?.offset || {};
+    pos.add(new THREE.Vector3(num(o.x) ?? 0, num(o.y) ?? 0, num(o.z) ?? 0).applyMatrix4(rot));
   }
+  return { rot, pos };
+}
+function _meshListOf(root) { const out = []; root?.traverse?.(o => { if (o.isMesh && o.geometry && o.visible !== false) out.push(o); }); return out; }
+// Mehrere Meshes in eine Binär-STL; Welt-Koordinaten, optional danach mit pre (Matrix4) transformiert
+function exportMergedStl(list, pre) {
+  const tris = [];
+  for (const mesh of list) {
+    mesh.updateMatrixWorld(true);
+    const g = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+    g.applyMatrix4(mesh.matrixWorld); if (pre) g.applyMatrix4(pre);
+    tris.push(g);
+  }
+  const count = tris.reduce((n, g) => n + Math.floor(g.getAttribute('position').count / 3), 0);
+  const buf = new ArrayBuffer(84 + count * 50), view = new DataView(buf); view.setUint32(80, count, true);
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3();
+  let off = 84;
+  for (const g of tris) {
+    const pos = g.getAttribute('position'), t = Math.floor(pos.count / 3);
+    for (let i = 0; i < t; i++) { a.fromBufferAttribute(pos, i*3); b.fromBufferAttribute(pos, i*3+1); c.fromBufferAttribute(pos, i*3+2); n.subVectors(c, b).cross(a.clone().sub(b)).normalize(); [n.x,n.y,n.z,a.x,a.y,a.z,b.x,b.y,b.z,c.x,c.y,c.z].forEach(v => { view.setFloat32(off, v, true); off += 4; }); view.setUint16(off, 0, true); off += 2; }
+    g.dispose();
+  }
+  return new Uint8Array(buf);
+}
+// Exportiert alle Roboterteile im RobSimul-Format und liefert die Zuordnung fuer die JSON:
+//  - Achsteile: alle Meshes, die in RobModel an A1..A6 haengen (nicht nur die erste Datei)
+//  - Podest: alle festen Teile (Sockel, Portal, feste Objekte) zusammengefasst in podest.stl (Welt)
+//  - Werkzeug: Werkzeugteile + Endeffektoren zusammengefasst in werkzeug.stl im RobSimul-Flanschsystem
+function exportRobotMeshes(zip, prefix) {
+  prefix = prefix || '';
+  const saved = (state.jointAngles || []).slice(), prevMode = toolMountMode;
+  const info = { stlFiles: {}, pedestal: null, tool: null };
+  try {
+    if (prevMode !== 'a6') setToolMode('a6');
+    const ref = parseReferencePose().slice();
+    state.jointAngles = ref.slice();
+    applyJointRotations(); scene.updateMatrixWorld(true);
+    attachToolToA6(); scene.updateMatrixWorld(true);
+    const fixedList = [], toolList = [], used = new Set();
+    for (const [path, mesh] of meshes) {
+      const file = state.stls.find(f => f.path === path) || { name: mesh.name };
+      let ax = null;
+      for (let p = mesh.parent; p && !ax; p = p.parent) { const gi = axisPivotGroups.indexOf(p); if (gi >= 0 && gi < 6) ax = 'A' + (gi + 1); }
+      if (ax && isTool(file)) ax = null;
+      if (!ax) { (isTool(file) ? toolList : fixedList).push(mesh); continue; }
+      let base = exportStlName(mesh.name).replace(/\.stl$/i, ''), nm = base, k = 2;
+      while (used.has(nm.toLowerCase())) nm = base + '_' + (k++);
+      used.add(nm.toLowerCase());
+      zip.file(prefix + nm + '.stl', exportBinaryStl(mesh));
+      const col = (state.axisStlParts[ax] || []).find(p => norm(p.name) === norm(mesh.name))?.color || ('#' + (mesh.userData.matStd || mesh.material).color.getHexString());
+      (info.stlFiles[ax] = info.stlFiles[ax] || []).push({ name: nm.toLowerCase(), color: col });
+    }
+    (festeGrps || []).forEach(g => fixedList.push(..._meshListOf(g)));
+    (effektorGroups || []).forEach(g => toolList.push(..._meshListOf(g)));
+    if (fixedList.length) { zip.file(prefix + 'podest.stl', exportMergedStl(fixedList)); info.pedestal = 'podest'; }
+    if (toolList.length) {
+      const f = _fkRefFlange(ref);
+      const m = new THREE.Matrix4().copy(f.rot).multiply(new THREE.Matrix4().makeRotationZ(Math.PI)); // RobSimul: rots[6] x Rz(180)
+      m.setPosition(f.pos);
+      zip.file(prefix + 'werkzeug.stl', exportMergedStl(toolList, m.invert())); info.tool = 'werkzeug';
+    }
+  } finally {
+    state.jointAngles = saved; applyJointRotations();
+    if (prevMode !== 'a6') setToolMode(prevMode);
+    scene.updateMatrixWorld(true);
+  }
+  return info;
+}
+function applyExportInfo(cfg, info) {
+  if (!cfg || !info) return cfg;
+  for (const ax of ['A1','A2','A3','A4','A5','A6']) if (info.stlFiles[ax]?.length) cfg.stlFiles[ax] = info.stlFiles[ax];
+  cfg.sceneModels = cfg.sceneModels || {};
+  if (info.pedestal) cfg.sceneModels.pedestal = { px:0, py:0, pz:0, rx:0, ry:0, rz:0, name: info.pedestal };
+  if (info.tool) cfg.sceneModels.tool = { px:0, py:0, pz:0, rx:0, ry:0, rz:0, name: info.tool };
+  return cfg;
 }
 function exportBinaryStl(mesh) {
   scene.updateMatrixWorld(true); mesh.updateMatrixWorld(true);
@@ -4650,9 +4724,7 @@ async function buildComponentZip(type, idx) {
   const zip = new JSZip();
   let cfg = null;
   if(type==='robot'){
-    const prevMode=toolMountMode; if(prevMode!=='world'){detachToolFromA6();scene.updateMatrixWorld(true);}
-    cfg = buildJson();
-    exportRobotMeshes(zip, 'stl/');
+    cfg = applyExportInfo(buildJson(), exportRobotMeshes(zip, 'stl/'));
     state.effektoren.forEach((e,i)=>{ if(e.stlFile?.buf) zip.file(`stl/eff_${i}.stl`,e.stlFile.buf); });
     // Feste Objekte
     (state.festeObjekte||[]).forEach((f,i)=>{ if(f.stlFile?.buf) zip.file(`stl/fix_${i}.stl`,f.stlFile.buf); });
@@ -4667,7 +4739,6 @@ async function buildComponentZip(type, idx) {
       if(s.fixedPart?.buf) zip.file(`stl/rail_fix_${i}.stl`, s.fixedPart.buf);
       if(s.movingPart?.buf) zip.file(`stl/rail_mov_${i}.stl`, s.movingPart.buf);
     });
-    if(prevMode!=='world') attachToolToA6();
   } else if(type==='rail'){
     cfg=buildRailJson(0);
     if(state.schienen[0]) _addStlsToZip(zip,['E'+(state.schienen[0].eNumber||1)]);
@@ -4705,10 +4776,7 @@ async function buildStationJson(zip) {
   const cfg = { type:'station', name:$('rl-name').value.trim()||'Station', components:{} };
 
   if(selected.has('robot') && (state.joints||[]).length){
-    const prevMode=toolMountMode; if(prevMode!=='world'){detachToolFromA6();scene.updateMatrixWorld(true);}
-    cfg.components.robot=buildJson();
-    exportRobotMeshes(zip, 'stl/');
-    if(prevMode!=='world') attachToolToA6();
+    cfg.components.robot=applyExportInfo(buildJson(), exportRobotMeshes(zip, 'stl/'));
   }
   if(selected.has('rail') && state.schienen[0]){
     cfg.components.rail=buildRailJson(0);
@@ -7445,5 +7513,5 @@ document.addEventListener('keydown', e => {
   else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redoStep(); }
 });
 setTimeout(undoCommit, 1500);
-window._rmDebug = { pivots: () => cumulativeAxisPositions().map(v => [v.x, v.y, v.z].map(n => Math.round(n * 1000) / 1000)), axisPoints: () => state.axisPoints, tcp: () => state.tcp.auftragen, joints: () => state.joints.map(j => [j.min, j.max]), toolName: () => state.toolName, exportTest: async () => { const zip = new JSZip(); exportRobotMeshes(zip, 'stl/'); const cfg = buildJson(); const out = {}; for (const [n, f] of Object.entries(zip.files)) { if (f.dir) continue; const b = await f.async('arraybuffer'); const dv = new DataView(b); const t = dv.getUint32(80, true); const mn = [1e9,1e9,1e9], mx = [-1e9,-1e9,-1e9]; for (let i = 0; i < t; i++) for (let v = 0; v < 3; v++) for (let k = 0; k < 3; k++) { const x = dv.getFloat32(84 + i*50 + 12 + v*12 + k*4, true); if (x < mn[k]) mn[k] = x; if (x > mx[k]) mx[k] = x; } out[n] = [...mn, ...mx].map(Math.round); } return { files: out, stlRotation: cfg.stlRotation, stlRefAngles: cfg.stlRefAngles, stlFiles: Object.fromEntries(Object.entries(cfg.stlFiles).map(([k, v]) => [k, v.map(x => x.name)])) }; }, boxes: () => { scene.updateMatrixWorld(true); return [...meshes].map(([k, m]) => { const b = new THREE.Box3().setFromObject(m); return [m.name, [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].map(v => Math.round(v))]; }); } };
+window._rmDebug = { pivots: () => cumulativeAxisPositions().map(v => [v.x, v.y, v.z].map(n => Math.round(n * 1000) / 1000)), axisPoints: () => state.axisPoints, tcp: () => state.tcp.auftragen, joints: () => state.joints.map(j => [j.min, j.max]), toolName: () => state.toolName, exportTest: async () => { const zip = new JSZip(); const cfg = applyExportInfo(buildJson(), exportRobotMeshes(zip, 'stl/')); const out = {}; for (const [n, f] of Object.entries(zip.files)) { if (f.dir) continue; const b = await f.async('arraybuffer'); const dv = new DataView(b); const t = dv.getUint32(80, true); const mn = [1e9,1e9,1e9], mx = [-1e9,-1e9,-1e9]; for (let i = 0; i < t; i++) for (let v = 0; v < 3; v++) for (let k = 0; k < 3; k++) { const x = dv.getFloat32(84 + i*50 + 12 + v*12 + k*4, true); if (x < mn[k]) mn[k] = x; if (x > mx[k]) mx[k] = x; } out[n] = [...mn, ...mx].map(Math.round); } return { files: out, stlRotation: cfg.stlRotation, stlRefAngles: cfg.stlRefAngles, stlFiles: Object.fromEntries(Object.entries(cfg.stlFiles).map(([k, v]) => [k, v.map(x => x.name)])), sceneModels: cfg.sceneModels }; }, boxes: () => { scene.updateMatrixWorld(true); return [...meshes].map(([k, m]) => { const b = new THREE.Box3().setFromObject(m); return [m.name, [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].map(v => Math.round(v))]; }); } };
 window.setJointAnglesToReferencePose = setJointAnglesToReferencePose; window.applyJointRotations = applyJointRotations; window.renderRows = renderRows;   // für onclick im HTML (Kanonenstellung 'Setzen')
