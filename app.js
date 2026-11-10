@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v53
+//  RobModel — Robot Kinematik Editor  v54
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -18,6 +18,14 @@ const qsa = s => [...document.querySelectorAll(s)];
 const num = v => { if (v === null || v === undefined || v === '') return null; const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) ? n : null; };
 const deg = v => THREE.MathUtils.degToRad(Number(v) || 0);
 const fmt = b => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : (b / 1024).toFixed(1) + ' KB';
+// ── Winkelkonvention der Steuerung (z. B. ABB) ↔ RobSimul (KUKA-Konvention) ──────────────
+// kuka = sign * steuerung + offset. ABB (geprüft mit ENCY, IRB 4600): A1, A4, A6 entgegengesetzt, A2 −90°, A3 +90°.
+const ANGLE_MAPS = { ABB: { brand: 'ABB', sign: [-1, 1, 1, -1, 1, -1], offset: [0, -90, 90, 0, 0, 0] } };
+function ctrlToKuka(i, v) { const m = state.angleMap; if (!m || v == null || isNaN(v)) return v; return m.sign[i] * v + m.offset[i]; }
+function kukaToCtrl(i, v) { const m = state.angleMap; if (!m || v == null || isNaN(v)) return v; return (v - m.offset[i]) / m.sign[i]; }
+function ctrlRangeToKuka(i, mn, mx) { const a = ctrlToKuka(i, mn), b = ctrlToKuka(i, mx); return [Math.min(a, b), Math.max(a, b)]; }
+function kukaRangeToCtrl(i, mn, mx) { const a = kukaToCtrl(i, mn), b = kukaToCtrl(i, mx); return [Math.min(a, b), Math.max(a, b)]; }
+const _r3 = v => (v == null || isNaN(v)) ? '' : Math.round(v * 1000) / 1000;
 const norm = s => String(s || '').toLowerCase().replace(/\\/g, '/').split('/').pop().replace(/\.stl$/i, '').trim();
 var _linkTargetAx = null; // Achse im Verknüpfungsmodus (+ Verknüpfung) bzw. '__origin__'
 var _linkLastMesh = null; // zuletzt im Pick-Modus angeklicktes Teil (Entf löscht es)
@@ -63,7 +71,7 @@ const state = {
     axis: ['Rz','Ry','Ry','Rx','Ry','Rx'][i],
     offset: defOffset(i),
     min: null, max: null,
-    rotationSign: [-1,1,1,-1,1,-1][i], status: 'KR8 Zielwert'
+    rotationSign: 1, status: 'KR8 Zielwert'
   })),
   tcp: {
     auftragen: { x: null, y: null, z: null, rz: null, ry: null, rx: null, toolLength: 0, toolStl: '', status: 'manuell' },
@@ -606,7 +614,8 @@ function applyJointRotations() {
   const r = Math.PI / 180;
   const ref = parseReferencePose();
   axisPivotGroups.forEach((g, i) => {
-    const a = ((state.jointAngles[i] || 0) - (ref[i] || 0)) * (num(state.joints[i]?.rotationSign) ?? 1) * r;
+    // Drehsinn wie RobSimul (FK_SIGNS); rotationSign = zusätzliche Umkehr durch den Nutzer (Standard +1)
+    const a = ((state.jointAngles[i] || 0) - (ref[i] || 0)) * FK_SIGNS[i] * (num(state.joints[i]?.rotationSign) ?? 1) * r;
     const v = nominalAxisVec(i);
     g.rotation.set(0, 0, 0);
     if      (v === 'x') g.rotation.x = a;
@@ -1093,7 +1102,7 @@ function resetData() {
   meshes.clear();
   state.files=[]; state.stls=[]; state.xmls=[]; state.jsons=[];
   state.buffers=new Map(); state.packageJson=null; state.mode='leer'; state.robotName='';
-  state.jointAngles=[0,-90,90,0,0,0]; state.referencePose=[0,-90,90,0,0,0];
+  state.jointAngles=[0,-90,90,0,0,0]; state.referencePose=[0,-90,90,0,0,0]; state.angleMap=null;
   if ($('refPose')) $('refPose').value='0,-90,90,0,0,0';
   state.robotTr={x:0,y:0,z:0,rx:0,ry:0,rz:0}; state.toolTr={x:0,y:0,z:0,rx:0,ry:0,rz:0};
   state.axisPoints=['A1','A2','A3','A4','A5','A6'].map((name,i)=>({name,...defOffset(i),rx:0,ry:0,rz:0,source:'KR8 Zielwert'}));
@@ -1365,9 +1374,14 @@ function parseMachineStateParameters(xml) {
     const j = state.joints[i - 1];
     if (!j) continue;
     // Min/Max aus XML: Achsgrenzen übernehmen (Skelett-Positionen bleiben ignoriert)
-    if (mn !== null && !isNaN(mn)) j.min = mn;
-    if (mx !== null && !isNaN(mx)) j.max = mx;
-    if (iv !== null && !isNaN(iv)) state.jointAngles[i - 1] = iv;
+    if (state.angleMap && mn !== null && mx !== null && !isNaN(mn) && !isNaN(mx)) {
+      // Grenzen stehen in Steuerungs-Konvention (z. B. ABB) → intern in RobSimul-Konvention
+      [j.min, j.max] = ctrlRangeToKuka(i - 1, mn, mx);
+    } else {
+      if (mn !== null && !isNaN(mn)) j.min = mn;
+      if (mx !== null && !isNaN(mx)) j.max = mx;
+    }
+    if (iv !== null && !isNaN(iv)) state.jointAngles[i - 1] = ctrlToKuka(i - 1, iv);
   }
 }
 
@@ -1404,6 +1418,7 @@ function parseRobotSize(xml) {
     new THREE.Vector3(0, 0, 0),          // A6
   ];
   const tmpl = xml.querySelector('SCType[Type$="RobotTemplate"]')?.getAttribute('Type') || 'RobotSize';
+  state.angleMap = /^Abb/i.test(tmpl) ? { ...ANGLE_MAPS.ABB, sign: ANGLE_MAPS.ABB.sign.slice(), offset: ANGLE_MAPS.ABB.offset.slice() } : null;
   state.axisPoints = world.map((w, k) => {
     const v = worldOffsetToJointOffset(k, w);
     return { name: 'A' + (k + 1), x: +v.x.toFixed(3), y: +v.y.toFixed(3), z: +v.z.toFixed(3), rx: 0, ry: 0, rz: 0, source: 'XML RobotSize (' + tmpl + ')' };
@@ -1452,10 +1467,20 @@ function parseToolDataQuat(xml) {
   const g = k => num(direct(td, k));
   const q = [g('q1'), g('q2'), g('q3'), g('q4')];
   if (q.some(v => v == null || isNaN(v))) return false;
-  const quat = new THREE.Quaternion(q[1], q[2], q[3], q[0]).normalize();
+  let quat = new THREE.Quaternion(q[1], q[2], q[3], q[0]).normalize();
+  let pos = new THREE.Vector3(g('X') ?? 0, g('Y') ?? 0, g('Z') ?? 0);
+  if (state.angleMap?.brand === 'ABB') {
+    // ABB tool0 (Z = Flanschnormale) → RobSimul-Flansch (X = Flanschnormale): tool0 = Flansch · Ry(90°)
+    // Werkzeugachse: ENCY Z (Spitze → Aufnahme) → KUKA X (Arbeitsrichtung): R_kuka = Ry(90)·R_q·Ry(90)
+    // geprüft mit ENCY (IRB 4600): TCP-Lage bei A4/A5 = 30° stimmt auf 0,1 mm
+    const ry90 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+    pos = pos.applyQuaternion(ry90);
+    quat = ry90.clone().multiply(quat).multiply(ry90);
+  }
   const e = new THREE.Euler().setFromQuaternion(quat, 'ZYX');      // A = Rz, B = Ry, C = Rx
   const r = v => Math.abs(v) < 1e-6 ? 0 : +(v * 180 / Math.PI).toFixed(3);
-  const tcp = { x: g('X') ?? 0, y: g('Y') ?? 0, z: g('Z') ?? 0, rz: r(e.z), ry: r(e.y), rx: r(e.x),
+  const rp = v => Math.abs(v) < 1e-6 ? 0 : +v.toFixed(4);
+  const tcp = { x: rp(pos.x), y: rp(pos.y), z: rp(pos.z), rz: r(e.z), ry: r(e.y), rx: r(e.x),
     toolLength: g('ToolLength') ?? 0, toolStl: '', status: 'XML ToolData', quat: { q1: q[0], q2: q[1], q3: q[2], q4: q[3] } };
   // Werkzeugmodell: ImageFile im Werkzeugblock (ToolBlockEnd), nicht das erste ImageFile der Datei
   const img = xml.querySelector('ToolBlockEnd > ImageFile') || xml.querySelector('ToolBlock ImageFile');
@@ -1525,6 +1550,7 @@ function normalizeKnownOffsets(){if((state.joints||[]).length<2)return;const o=s
 function applyJsonToState(j) {
   if(!j)return;
   state.robotName=j.name||state.robotName;
+  state.angleMap = (j.angleMap && Array.isArray(j.angleMap.sign) && Array.isArray(j.angleMap.offset)) ? { brand: j.angleMap.brand || 'Steuerung', sign: j.angleMap.sign.map(Number), offset: j.angleMap.offset.map(Number) } : null;
   if(Array.isArray(j.stlRefAngles)&&j.stlRefAngles.length===6){state.referencePose=j.stlRefAngles.map(v=>Number(v)||0);if($('refPose'))$('refPose').value=state.referencePose.join(',');}
   if(Array.isArray(j.jointAngles)&&j.jointAngles.length===6)state.jointAngles=j.jointAngles.map(v=>Number(v)||0);
   if(Array.isArray(j.joints)){state.joints=j.joints.map((v,i)=>({name:v.name||('A'+(i+1)),axis:fixedAxisType(i),offset:{x:num(v.offset?.x)??null,y:num(v.offset?.y)??null,z:num(v.offset?.z)??null},min:num(v.min),max:num(v.max),rotationSign:num(v.rotationSign??v.rotationDirection??v.dir)??1,status:v.status||'JSON'}));state.axisPoints=state.joints.map((v,i)=>({name:v.name||('A'+(i+1)),x:num(v.offset?.x),y:num(v.offset?.y),z:num(v.offset?.z),rx:0,ry:0,rz:0,source:'JSON'}));}
@@ -1589,6 +1615,7 @@ function buildJson() {
       max: num(j.max) ??  180
     })),
     stlRefAngles: parseReferencePose(),
+    ...(state.angleMap ? { angleMap: { brand: state.angleMap.brand, sign: state.angleMap.sign, offset: state.angleMap.offset, note: 'Gelenkwinkel/Grenzen in dieser Datei in RobSimul-(KUKA-)Konvention; Steuerung = (kuka - offset) / sign' } } : {}),
     tcp: { x: tcpX??0, y: tcpY??0, z: tcpZ??0, a: tcpA??0, b: tcpB??0, c: tcpC??0 },
     stlFiles,
     sceneModels: {
@@ -1701,7 +1728,7 @@ function simulateAxis(axisIndex){
     applyJointRotations();
     // Winkelfeld in Tabelle live aktualisieren
     var _inp=document.querySelector('[data-joint-angle="'+axisIndex+'"]');
-    if(_inp) _inp.value=value.toFixed(1);
+    if(_inp) _inp.value=kukaToCtrl(axisIndex,value).toFixed(1);
     if(t<1&&state.simulation.active&&state.simulation.axis===axisIndex){state.simulation.raf=requestAnimationFrame(step);}
     else{state.jointAngles=base.slice();state.jointAngles[axisIndex]=startValue;applyJointRotations();state.simulation={active:false,axis:null,raf:null};}
   };
@@ -1726,7 +1753,7 @@ window.setParamTab = setParamTab;
 function renderRows(){
   const ph=$('colPosHeader'), dh=$('colDirHeader');
   if(_paramTab==='l'){if(ph)ph.textContent='mm';if(dh)dh.textContent='Richtung';}
-  else{if(ph)ph.textContent='Winkel °';if(dh)dh.textContent='Dreht';}
+  else{if(ph)ph.textContent=state.angleMap?('Winkel ° ('+state.angleMap.brand+')'):'Winkel °';if(dh)dh.textContent='Dreht';}
   const rail = (state.schienen||[])[0];
 
   if (_paramTab === 'e') {
@@ -1897,13 +1924,13 @@ function renderRows(){
     const col=(parts[0]?.color)||colors[ax]||'#999999';
     return `<tr data-param-row="${i}" class="${i===state.selectedAxis?'sel':''}">
       <td><b>${esc(j.name)}</b></td>
-      <td><input class="angleInput" data-joint-angle="${i}" type="number" step="0.1" value="${state.jointAngles?.[i]??0}"></td>
+      <td><input class="angleInput" data-joint-angle="${i}" type="number" step="0.1" value="${_r3(kukaToCtrl(i, state.jointAngles?.[i]??0))}"></td>
       <td><span class="axisDir">${axisDirectionLabel(i)}</span></td>
       <td><input data-j="${i}" data-f="x" value="${j.offset?.x??''}"></td>
       <td><input data-j="${i}" data-f="y" value="${j.offset?.y??''}"></td>
       <td><input data-j="${i}" data-f="z" value="${j.offset?.z??''}"></td>
-      <td><input data-j="${i}" data-f="min" value="${j.min??''}"></td>
-      <td><input data-j="${i}" data-f="max" value="${j.max??''}"></td>
+      <td><input data-j="${i}" data-f="min" value="${state.angleMap&&j.min!=null&&j.max!=null?_r3(kukaRangeToCtrl(i,j.min,j.max)[0]):(j.min??'')}"></td>
+      <td><input data-j="${i}" data-f="max" value="${state.angleMap&&j.min!=null&&j.max!=null?_r3(kukaRangeToCtrl(i,j.min,j.max)[1]):(j.max??'')}"></td>
       <td><select class="dirSel" data-j="${i}" data-f="rotationSign"><option value="1" ${(num(j.rotationSign)??1)>=0?'selected':''}>+</option><option value="-1" ${(num(j.rotationSign)??1)<0?'selected':''}>−</option></select></td>
       <td><label style="display:inline-block;width:26px;height:22px;border-radius:3px;background:${col};border:1px solid rgba(255,255,255,.25);cursor:pointer;overflow:hidden" title="Farbe ${ax}"><input type="color" data-axis-color="${ax}" value="${col}" style="opacity:0;width:1px;height:1px;position:absolute"></label></td>
       <td><div class="ax-stl-pair"><button class="axis-stl-btn ax-mini" data-ax="${ax}" title="STL/OSD-Datei für ${ax} laden" style="color:${parts.length?'#d8e8f0':'#6a8fa8'}">${parts.length?parts.length+' Part'+(parts.length>1?'s':''):'+ STL'}</button><button class="ax-link-btn ax-mini${_linkTargetAx===ax?' on':''}" data-link-ax="${ax}" title="Teil im Viewport anklicken und ${ax} zuweisen (Esc = Abbrechen)">+ Verknüpfung</button></div></td>
@@ -5479,10 +5506,10 @@ document.addEventListener('wheel', e => {
 
 document.addEventListener('input',e=>{
   const t=e.target;
-  if(t.dataset.jointAngle!==undefined){state.jointAngles[Number(t.dataset.jointAngle)]=num(t.value)||0;applyJointRotations();return;}
+  if(t.dataset.jointAngle!==undefined){const ji=Number(t.dataset.jointAngle);state.jointAngles[ji]=ctrlToKuka(ji,num(t.value)||0);applyJointRotations();return;}
   if(t.dataset.tcp){state.tcp[state.activeTcp][t.dataset.tcp]=['toolStl','status'].includes(t.dataset.tcp)?t.value:num(t.value);renderTcp();}
   if(t.dataset.axisPoint!==undefined){const p=state.axisPoints[Number(t.dataset.axisPoint)],f=t.dataset.axisField;p[f]=num(t.value);p.source='manuell';syncJointsFromAxisPoints();rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();renderRows();}
-  if(t.dataset.j!==undefined){const idx=Number(t.dataset.j),j=state.joints[idx],f=t.dataset.f;if(['x','y','z'].includes(f)){j.offset[f]=num(t.value);state.axisPoints[idx][f]=num(t.value);state.axisPoints[idx].source='manuell';rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();}else if(['min','max'].includes(f))j[f]=num(t.value);else if(f==='rotationSign'){j[f]=num(t.value);applyJointRotations();}else j[f]=t.value;}
+  if(t.dataset.j!==undefined){const idx=Number(t.dataset.j),j=state.joints[idx],f=t.dataset.f;if(['x','y','z'].includes(f)){j.offset[f]=num(t.value);state.axisPoints[idx][f]=num(t.value);state.axisPoints[idx].source='manuell';rebuildRobotKinematics();applyTransforms();updateAxisPointVisuals();}else if(['min','max'].includes(f)){if(state.angleMap){const row=t.closest('tr');const cm=num(row?.querySelector('[data-f="min"]')?.value),cx=num(row?.querySelector('[data-f="max"]')?.value);if(cm!=null&&cx!=null)[j.min,j.max]=ctrlRangeToKuka(idx,cm,cx);else j[f]=ctrlToKuka(idx,num(t.value));}else j[f]=num(t.value);}else if(f==='rotationSign'){j[f]=num(t.value);applyJointRotations();}else j[f]=t.value;}
   // Farb-Picker in Parameterzeile
   // axisColor: handled by Enter/blur (hex text input)
 });
@@ -7287,7 +7314,7 @@ window._toggleMeasureSnap = function() {
 
 // ── Rückgängig / Wiederholen (Lage-Änderungen: Verschieben, Verdrehen, Zahlenwerte) ──────────
 // Schnappschüsse der Lage-Daten; STL-Puffer werden nur referenziert, nicht kopiert.
-const UNDO_KEYS = ['robotTr','toolTr','referencePose','jointAngles','axisPoints','joints','tcp','effektoren','umfElemente','schienen','objekte','positioners','festeObjekte'];
+const UNDO_KEYS = ['angleMap','robotTr','toolTr','referencePose','jointAngles','axisPoints','joints','tcp','effektoren','umfElemente','schienen','objekte','positioners','festeObjekte'];
 const UNDO_MAX = 20;
 let _undoStack = [], _redoStack = [], _undoStable = null, _undoStableJson = '', _undoSig = '';
 function _undoClone(v) {
