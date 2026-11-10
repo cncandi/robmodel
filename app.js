@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v49
+//  RobModel — Robot Kinematik Editor  v50
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -215,6 +215,7 @@ function init3d() {
   transformControls = new TransformControls(camera, renderer.domElement);
   transformControls.addEventListener('dragging-changed', e => {
     controls.enabled = !e.value;
+    if (!e.value) setTimeout(() => window.undoCommit?.(), 0);   // Rückgängig: Gimbal-Ende als Schritt
     if (e.value && _gimbalMode === 'translate' && _gimbalProxy) {
       // Drag-Start: aktuelle Positionen merken
       _proxyStartPos.copy(_gimbalProxy.position);
@@ -7185,3 +7186,90 @@ window._toggleMeasureSnap = function() {
     btn.style.borderColor = _measureSnapEnabled ? 'rgba(37,99,235,.6)' : 'rgba(255,255,255,.15)';
   }
 };
+
+// ── Rückgängig / Wiederholen (Lage-Änderungen: Verschieben, Verdrehen, Zahlenwerte) ──────────
+// Schnappschüsse der Lage-Daten; STL-Puffer werden nur referenziert, nicht kopiert.
+const UNDO_KEYS = ['robotTr','toolTr','referencePose','jointAngles','axisPoints','joints','tcp','effektoren','umfElemente','schienen','objekte','positioners','festeObjekte'];
+const UNDO_MAX = 20;
+let _undoStack = [], _redoStack = [], _undoStable = null, _undoStableJson = '', _undoSig = '';
+function _undoClone(v) {
+  if (v == null || typeof v !== 'object') return v;
+  if (ArrayBuffer.isView(v) || v instanceof ArrayBuffer || v instanceof Map || v instanceof Set || (v.isObject3D)) return v;
+  if (Array.isArray(v)) return v.map(_undoClone);
+  const o = {}; for (const k of Object.keys(v)) o[k] = _undoClone(v[k]); return o;
+}
+function _undoSnap() { const s = {}; UNDO_KEYS.forEach(k => s[k] = _undoClone(state[k])); return s; }
+function _undoJson(s) { return JSON.stringify(s, (k, v) => (v && (ArrayBuffer.isView(v) || v instanceof ArrayBuffer)) ? '#buf' + (v.byteLength || 0) : v); }
+function _undoMeshSig() { return [...meshes.keys()].join('|') + '#' + (state.festeObjekte || []).length; }
+function _undoUpdateUi() {
+  const u = $('undoBtn'), r = $('redoBtn'), ru = $('rib-undo');
+  if (u) u.disabled = !_undoStack.length; if (ru) ru.classList.toggle('dim', !_undoStack.length);
+  if (r) r.disabled = !_redoStack.length;
+}
+// nach jeder abgeschlossenen Änderung aufrufen: legt den vorherigen Stand auf den Stapel
+function undoCommit() {
+  try {
+    const sig = _undoMeshSig();
+    const snap = _undoSnap(), json = _undoJson(snap);
+    if (!_undoStable || sig !== _undoSig) {           // neues Modell / Teile geändert → neu beginnen
+      _undoStable = snap; _undoStableJson = json; _undoSig = sig;
+      if (_undoStack.length || _redoStack.length) { _undoStack = []; _redoStack = []; }
+      _undoUpdateUi(); return;
+    }
+    if (json === _undoStableJson) return;
+    _undoStack.push(_undoStable); if (_undoStack.length > UNDO_MAX) _undoStack.shift();
+    _redoStack = [];
+    _undoStable = snap; _undoStableJson = json;
+    _undoUpdateUi();
+  } catch (e) { console.warn('undoCommit', e); }
+}
+function _undoApply(s) {
+  UNDO_KEYS.forEach(k => { if (k in s) state[k] = _undoClone(s[k]); });
+  setInputs('r', state.robotTr || {}); setInputs('t', state.toolTr || {});
+  if ($('refPose') && Array.isArray(state.referencePose)) $('refPose').value = state.referencePose.join(',');
+  // Gruppen der Komponenten neu aufbauen (Anzahl kann sich geändert haben)
+  [objekteGroups, effektorGroups, umfGroups, festeGrps].forEach(arr => { arr.forEach(g => { if (g && g.parent) g.parent.remove(g); }); arr.length = 0; });
+  (state.festeObjekte || []).forEach((_, i) => rebuildFixMesh(i));
+  _rebuildAllAfterDelete();
+  [renderObjRows, renderPosRows, renderFixRows, renderEffRow, renderUmfRows, renderRailRows].forEach(f => { try { f(); } catch (e) {} });
+  try { if (_gimbalActive && transformControls?.object) transformControls.detach(); } catch (e) {}
+  requestRender();
+}
+function undoStep() {
+  undoCommit();                                       // offene Änderung zuerst sichern
+  if (!_undoStack.length) { _undoToast('Nichts rückgängig zu machen'); return; }
+  const prev = _undoStack.pop();
+  _redoStack.push(_undoStable);
+  _undoApply(prev);
+  _undoStable = prev; _undoStableJson = _undoJson(prev); _undoSig = _undoMeshSig();
+  _undoUpdateUi(); _undoToast(`Rückgängig (noch ${_undoStack.length} Schritt${_undoStack.length === 1 ? '' : 'e'})`);
+}
+function redoStep() {
+  if (!_redoStack.length) { _undoToast('Nichts zu wiederholen'); return; }
+  const next = _redoStack.pop();
+  _undoStack.push(_undoStable);
+  _undoApply(next);
+  _undoStable = next; _undoStableJson = _undoJson(next); _undoSig = _undoMeshSig();
+  _undoUpdateUi(); _undoToast('Wiederholt');
+}
+let _undoToastT = null;
+function _undoToast(t) {
+  let h = document.getElementById('undoToast');
+  if (!h) { h = document.createElement('div'); h.id = 'undoToast'; document.body.appendChild(h); }
+  h.textContent = t; h.style.opacity = '1';
+  clearTimeout(_undoToastT); _undoToastT = setTimeout(() => { h.style.opacity = '0'; }, 1400);
+}
+window.undoStep = undoStep; window.redoStep = redoStep; window.undoCommit = undoCommit;
+// Auslöser: Gimbal-Ende, Feldänderung, Mausrad (verzögert), Klicks auf Buttons
+document.addEventListener('change', () => setTimeout(undoCommit, 0), true);
+let _undoWheelT = null;
+document.addEventListener('wheel', e => { if (e.target?.tagName === 'INPUT') { clearTimeout(_undoWheelT); _undoWheelT = setTimeout(undoCommit, 500); } }, true);
+document.addEventListener('click', e => { if (e.target.closest?.('button')) setTimeout(undoCommit, 60); }, true);
+document.addEventListener('keydown', e => {
+  const t = e.target, inField = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+  if (!(e.ctrlKey || e.metaKey) || inField) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z' && !e.shiftKey) { e.preventDefault(); undoStep(); }
+  else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redoStep(); }
+});
+setTimeout(undoCommit, 1500);

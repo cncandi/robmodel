@@ -200,3 +200,5 @@ body:is(.bg-white,.bg-minimal,.bg-win11) :is(.ax-mini,#applyStlRotBtn,#splitPick
 body:is(.bg-white,.bg-minimal,.bg-win11) :is(.ax-mini,#applyStlRotBtn,#splitPickBtn,#originPickBtn):hover{background:var(--acc)!important;color:#fff!important}
 body:is(.bg-white,.bg-minimal,.bg-win11) :is(.ax-link-btn.on,#splitPickBtn.on,#originPickBtn.on,#fixFromModelBtn.on){background:#ffe2c2!important;border-color:#ff8a00!important;color:#a04400!important}
 body:is(.bg-white,.bg-minimal,.bg-win11) #fixFromModelBtn{color:#1d5fd0!important}
+#undoToast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:3000;background:rgba(10,20,32,.95);border:1px solid var(--acc,#ff8a00);color:#d8e8f0;font:12px monospace;padding:6px 14px;border-radius:4px;pointer-events:none;opacity:0;transition:opacity .25s}
+.rib-btn.dim{opacity:.45}

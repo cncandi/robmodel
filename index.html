@@ -9,7 +9,7 @@
   <script type="importmap">
     {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"}}
   </script>
-  <link rel="stylesheet" href="style.css?v=20261109i">
+  <link rel="stylesheet" href="style.css?v=20261110b">
 
 <style>
 /* ── Menüleiste ──────────────────────────────────────────────── */
@@ -264,7 +264,7 @@ header.top .title    { display: none !important; }
 
   <!-- ─── HEADER ──────────────────────────────────────────────── -->
   <header class="top">
-  <div class="appname"><svg class="ico"><use href="#i-kin"/></svg>RobModel <span>v49</span></div>
+  <div class="appname"><svg class="ico"><use href="#i-kin"/></svg>RobModel <span>v50</span></div>
 
   <nav class="menubar" id="mainMenubar">
 
@@ -291,6 +291,9 @@ header.top .title    { display: none !important; }
     <div class="mnu" id="mnuBearbeiten">
       <button class="mnubtn">Bearbeiten</button>
       <div class="mnudrop">
+        <button id="undoBtn" onclick="window.undoStep?.()">↶ Rückgängig (Strg+Z)</button>
+        <button id="redoBtn" onclick="window.redoStep?.()">↷ Wiederholen (Strg+Y)</button>
+        <div class="mnusep"></div>
         <button id="stlCopyBtn">📋 Kopieren</button>
         <button id="stlPasteBtn">📥 Einfügen</button>
         <button id="stlDeleteBtn">🗑 Löschen</button>
@@ -383,6 +386,8 @@ header.top .title    { display: none !important; }
     <button class="rib-btn" onclick="document.getElementById('sourceZip')?.click()" title="Archiv laden"><svg><use href="#i-archive"/></svg>Archiv</button>
     <button class="rib-btn" onclick="document.getElementById('sourceFolder')?.click()" title="Ordner laden"><svg><use href="#i-folder"/></svg>Ordner</button>
     <button class="rib-btn" id="rib-save" onclick="document.getElementById('downloadZip')?.click()" title="Speichern"><svg><use href="#i-save"/></svg>Speichern</button>
+    <button class="rib-btn dim" id="rib-undo" onclick="window.undoStep?.()" title="Rückgängig (Strg+Z) – Verschieben, Verdrehen, Zahlenwerte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>Zurück</button>
+    <button class="rib-btn" id="rib-redo" onclick="window.redoStep?.()" title="Wiederholen (Strg+Y)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>Vor</button>
     <span class="rib-group-label">Datei</span>
   </div>
   <div class="rib-group" style="padding-bottom:16px">
@@ -1150,7 +1155,7 @@ header.top .title    { display: none !important; }
 
 </div><!-- .wrap -->
 
-<script type="module" src="app.js?v=20261110a"></script>
+<script type="module" src="app.js?v=20261110b"></script>
 <script type="module" src="measure.js?v=20260602s"></script>
 <!-- ── ROBLIB UPLOAD MODAL ──────────────────────────────────── -->
 <div id="roblibModal" class="rl-overlay" style="display:none">
