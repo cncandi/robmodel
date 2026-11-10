@@ -264,7 +264,7 @@ header.top .title    { display: none !important; }
 
   <!-- ─── HEADER ──────────────────────────────────────────────── -->
   <header class="top">
-  <div class="appname"><svg class="ico"><use href="#i-kin"/></svg>RobModel <span>v48</span></div>
+  <div class="appname"><svg class="ico"><use href="#i-kin"/></svg>RobModel <span>v49</span></div>
 
   <nav class="menubar" id="mainMenubar">
 
@@ -405,6 +405,7 @@ header.top .title    { display: none !important; }
     <button class="rib-btn" onclick="document.getElementById('themeBtn')?.click()"      title="Theme"><svg><use href="#i-contrast"/></svg>Theme</button>
     <button class="rib-btn" id="rib-quality" onclick="window.RMGfx?.cycle()" title="Grafikqualität: Standard (schnell), Hoch (Material, Studio-Licht, Schatten), Maximal (zusätzlich Ambient Occlusion und Kantenglättung)"><svg><use href="#i-quality"/></svg><span data-gfx-label>Grafik Hoch</span></button>
     <button class="rib-btn" id="rib-labels" onclick="document.getElementById('axisLabelBtn')?.click()" title="Labels"><svg><use href="#i-tag"/></svg>Labels</button>
+    <button class="rib-btn on" id="rib-skelett" onclick="window.toggleSkeleton?.()" title="Skelett (Achslinien und Gelenkkugeln) ein/aus"><svg><use href="#i-kin"/></svg>Skelett</button>
     <button class="rib-btn" id="rib-roboter" onclick="document.getElementById('robotVisBtn')?.click()" title="Roboter: Stirnkanten schattiert"><svg><use href="#i-eye"/></svg><span id="rib-roboter-label">Roboter</span></button>
     <span class="rib-group-label">Anzeige</span>
   </div>
@@ -1149,7 +1150,7 @@ header.top .title    { display: none !important; }
 
 </div><!-- .wrap -->
 
-<script type="module" src="app.js?v=20261109i"></script>
+<script type="module" src="app.js?v=20261110a"></script>
 <script type="module" src="measure.js?v=20260602s"></script>
 <!-- ── ROBLIB UPLOAD MODAL ──────────────────────────────────── -->
 <div id="roblibModal" class="rl-overlay" style="display:none">

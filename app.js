@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v48
+//  RobModel — Robot Kinematik Editor  v49
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -415,7 +415,10 @@ function setToolMode(mode) {
   });
   if (mode === 'world') detachToolFromA6();
   applyTransforms();
+  // Endeffektoren umhängen (World ↔ A6)
+  (state.effektoren || []).forEach((_, i) => { try { rebuildEffMesh(i); } catch (e) { console.warn('rebuildEffMesh', e); } });
   updateEffTcpMarker();
+  if (typeof requestRender === 'function') requestRender();
 }
 
 function attachToolToA6() {
@@ -1928,7 +1931,9 @@ function rebuildEffMesh(effIdx) {
   const eff=state.effektoren[effIdx]; if(!eff) return;
   if(!effektorGroups[effIdx]) effektorGroups[effIdx]=new THREE.Group();
   const grp=effektorGroups[effIdx];
-  const targetParent=(axisPivotGroups[5])||scene;
+  // 'an World': Endeffektor im Weltursprung (Offset = Lage zum Weltursprung, zum Modellieren);
+  // 'An A6': am Flansch (Offset = Lage zum A6-Flansch). Gleicher Offset in beiden Modi.
+  const targetParent=(toolMountMode==='a6'&&axisPivotGroups[5])?axisPivotGroups[5]:scene;
   if(grp.parent!==targetParent){if(grp.parent)grp.parent.remove(grp);targetParent.add(grp);}
   while(grp.children.length)grp.remove(grp.children[0]);
   const o=eff.offset||{}, deg2=Math.PI/180;
@@ -6896,6 +6901,7 @@ window.toggleSkeleton = function() {
   skeletonSphs.forEach(m => m.visible = _skeletonVisible);
   const btn = document.getElementById('skeletonVisBtn');
   if (btn) btn.classList.toggle('on', _skeletonVisible);
+  document.getElementById('rib-skelett')?.classList.toggle('on', _skeletonVisible);
   if (typeof requestRender === 'function') requestRender();
 };
 
