@@ -264,7 +264,7 @@ header.top .title    { display: none !important; }
 
   <!-- ─── HEADER ──────────────────────────────────────────────── -->
   <header class="top">
-  <div class="appname"><svg class="ico"><use href="#i-kin"/></svg>RobModel <span>v59</span></div>
+  <div class="appname"><svg class="ico"><use href="#i-kin"/></svg>RobModel <span>v60</span></div>
 
   <nav class="menubar" id="mainMenubar">
 
@@ -732,6 +732,17 @@ header.top .title    { display: none !important; }
             <label style="font-size:10px;color:#6a8fa8">Rz °<input id="eff-rz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
           </div>
         </label>
+        <label class="rl-span2" style="font-size:11px;color:#6a8fa8;letter-spacing:.05em">TCP (Werkzeugspitze, vom Flansch wie RobSimul: A=Rz, B=Ry, C=Rx)
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px">
+            <label style="font-size:10px;color:#6a8fa8">X mm<input id="eff-tx" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Y mm<input id="eff-ty" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">Z mm<input id="eff-tz" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">A °<input id="eff-ta" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">B °<input id="eff-tb" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+            <label style="font-size:10px;color:#6a8fa8">C °<input id="eff-tc" type="number" value="0" step="1" style="width:100%;margin-top:2px"></label>
+          </div>
+          <div style="font-size:10px;color:#6a8fa8;margin-top:4px">Spitze per Klick: in der Effektor-Zeile „TCP“ wählen und die Spitze im Modell anklicken. A=B=C=0: Werkzeugachse in Flansch-Normale.</div>
+        </label>
       </div>
       <input type="hidden" id="eff-edit-idx" value="-1">
       <button id="eff-submit" class="rl-submit" style="margin-top:12px">Übernehmen</button>
@@ -1155,7 +1166,7 @@ header.top .title    { display: none !important; }
 
 </div><!-- .wrap -->
 
-<script type="module" src="app.js?v=20261110k"></script>
+<script type="module" src="app.js?v=20261111a"></script>
 <script type="module" src="measure.js?v=20260602s"></script>
 <!-- ── ROBLIB UPLOAD MODAL ──────────────────────────────────── -->
 <div id="roblibModal" class="rl-overlay" style="display:none">

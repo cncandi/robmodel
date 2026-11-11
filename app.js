@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  RobModel — Robot Kinematik Editor  v59
+//  RobModel — Robot Kinematik Editor  v60
 //  app.js — Haupt-Anwendungslogik (ES Module)
 // ═══════════════════════════════════════════════════
 
@@ -290,7 +290,7 @@ function updateEffTcpMarker() {
   if (!showMarker || !scene) return;
   if (toolMountMode === 'a6' && (!axisPivotGroups || !axisPivotGroups[5])) return;
 
-  const eo = state.effektoren[state.activeEff]?.offset || {};
+  const tc = activeTcp();
   const g = new THREE.Group();
 
   // Dicke Achsen als Zylinder (r=4, l=80)
@@ -332,15 +332,13 @@ function updateEffTcpMarker() {
   baseQuat.multiply(zRot);
 
   // User-Offset (im Werkzeugrahmen, additiv)
+  // TCP-Orientierung wie RobSimul: R = Rz(A)·Ry(B)·Rx(C)  (Basis = Ry90 = KUKA-Flansch-KS)
   const offsetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(
-    (eo.rx||0)*Math.PI/180,
-    (eo.ry||0)*Math.PI/180,
-    (eo.rz||0)*Math.PI/180,
-    'XYZ'
+    tc.c*Math.PI/180, tc.b*Math.PI/180, tc.a*Math.PI/180, 'ZYX'
   ));
 
-  // Translation im Werkzeugrahmen: Offset-Vektor mit Basis-Rotation transformieren
-  const localOffset = new THREE.Vector3(eo.x||0, eo.y||0, eo.z||0);
+  // Translation im Werkzeugrahmen: TCP-Vektor mit Basis-Rotation transformieren
+  const localOffset = new THREE.Vector3(tc.x, tc.y, tc.z);
   localOffset.applyQuaternion(baseQuat);
   g.position.copy(localOffset);
   g.quaternion.copy(baseQuat).multiply(offsetQuat);
@@ -1269,20 +1267,29 @@ async function loadJsonFile(file) {
 
 
 // ── TCP ↔ Endeffektor TCP-Offset Sync ──────────────────────────
+// TCP des Effektors in RobSimul-Konvention (vom Flansch, Position im KUKA-Flansch-KS = Ry90 zum A6-Rahmen,
+// Orientierung R = Rz(A)·Ry(B)·Rx(C)). Getrennt von der Anbaulage (offset) des 3D-Modells.
+function getEffTcp(eff) {
+  const t = eff?.tcp; if (t) return { x: +t.x || 0, y: +t.y || 0, z: +t.z || 0, a: +t.a || 0, b: +t.b || 0, c: +t.c || 0 };
+  return { x: 0, y: 0, z: 0, a: 0, b: 0, c: 0 };
+}
+function _tcpFromAuftragen() {
+  const t = state.tcp.auftragen || {};
+  return { x: num(t.x) ?? 0, y: num(t.y) ?? 0, z: num(t.z) ?? 0, a: num(t.rz ?? t.a) ?? 0, b: num(t.ry ?? t.b) ?? 0, c: num(t.rx ?? t.c) ?? 0 };
+}
+// Aktiver TCP fuer Anzeige und Export: Effektor-TCP, sonst Roboter-TCP (z. B. aus ENCY-ToolData)
+function activeTcp() { const e = state.effektoren?.[state.activeEff]; return e ? getEffTcp(e) : _tcpFromAuftragen(); }
 function setEffOffsetFromTcp(tcp) {
-  // tcp.a=Rz, tcp.b=Ry, tcp.c=Rx (RobSimul XYZABC convention)
-  // eff-o fields: x,y,z,rx(=c),ry(=b),rz(=a)
-  const offset = { x: tcp.x??0, y: tcp.y??0, z: tcp.z??0, rx: tcp.c??tcp.rx??0, ry: tcp.b??tcp.ry??0, rz: tcp.a??tcp.rz??0 };
-  if (state.effektoren[state.activeEff]) state.effektoren[state.activeEff].offset = offset;
-  else { state.effektoren.push({ stlFile: null, offset }); state.activeEff = 0; }
+  // tcp.a=Rz, tcp.b=Ry, tcp.c=Rx (RobSimul XYZABC). Setzt nur den TCP, die Anbaulage des Modells bleibt.
+  const t = { x: num(tcp.x) ?? 0, y: num(tcp.y) ?? 0, z: num(tcp.z) ?? 0, a: num(tcp.a ?? tcp.rz) ?? 0, b: num(tcp.b ?? tcp.ry) ?? 0, c: num(tcp.c ?? tcp.rx) ?? 0 };
+  if (state.effektoren[state.activeEff]) state.effektoren[state.activeEff].tcp = t;
+  else { state.effektoren.push({ stlFile: null, offset: { x:0, y:0, z:0, rx:0, ry:0, rz:0 }, tcp: t }); state.activeEff = 0; }
 }
 
 function syncTcpFromActiveEff() {
-  const eo = state.effektoren[state.activeEff]?.offset || {};
+  const t = activeTcp();
   state.tcp.auftragen = { ...state.tcp.auftragen,
-    x: eo.x||0, y: eo.y||0, z: eo.z||0,
-    rx: eo.rx||0, ry: eo.ry||0, rz: eo.rz||0,
-    a: eo.rz||0, b: eo.ry||0, c: eo.rx||0
+    x: t.x, y: t.y, z: t.z, rx: t.c, ry: t.b, rz: t.a, a: t.a, b: t.b, c: t.c
   };
   state.tcp.abtragen = { ...state.tcp.auftragen };
 }
@@ -1584,6 +1591,7 @@ function applyJsonToState(j) {
     state.effektoren = j.endeffektoren.map(e => ({
       stlFile: null,
       offset: { x:e.px||0, y:e.py||0, z:e.pz||0, rx:e.rx||0, ry:e.ry||0, rz:e.rz||0 },
+      ...(e.tcp ? { tcp: { ...e.tcp } } : {}),
       stlName: e.stl || null, name: e.name || null, typ: e.typ || 'auftragend'
     }));
     state.activeEff = 0;
@@ -1626,9 +1634,8 @@ function buildJson() {
   }));
   const tcp = state.tcp.auftragen;
   const toolName = norm(state.toolName || tcp.toolStl || '').replace(/\.osd$/i,'') || 'tool1_tcp';
-  const eo = state.effektoren[state.activeEff]?.offset || {};
-  const tcpX = eo.x??num(tcp.x)??0, tcpY = eo.y??num(tcp.y)??0, tcpZ = eo.z??num(tcp.z)??0;
-  const tcpA = eo.rz??num(tcp.rz)??0, tcpB = eo.ry??num(tcp.ry)??0, tcpC = eo.rx??num(tcp.rx)??0;
+  const _at = activeTcp();   // TCP (Werkzeugspitze), nicht die Anbaulage des Effektor-Modells
+  const tcpX = _at.x, tcpY = _at.y, tcpZ = _at.z, tcpA = _at.a, tcpB = _at.b, tcpC = _at.c;
   const result = {
     name: state.robotName || 'Robot',
     stlRotation: {rx:0, ry:0, rz:0},   // Rotation ist in den exportierten STL bereits enthalten (vorher: ${stlRx},${stlRy},${stlRz})
@@ -1651,7 +1658,7 @@ function buildJson() {
   if (state.effektoren.length > 0) {
     result.endeffektoren = state.effektoren.map((eff, i) => {
       const eo = eff.offset || {};
-      return { name: norm(eff.stlFile?.name || ('Effektor '+(i+1))), stl: 'endeffektor_'+(i+1)+'.stl', typ: eff.typ||'auftragend', px: eo.x||0, py: eo.y||0, pz: eo.z||0, rx: eo.rx||0, ry: eo.ry||0, rz: eo.rz||0 };
+      return { name: norm(eff.stlFile?.name || ('Effektor '+(i+1))), stl: 'endeffektor_'+(i+1)+'.stl', typ: eff.typ||'auftragend', px: eo.x||0, py: eo.y||0, pz: eo.z||0, rx: eo.rx||0, ry: eo.ry||0, rz: eo.rz||0, tcp: getEffTcp(eff) };
     });
   }
   const allUmf = [...(state.umfElemente||[]), ...(state.umfStls||[]).map(u=>({stlFile:u,offset:{x:0,y:0,z:0,rx:0,ry:0,rz:0}}))];
@@ -3865,6 +3872,7 @@ function renderEffRow() {
         <span style="flex:1;font-family:monospace;font-size:12px;color:var(--txt)">🔧 ${e.name||'Endeffektor '+(i+1)}</span>
         <button data-eff-stl="${i}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:${e.stlFile?'#4499cc':'#6a8fa8'};border-radius:3px;padding:1px 6px;cursor:pointer;font-size:11px" title="Basis-STL laden">📁</button>
         <button data-teil-add="${i}" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#4ade80;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:11px" title="Backe / Teil hinzufügen">+ Teil</button>
+        <button data-eff-tcp="${i}" class="${_linkTargetAx==='__tcp__'&&_tcpPickEff===i?'on':''}" style="background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.4);color:#c084fc;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:11px" title="Werkzeugspitze im Modell anklicken (TCP)">TCP</button>
         <button data-eff-edit="${i}" style="background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.4);color:#60a5fa;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:11px">✏️</button>
         <button data-eff-del="${i}" style="background:rgba(204,51,51,.15);border:1px solid rgba(204,51,51,.3);color:#f87171;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:12px">✕</button>
       </div>
@@ -3897,6 +3905,7 @@ function renderEffRow() {
     renderEffRow(); applyTransforms();
   }));
   el.querySelectorAll('[data-eff-edit]').forEach(btn=>btn.addEventListener('click',()=>openEffModal(+btn.dataset.effEdit)));
+  el.querySelectorAll('[data-eff-tcp]').forEach(btn=>btn.addEventListener('click',()=>{ _tcpPickEff=+btn.dataset.effTcp; startLinkPick('__tcp__'); renderEffRow(); }));
 }
 
 var _teAxis='Y+', _teStlBuf=null;
@@ -3987,6 +3996,7 @@ function openEffModal(editIdx) {
   $('eff-height').value= e?.height||300; $('eff-radius').value=e?.radius||80;
   $('eff-x').value=e?.offset?.x||0; $('eff-y').value=e?.offset?.y||0; $('eff-z').value=e?.offset?.z||0;
   $('eff-rx').value=e?.offset?.rx||0;$('eff-ry').value=e?.offset?.ry||0;$('eff-rz').value=e?.offset?.rz||0;
+  { const t=e?getEffTcp(e):{x:0,y:0,z:0,a:0,b:0,c:0}; $('eff-tx').value=t.x; $('eff-ty').value=t.y; $('eff-tz').value=t.z; $('eff-ta').value=t.a; $('eff-tb').value=t.b; $('eff-tc').value=t.c; }
   $('eff-stl-name').textContent=e?.stlFile?.name||'Keine STL gewählt';
   if(e?.stlFile?.buf) _effStlBuf=e.stlFile.buf;
   $('eff-edit-idx').value=editIdx>=0?editIdx:-1;
@@ -4023,11 +4033,15 @@ $('eff-submit')?.addEventListener('click',()=>{
     height:parseFloat($('eff-height').value)||300, radius:parseFloat($('eff-radius').value)||80,
     stlFile: _effStlBuf ? {name:$('eff-name').value+'.stl', buf:_effStlBuf} : (editIdx>=0?state.effektoren[editIdx]?.stlFile:null),
     offset:{x:parseFloat($('eff-x').value)||0,y:parseFloat($('eff-y').value)||0,z:parseFloat($('eff-z').value)||0,
-      rx:parseFloat($('eff-rx').value)||0,ry:parseFloat($('eff-ry').value)||0,rz:parseFloat($('eff-rz').value)||0}
+      rx:parseFloat($('eff-rx').value)||0,ry:parseFloat($('eff-ry').value)||0,rz:parseFloat($('eff-rz').value)||0},
+    tcp:{x:parseFloat($('eff-tx').value)||0,y:parseFloat($('eff-ty').value)||0,z:parseFloat($('eff-tz').value)||0,
+      a:parseFloat($('eff-ta').value)||0,b:parseFloat($('eff-tb').value)||0,c:parseFloat($('eff-tc').value)||0}
   };
+  if(editIdx>=0&&state.effektoren[editIdx]?.teile) entry.teile=state.effektoren[editIdx].teile;
   state.effektoren=state.effektoren||[];
   if(editIdx>=0) state.effektoren[editIdx]=entry; else state.effektoren.push(entry);
   state.activeEff=editIdx>=0?editIdx:state.effektoren.length-1;
+  syncTcpFromActiveEff();
   renderEffRow(); rebuildRobotKinematics(); applyTransforms(); updateEffTcpMarker?.();
   $('effModal').style.display='none';
 });
@@ -5695,9 +5709,22 @@ function startLinkPick(ax) {
   if (ax === '__split__') { _linkUntintAll(); _linkHint('Trennen: Teil anklicken, das aus mehreren Körpern besteht — Esc beendet'); $('splitPickBtn')?.classList.add('on'); return; }
   if (ax === '__fix__') { _linkUntintAll(); _linkHint('Aus Modell lösen: Teil anklicken (z. B. Podest) — wird festes Objekt, einzeln verschiebbar. Esc beendet'); $('fixFromModelBtn')?.classList.add('on'); return; }
   if (ax === '__origin__') { _linkUntintAll(); _linkHint('Auf 0,0,0: Grundkörper des Roboters anklicken — Esc bricht ab'); $('originPickBtn')?.classList.add('on'); return; }
+  if (ax === '__tcp__') { _linkUntintAll(); if (toolMountMode !== 'a6') setToolMode('a6'); _linkHint('TCP: Werkzeugspitze im Modell anklicken — Esc bricht ab'); return; }
   _linkHint(`Verknüpfung ${ax}: Teil anklicken (grün = ${ax} zugeordnet, erneuter Klick hebt auf, Entf löscht) — Esc beendet`);
   renderRows();
   _linkTintAxis(ax);
+}
+var _tcpPickEff = 0;
+// Weltpunkt -> TCP-Position im KUKA-Flansch-KS (RobSimul: p_welt = R6·Ry90·p + P6); Orientierung bleibt
+function setEffTcpFromWorldPoint(ei, pw) {
+  const eff = state.effektoren?.[ei]; if (!eff || !axisPivotGroups[5]) return;
+  scene.updateMatrixWorld(true);
+  const pl = pw.clone().applyMatrix4(axisPivotGroups[5].matrixWorld.clone().invert());
+  const pk = pl.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2));
+  const r = v => Math.abs(v) < 0.05 ? 0 : Math.round(v * 10) / 10;
+  eff.tcp = { ...getEffTcp(eff), x: r(pk.x), y: r(pk.y), z: r(pk.z) };
+  state.activeEff = ei; syncTcpFromActiveEff(); updateEffTcpMarker?.(); requestRender();
+  setTimeout(() => alert(`TCP ${eff.name || 'Endeffektor ' + (ei + 1)}: X ${eff.tcp.x}  Y ${eff.tcp.y}  Z ${eff.tcp.z} mm (vom Flansch, RobSimul-Konvention).\nOrientierung A/B/C bei Bedarf im Effektor-Dialog (✏️) anpassen.`), 30);
 }
 function stopLinkPick() {
   _linkTargetAx = null; _linkDown = null; _linkLastMesh = null; _pickMark(null);
@@ -5792,6 +5819,12 @@ function _linkPickAt(ev) {
   const robot = [...meshes.values()].filter(m => m.visible !== false);
   const unassigned = [..._unassignedMeshes.entries()].map(([n, e]) => { e.mesh.userData._linkName = n; return e.mesh; });
   const fixed = []; (festeGrps || []).forEach(g => g && g.traverse(c => { if (c.isMesh) fixed.push(c); }));
+  if (_linkTargetAx === '__tcp__') {
+    const effm = []; (effektorGroups || []).forEach(g => g && g.traverse(c => { if (c.isMesh) effm.push(c); }));
+    const th = rc.intersectObjects([...effm, ...robot], false).filter(h => h.object.isMesh);
+    if (!th.length) { _linkHint('TCP: kein Teil getroffen — erneut klicken oder Esc'); return; }
+    setEffTcpFromWorldPoint(_tcpPickEff, th[0].point); stopLinkPick(); renderEffRow(); return;
+  }
   const hits = rc.intersectObjects([...robot, ...unassigned, ...(_linkTargetAx === '__split__' ? fixed : [])], false).filter(h => h.object.isMesh);
   if (!hits.length) { _linkHint(`Verknüpfung ${_linkTargetAx}: kein Teil getroffen — erneut klicken oder Esc`); return; }
   const obj = hits[0].object, ax = _linkTargetAx;
@@ -7516,5 +7549,5 @@ document.addEventListener('keydown', e => {
   else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redoStep(); }
 });
 setTimeout(undoCommit, 1500);
-window._rmDebug = { pivots: () => cumulativeAxisPositions().map(v => [v.x, v.y, v.z].map(n => Math.round(n * 1000) / 1000)), axisPoints: () => state.axisPoints, tcp: () => state.tcp.auftragen, joints: () => state.joints.map(j => [j.min, j.max]), toolName: () => state.toolName, exportTest: async () => { const zip = new JSZip(); const cfg = applyExportInfo(buildJson(), exportRobotMeshes(zip, 'stl/')); const out = {}; for (const [n, f] of Object.entries(zip.files)) { if (f.dir) continue; const b = await f.async('arraybuffer'); const dv = new DataView(b); const t = dv.getUint32(80, true); const mn = [1e9,1e9,1e9], mx = [-1e9,-1e9,-1e9]; for (let i = 0; i < t; i++) for (let v = 0; v < 3; v++) for (let k = 0; k < 3; k++) { const x = dv.getFloat32(84 + i*50 + 12 + v*12 + k*4, true); if (x < mn[k]) mn[k] = x; if (x > mx[k]) mx[k] = x; } out[n] = [...mn, ...mx].map(Math.round); } return { files: out, stlRotation: cfg.stlRotation, stlRefAngles: cfg.stlRefAngles, stlFiles: Object.fromEntries(Object.entries(cfg.stlFiles).map(([k, v]) => [k, v.map(x => x.name)])), sceneModels: cfg.sceneModels }; }, boxes: () => { scene.updateMatrixWorld(true); return [...meshes].map(([k, m]) => { const b = new THREE.Box3().setFromObject(m); return [m.name, [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].map(v => Math.round(v))]; }); } };
+window._rmDebug = { pivots: () => cumulativeAxisPositions().map(v => [v.x, v.y, v.z].map(n => Math.round(n * 1000) / 1000)), axisPoints: () => state.axisPoints, tcp: () => state.tcp.auftragen, joints: () => state.joints.map(j => [j.min, j.max]), toolName: () => state.toolName, exportTest: async () => { const zip = new JSZip(); const cfg = applyExportInfo(buildJson(), exportRobotMeshes(zip, 'stl/')); const out = {}; for (const [n, f] of Object.entries(zip.files)) { if (f.dir) continue; const b = await f.async('arraybuffer'); const dv = new DataView(b); const t = dv.getUint32(80, true); const mn = [1e9,1e9,1e9], mx = [-1e9,-1e9,-1e9]; for (let i = 0; i < t; i++) for (let v = 0; v < 3; v++) for (let k = 0; k < 3; k++) { const x = dv.getFloat32(84 + i*50 + 12 + v*12 + k*4, true); if (x < mn[k]) mn[k] = x; if (x > mx[k]) mx[k] = x; } out[n] = [...mn, ...mx].map(Math.round); } return { files: out, stlRotation: cfg.stlRotation, stlRefAngles: cfg.stlRefAngles, stlFiles: Object.fromEntries(Object.entries(cfg.stlFiles).map(([k, v]) => [k, v.map(x => x.name)])), sceneModels: cfg.sceneModels, tcp: cfg.tcp, eff: cfg.endeffektoren }; }, tcpPick: (x, y, z) => { setEffTcpFromWorldPoint(state.activeEff || 0, new THREE.Vector3(x, y, z)); return getEffTcp(state.effektoren[state.activeEff || 0]); }, boxes: () => { scene.updateMatrixWorld(true); return [...meshes].map(([k, m]) => { const b = new THREE.Box3().setFromObject(m); return [m.name, [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].map(v => Math.round(v))]; }); } };
 window.setJointAnglesToReferencePose = setJointAnglesToReferencePose; window.applyJointRotations = applyJointRotations; window.renderRows = renderRows;   // für onclick im HTML (Kanonenstellung 'Setzen')
